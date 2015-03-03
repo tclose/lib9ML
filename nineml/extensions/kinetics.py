@@ -218,7 +218,7 @@ class Constraint(Expression, BaseALObject):
 class ReactionRate(Alias):
 
     def __init__(self, expr):
-        self._rhs = expr
+        self.rhs = expr
         self._reaction = None
 
     def set_reaction(self, reaction):
