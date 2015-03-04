@@ -132,4 +132,4 @@ class Constant(BaseALObject, ExpressionSymbol):
     def set_units(self, units):
         assert self.units == units, \
             "Renaming units with ones that do not match"
-        self.units = units
+        self._units = units

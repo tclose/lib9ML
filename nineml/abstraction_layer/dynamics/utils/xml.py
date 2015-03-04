@@ -180,7 +180,7 @@ class DynamicsClassXMLWriter(ComponentClassXMLWriter):
                      for p in componentclass.event_ports] +
                     [p.accept_visitor(self)
                      for p in componentclass.parameters] +
-                    [componentclass.dynamicsblock.accept_visitor(self)])
+                    [componentclass._main_block.accept_visitor(self)])
         return E('ComponentClass', *elements, name=componentclass.name)
 
     @annotate_xml
@@ -190,7 +190,7 @@ class DynamicsClassXMLWriter(ComponentClassXMLWriter):
                     [r.accept_visitor(self) for r in dynamicsblock.regimes] +
                     [b.accept_visitor(self) for b in dynamicsblock.aliases] +
                     [c.accept_visitor(self) for c in dynamicsblock.constants] +
-                    [c.accept_visitor(self) for c in dynamics.random_variables] +
+                    [c.accept_visitor(self) for c in dynamicsblock.random_variables] +
                     [c.accept_visitor(self) for c in dynamicsblock.piecewises])
         return E('Dynamics', *elements)
 
