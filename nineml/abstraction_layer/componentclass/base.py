@@ -9,7 +9,6 @@ This module provides the base class for these.
 """
 from itertools import chain
 from abc import ABCMeta
-from itertools import chain
 from collections import defaultdict
 from .. import BaseALObject
 import nineml
@@ -87,9 +86,10 @@ class ComponentClass(BaseALObject, TopLevelObject):
     _class_to_member = {Parameter: '_parameters'}
     element_name = 'ComponentClass'
 
-    def __init__(self, name, parameters, main_block):
+    def __init__(self, name, parameters, main_block, url=None):
         ensure_valid_identifier(name)
         BaseALObject.__init__(self)
+        TopLevelObject.__init__(self, url)
         self._name = name
         self._main_block = main_block
         # Turn any strings in the parameter list into Parameters:
@@ -122,9 +122,6 @@ class ComponentClass(BaseALObject, TopLevelObject):
         This function is meant to be useful during code-generation, where an
         name of an element can be replaced with a unique integer value (and
         referenced elsewhere in the code).
-
-        The element would typically be part of the component class, but this
-        is not checked for.
         """
         if key is None:
             try:
@@ -134,6 +131,8 @@ class ComponentClass(BaseALObject, TopLevelObject):
         try:
             return self._indices[key][element]
         except KeyError:
+            assert element in self, ("Element '{}' does not belong to "
+                                     "component".format(element.name))
             if self._indices[key]:
                 index = max(self._indices[key].itervalues()) + 1
             else:
@@ -159,6 +158,47 @@ class ComponentClass(BaseALObject, TopLevelObject):
                 raise NineMLRuntimeError(
                     "Could not remove '{}' from component class as it was not "
                     "found in member dictionary".format(element.name))
+
+    def __getitem__(self, name):
+        for dct in self._all_member_dicts:
+            try:
+                return dct[name]
+            except KeyError:
+                pass
+        raise KeyError("'{}' was not found in '{}' component class"
+                       .format(name, self.name))
+
+    def __contains__(self, element):
+        """
+        Comprehensively checks whether the element belongs to this component
+        class or not. Useful for asserts and unit tests.
+        """
+        if isinstance(element, basestring):
+            try:
+                self[element]
+            except KeyError:
+                return False
+        else:
+            try:
+                dct = self._get_member_dict(element)
+                try:
+                    found = dct[element.name]
+                    assert(found == element)
+                    return True
+                except KeyError:
+                    return False
+            except NineMLInvalidElementTypeException:
+                return self._find_element(element)
+
+    @property
+    def _all_member_dicts(self):
+        return chain(*([m.itervalues() for m in self._class_to_member] +
+                       [m.itervalues()
+                        for m in self._main_block._class_to_member]))
+
+    @property
+    def elements(self):
+        return chain(*(d.itervalues() for d in self._all_member_dicts))
 
     @property
     def parameters(self):
@@ -243,6 +283,7 @@ class ComponentClass(BaseALObject, TopLevelObject):
         self.standardize_unit_dimensions()
         XMLWriter = getattr(nineml.abstraction_layer,
                             self.__class__.__name__ + 'XMLWriter')
+        self.validate()
         return XMLWriter().visit(self)
 
     @classmethod
@@ -278,7 +319,7 @@ class ComponentClass(BaseALObject, TopLevelObject):
                 try:
                     inblock_name = next(
                         d for cls, d in
-                        self._class_to_main_block_member.iteritems()
+                        self._main_block._class_to_member.iteritems()
                         if isinstance(element, cls))
                 except StopIteration:
                     raise NineMLInvalidElementTypeException(
