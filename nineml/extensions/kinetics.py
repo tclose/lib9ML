@@ -12,7 +12,7 @@ from nineml.abstraction_layer.expressions import (
     Expression, Alias, ExpressionSymbol)
 from nineml.abstraction_layer.dynamics.utils.xml import (
     DynamicsClassXMLLoader, DynamicsClassXMLWriter)
-from nineml.annotations import read_annotations
+from nineml.annotations import read_annotations, annotate_xml
 from nineml.abstraction_layer.units import dimensionless
 from nineml.utils import ensure_valid_identifier, expect_single
 from nineml.exceptions import NineMLRuntimeError
@@ -23,7 +23,8 @@ from itertools import chain
 from nineml.abstraction_layer.dynamics import (
     TimeDerivative, Regime, StateVariable)
 import sympy
-
+import nineml
+from nineml.xmlns import E
 
 def inf_check(l1, l2, desc):
     check_list_contain_same_items(l1, l2, desc1='Declared',
@@ -90,6 +91,13 @@ class KineticsClass(DynamicsClass):
     def constraint_variables(self):
         return self._main_block.constraints.iterkeys()
 
+    @annotate_xml
+    def to_xml(self):
+        self.standardize_unit_dimensions()
+        XMLWriter=nineml.extensions.kinetics.KineticsClassXMLWriter
+        self.validate()
+        return XMLWriter().visit(self)
+
 
 class KineticsBlock(DynamicsBlock):
 
@@ -123,9 +131,16 @@ class KineticsBlock(DynamicsBlock):
         # Kinetics specific members
         self.reactions = dict((tuple(sorted((r.from_state, r.to_state))), r)
                                for r in reactions)
-
+  
+        
         self.kinetic_states = dict((a.name, a) for a in kinetic_states)
-        self.constraints = dict((c.state, c) for c in constraints)
+
+
+        if type(constraints[0])==tuple:
+            state=kinetic_states[0]
+            self.constraints = dict((state, c) for c in constraints)
+        else:
+            self.constraints = dict((c.state, c) for c in constraints)
 
         td_rates = {}
         for state in self.kinetic_states:
@@ -367,6 +382,105 @@ class ReverseRate(ReactionRate):
     def name(self):
         return 'ReactionRate__from{}_to{}'.format(self._reaction.to_state,
                                                   self._reaction.from_state)
+
+
+class KineticsClassXMLWriter(DynamicsClassXMLWriter):
+
+    @annotate_xml
+    def visit_componentclass(self, componentclass):
+        elements = ([p.accept_visitor(self)
+                     for p in componentclass.analog_ports] +
+                    [p.accept_visitor(self)
+                     for p in componentclass.event_ports] +
+                    [p.accept_visitor(self)
+                     for p in componentclass.parameters] +
+                    [componentclass._main_block.accept_visitor(self)])
+        return E('ComponentClass', *elements, name=componentclass.name)
+
+    @annotate_xml
+    def visit_dynamicsblock(self, dynamicsblock):
+        elements = ([b.accept_visitor(self)
+                     for b in dynamicsblock.state_variables] +
+                    [r.accept_visitor(self) for r in dynamicsblock.regimes] +
+                    [b.accept_visitor(self) for b in dynamicsblock.aliases] +
+                    [c.accept_visitor(self) for c in dynamicsblock.constants] +
+                    [c.accept_visitor(self) for c in dynamicsblock.random_variables] +
+                    [c.accept_visitor(self) for c in dynamicsblock.piecewises])
+        return E('Dynamics', *elements)
+
+    @annotate_xml
+    def visit_regime(self, regime):
+        nodes = ([node.accept_visitor(self)
+                  for node in regime.time_derivatives] +
+                 [node.accept_visitor(self) for node in regime.on_events] +
+                 [node.accept_visitor(self) for node in regime.on_conditions])
+        return E('Regime', name=regime.name, *nodes)
+
+    @annotate_xml
+    def visit_statevariable(self, state_variable):
+        return E('StateVariable',
+                 name=state_variable.name,
+                 dimension=state_variable.dimension.name)
+
+    @annotate_xml
+    def visit_outputevent(self, event_out):
+        return E('OutputEvent',
+                 port=event_out.port_name)
+
+    @annotate_xml
+    def visit_analogreceiveport(self, port):
+        return E('AnalogReceivePort', name=port.name,
+                 dimension=port.dimension.name)
+
+    @annotate_xml
+    def visit_analogreduceport(self, port):
+        return E('AnalogReducePort', name=port.name,
+                 dimension=port.dimension.name, operator=port.reduce_op)
+
+    @annotate_xml
+    def visit_analogsendport(self, port):
+        return E('AnalogSendPort', name=port.name,
+                 dimension=port.dimension.name)
+
+    @annotate_xml
+    def visit_eventsendport(self, port):
+        return E('EventSendPort', name=port.name)
+
+    @annotate_xml
+    def visit_eventreceiveport(self, port):
+        return E('EventReceivePort', name=port.name)
+
+    @annotate_xml
+    def visit_assignment(self, assignment):
+        return E('StateAssignment',
+                 E("MathInline", assignment.rhs_str),
+                 variable=assignment.lhs)
+
+    @annotate_xml
+    def visit_timederivative(self, time_derivative):
+        return E('TimeDerivative',
+                 E("MathInline", time_derivative.rhs_str),
+                 variable=time_derivative.dependent_variable)
+
+    @annotate_xml
+    def visit_oncondition(self, on_condition):
+        nodes = chain(on_condition.state_assignments,
+                      on_condition.event_outputs, [on_condition.trigger])
+        newNodes = [n.accept_visitor(self) for n in nodes]
+        return E('OnCondition', *newNodes,
+                 target_regime=on_condition._target_regime.name)
+
+    @annotate_xml
+    def visit_trigger(self, trigger):
+        return E('Trigger', E("MathInline", trigger.rhs_str))
+
+    @annotate_xml
+    def visit_onevent(self, on_event):
+        elements = ([p.accept_visitor(self)
+                     for p in on_event.state_assignments] +
+                    [p.accept_visitor(self) for p in on_event.event_outputs])
+        return E('OnEvent', *elements, port=on_event.src_port_name,
+                 target_regime=on_event.target_regime.name)
 
 
 class KineticsClassXMLLoader(DynamicsClassXMLLoader):
