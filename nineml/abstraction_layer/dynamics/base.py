@@ -6,7 +6,6 @@ components definitions of interface and dynamics
 :copyright: Copyright 2010-2013 by the Python lib9ML team, see AUTHORS.
 :license: BSD-3, see LICENSE for details.
 """
-from copy import copy
 from nineml.exceptions import NineMLRuntimeError
 from nineml.abstraction_layer.componentclass.namespace import NamespaceAddress
 from nineml.utils import normalise_parameter_as_list, filter_discrete_types
@@ -334,6 +333,9 @@ class DynamicsClass(ComponentClass, _NamespaceMixin):
     def required_for(self, expressions):
         return DynamicsRequiredDefinitions(self, expressions)
 
+    def _find_element(self, element):
+        return DynamicsElementFinder(element).found_in(self)
+
     def __repr__(self):
         return "<dynamics.DynamicsClass %s>" % self.name
 
@@ -495,7 +497,8 @@ class DynamicsClass(ComponentClass, _NamespaceMixin):
         Returns an iterator over all aliases that are required for analog
         send ports
         """
-        return (a for a in self.aliases if a.name in self.analog_send_ports)
+        return (a for a in self.aliases
+                if a.name in self.analog_send_port_names)
 
     @property
     def flattener(self):
@@ -528,24 +531,8 @@ class DynamicsClass(ComponentClass, _NamespaceMixin):
         return len(self.subnodes) == 0
 
     @property
-    def regime_names(self):
-        return self._main_block._regimes.iterkeys()
-
-    @property
     def alias_names(self):
         return self._main_block._aliases.iterkeys()
-
-    @property
-    def state_variable_names(self):
-        return self._main_block._state_variables.iterkeys()
-
-    @property
-    def num_regimes(self):
-        return len(self._main_block._regimes)
-
-    @property
-    def num_state_variables(self):
-        return len(self._main_block._state_variables)
 
     @property
     def num_aliases(self):
@@ -654,6 +641,7 @@ def inf_check(l1, l2, desc):
 
 from .validators import DynamicsValidator
 from .utils import DynamicsClassInterfaceInferer
-from .utils.visitors import DynamicsRequiredDefinitions
+from .utils.visitors import (DynamicsElementFinder,
+                             DynamicsRequiredDefinitions)
 from .utils.modifiers import (
     DynamicsRenameSymbol, DynamicsAssignIndices)
