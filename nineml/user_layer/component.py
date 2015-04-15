@@ -7,13 +7,13 @@ from nineml.reference import BaseReference
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
 from nineml.xmlns import nineml_namespace
-from operator import and_
 from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_tag, check_units
 from nineml.units import Unit, unitless
 from ..abstraction_layer import (
-    ComponentClass, DynamicsClass, ConnectionRuleClass, RandomDistributionClass)
+    ComponentClass, DynamicsClass, ConnectionRuleClass,
+    RandomDistributionClass)
 from .values import SingleValue, ArrayValue, ExternalArrayValue
 from . import BaseULObject
 from nineml.document import Document
@@ -401,7 +401,7 @@ class Quantity(BaseULObject):
     __metaclass__ = ABCMeta  # Abstract base class
     element_name = 'Quantity'
 
-    defining_attributes = ("name", "value", "units")
+    defining_attributes = ("value", "units")
 
     def __init__(self, value, units=None):
         if not isinstance(value, (int, float, SingleValue, ArrayValue,
@@ -418,7 +418,7 @@ class Quantity(BaseULObject):
         if isinstance(value, (int, float)):
             value = SingleValue(value)
         self._value = value
-        self.units = units
+        self._units = units
 
     def __hash__(self):
         return hash(self.value) ^ hash(self.units)
@@ -433,6 +433,9 @@ class Quantity(BaseULObject):
         return (isinstance(self._value, ArrayValue) or
                 isinstance(self._value, ExternalArrayValue))
 
+    def __iter__(self):
+        return self.value, self.units
+
     @property
     def value(self):
         if self.is_single():
@@ -442,9 +445,16 @@ class Quantity(BaseULObject):
                                      "componentclass type")
 
     @property
+    def units(self):
+        return self._units
+
+    @property
     def quantity(self):
-        """The value of the parameter (magnitude and units)."""
-        return (self.value, self.units)
+        """
+        The value of the parameter (magnitude and units). Useful for derived
+        classes
+        """
+        return Quantity(self.value, self.units)
 
     @property
     def value_array(self):
@@ -459,8 +469,9 @@ class Quantity(BaseULObject):
         if self.is_random():
             return self._value.componentclass
         else:
-            raise NineMLRuntimeError("Cannot access random randomdistribution for "
-                                     "componentclass or single value types")
+            raise NineMLRuntimeError(
+                "Cannot access random randomdistribution for componentclass or"
+                " single value types")
 
     def set_units(self, units):
         if units.dimension != self.units.dimension:
@@ -539,10 +550,23 @@ class Property(Quantity):
     numbers, e.g. a RandomDistribution instance.
     """
     element_name = "Property"
+    defining_attributes = ("_name", "value", "units")
 
-    def __init__(self, name, value, units=None):
+    def __init__(self, name, value=None, units=None, *args):
+        if name is None or value is None:
+            if len(args) == 1:
+                if isinstance(args[0], Quantity):
+                    value, units = args[0]
+                else:
+                    value, units = args[0], None
+            elif len(args) == 2:
+                value, units = args
+            else:
+                assert False, ("Incorrect number of arguments (expected 1-3, "
+                               "found {})".format(len(args)))
         super(Property, self).__init__(value, units)
-        self.name = name
+        assert isinstance(name, basestring)
+        self._name = name
 
     def __hash__(self):
         return hash(self.name) ^ super(Property, self).__hash__()
@@ -556,6 +580,10 @@ class Property(Quantity):
             units = units.replace(u"µ", "u")
         return ("{}(name={}, value={}, units={})"
                 .format(self.element_name, self.name, self.value, units))
+
+    @property
+    def name(self):
+        return self._name
 
     @annotate_xml
     def to_xml(self):
@@ -676,11 +704,15 @@ class ConnectionRule(Component):
 
 class RandomDistribution(Component):
     """
-    Component representing a random number randomdistribution, e.g. normal, gamma,
-    binomial.
+    Component representing a random number randomdistribution, e.g. normal,
+    gamma, binomial.
 
     *Example*::
 
         example goes here
     """
     pass
+
+if __name__ == '__main__':
+    from nineml.units import *
+    prop = Property('test', 10 * mV)
