@@ -48,6 +48,16 @@ class ComponentClassXMLLoader(object):
         return Alias(lhs=name, rhs=rhs)
 
     @read_annotations
+    def load_randomvariable(self, element, **kwargs):  # @UnusedVariable
+        # RandomDistributions are defined in Uncertml (http://uncertml.org)
+        # so have their own reader/writing functions.
+        return RandomVariable(
+            name=element.get('name'),
+            distribution=RandomDistribution.from_xml(
+                expect_single(element.getchildren()), self.document),
+            units=self.document[element.get('units')])
+
+    @read_annotations
     def load_constant(self, element, **kwargs):  # @UnusedVariable
         return Constant(name=element.attrib['name'],
                         value=float(element.attrib['value']),
@@ -102,7 +112,8 @@ class ComponentClassXMLLoader(object):
     tag_to_loader = {
         "Parameter": load_parameter,
         "Alias": load_alias,
-        "Constant": load_constant
+        "Constant": load_constant,
+        "RandomVariable": load_randomvariable
     }
 
 
@@ -135,6 +146,13 @@ class ComponentClassXMLWriter(ComponentVisitor):
         return sorted(
             elements,
             key=lambda e: self.write_order.index(e.tag[len(NINEML):]))
+
+    @annotate_xml
+    def visit_randomvariable(self, randomvariable):
+        return E('RandomVariable',
+                 randomvariable.distribution.to_xml(),
+                 name=randomvariable.name,
+                 units=randomvariable.units.name)
 
 
 from nineml.document import Document

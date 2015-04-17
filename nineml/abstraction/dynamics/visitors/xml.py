@@ -104,23 +104,27 @@ class DynamicsXMLLoader(ComponentClassXMLLoader):
 
     @read_annotations
     def load_oncondition(self, element, **kwargs):  # @UnusedVariable
-        block_names = ('Trigger', 'StateAssignment', 'OutputEvent')
+        block_names = ('Trigger', 'StateAssignment', 'OutputEvent',
+                       'RandomVariable')
         blocks = self._load_blocks(element, block_names=block_names)
         target_regime = element.attrib['target_regime']
         trigger = expect_single(blocks["Trigger"])
         return OnCondition(trigger=trigger,
                            state_assignments=blocks["StateAssignment"],
                            output_events=blocks["OutputEvent"],
+                           random_variables=blocks["RandomVariable"],
                            target_regime=target_regime)
 
     @read_annotations
     def load_onevent(self, element, **kwargs):  # @UnusedVariable
-        block_names = ('StateAssignment', 'OutputEvent')
+        block_names = ('StateAssignment', 'OutputEvent',
+                       'RandomVariable')
         blocks = self._load_blocks(element, block_names=block_names)
         target_regime = element.attrib['target_regime']
         return OnEvent(src_port_name=element.attrib['port'],
                        state_assignments=blocks["StateAssignment"],
                        output_events=blocks["OutputEvent"],
+                       random_variables=blocks["RandomVariable"],
                        target_regime=target_regime)
 
     @read_annotations

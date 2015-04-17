@@ -122,6 +122,9 @@ class NoUnresolvedSymbolsComponentValidator(PerNamespaceComponentValidator):
     def action_constant(self, constant, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
         self.add_symbol(namespace, constant.name)
 
+    def action_randomvariable(self, randomvariable, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
+        self.add_symbol(namespace, randomvariable.name)        
+
 
 class NoDuplicatedObjectsComponentValidator(PerNamespaceComponentValidator):
 
@@ -143,6 +146,9 @@ class NoDuplicatedObjectsComponentValidator(PerNamespaceComponentValidator):
 
     def action_constant(self, constant, **kwargs):  # @UnusedVariable
         self.all_objects.append(constant)
+
+    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
+        self.all_objects.append(randomvariable)        
 
 
 class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
@@ -168,6 +174,9 @@ class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
 
     def action_parameter(self, parameter, **kwargs):  # @UnusedVariable
         self.check_lhssymbol_is_valid(parameter.name)
+
+    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
+        self.check_lhssymbol_is_valid(randomvariable.name)
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable
         self.check_lhssymbol_is_valid(alias.lhs)

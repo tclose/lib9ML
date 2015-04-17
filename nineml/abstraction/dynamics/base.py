@@ -408,6 +408,11 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return len(self._event_receive_ports)
 
     @property
+    def attributes_with_units(self):
+        return chain(super(Dynamics, self).attributes_with_units,
+                     *(t.random_variables for t in self.transitions))
+
+    @property
     def analog_send_ports(self):
         """Returns an iterator over the local |AnalogSendPort| objects"""
         return self._analog_send_ports.itervalues()
