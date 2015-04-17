@@ -35,6 +35,9 @@ class ComponentActionVisitor(ComponentVisitor):
     def visit_constant(self, constant, **kwargs):
         self.action_constant(constant, **kwargs)
 
+    def visit_randomvariable(self, randomvariable, **kwargs):
+        self.action_randomvariable(randomvariable, **kwargs)
+
     def check_pass(self):
         if self.require_explicit_overrides:
             assert False, ("There is an overriding function missing from {}"
@@ -51,6 +54,9 @@ class ComponentActionVisitor(ComponentVisitor):
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable
         self.check_pass()
+        
+    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
+        self.check_pass()        
 
     def action_constant(self, constant, **kwargs):  # @UnusedVariable
         self.check_pass()
