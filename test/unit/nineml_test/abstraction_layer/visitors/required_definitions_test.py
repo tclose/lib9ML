@@ -1,7 +1,10 @@
 import unittest
 from itertools import chain
 from nineml.abstraction.dynamics import (
-    Dynamics, Regime, On, OutputEvent)
+    Dynamics, Regime, On, OutputEvent, StateAssignment)
+from nineml.abstraction import RandomVariable
+from nineml.abstraction.expressions.random import RandomDistribution
+import nineml.units as un
 from nineml.abstraction import Alias
 from nineml.abstraction.ports import AnalogSendPort, AnalogReceivePort
 from nineml.abstraction.expressions import reserved_identifiers
@@ -19,7 +22,14 @@ class DynamicsRequiredDefinitions_test(unittest.TestCase):
                 Regime('dSV1/dt = -SV1 / (P2*t)',
                        'dSV2/dt = A2/t + A3/t + ARP1/t',
                        name='R1',
-                       transitions=On('input', 'SV1 = SV1 + 1'))],
+                       transitions=On(
+                           'input',
+                           do=[StateAssignment('SV1', 'SV1 + 1'),
+                               StateAssignment('SV2', 'r'),
+                               RandomVariable(
+                                   'r', units=un.unitless,
+                                   distribution=RandomDistribution(
+                                       'Gamma', shape=10.0, scale=1.0))]))],
             analog_ports=[AnalogReceivePort('ARP1'),
                           AnalogReceivePort('ARP2'),
                           AnalogSendPort('A1'),

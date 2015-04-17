@@ -6,6 +6,7 @@ docstring goes here
 """
 from lxml import etree  # @UnusedImport
 from lxml.builder import ElementMaker
+from os import path
 
 nineml_namespace = 'http://nineml.net/9ML/1.0'
 NINEML = '{' + nineml_namespace + '}'

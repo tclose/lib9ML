@@ -10,6 +10,7 @@
   <Dimension name="length2" l="2"/>
   <Dimension name="temperature" k="1"/>
   <Dimension name="per_time_voltage" m="-1" l="-2" t="2" i="1"/>
+  <Unit symbol="mV" dimension="voltage" power="-3"/>
   <Dynamics name="HodgkinHuxleyClass">
     <Parameter name="m_alpha_A" dimension="per_time_voltage"/>
     <Parameter name="m_alpha_V0" dimension="voltage"/>
@@ -71,8 +72,14 @@
           <Annotations>
             <Description>Even State assignments can be annotated</Description>
           </Annotations>
-          <MathInline>v + spikeImpulse</MathInline>
+          <MathInline>v + spikeImpulse + r</MathInline>
         </StateAssignment>
+        <RandomVariable name="r" units="mV">
+          <un:NormalDistribution xmlns:un="http://www.uncertml.org/2.0">
+            <un:mean>0.0</un:mean>
+            <un:variance>1.0</un:variance>
+          </un:NormalDistribution>
+        </RandomVariable>
       </OnEvent>
       <OnCondition target_regime="single">
         <Trigger>

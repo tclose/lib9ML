@@ -150,6 +150,9 @@ class NoDuplicatedObjectsComponentValidator(PerNamespaceComponentValidator):
     def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
         self.all_objects.append(randomvariable)        
 
+    def action_randomdistribution(self, randomdistribution, **kwargs):  # @UnusedVariable @IgnorePep8
+        self.all_objects.append(randomdistribution)
+        
 
 class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
         PerNamespaceComponentValidator):
