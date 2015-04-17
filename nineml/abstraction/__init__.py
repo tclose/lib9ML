@@ -23,18 +23,18 @@ import randomdistribution
 import ports
 from .componentclass import Parameter, ComponentClass, NamespaceAddress
 from .expressions import Alias, Expression, Constant
-from .dynamics import (DynamicsClass, Regime,
+from .dynamics import (Dynamics, Regime,
                        OutputEvent, StateAssignment, TimeDerivative,
                        OnCondition, Trigger, StateVariable, OnEvent, On,
                        SpikeOutputEvent)
 from .ports import (AnalogSendPort, AnalogReceivePort,
                     AnalogReducePort, EventSendPort,
                     EventReceivePort, AnalogPort, EventPort, Port)
-from nineml.abstraction.dynamics.utils import flattener as flattening
-from .connectionrule import ConnectionRuleClass
-from .randomdistribution import RandomDistributionClass
-from .dynamics import DynamicsClassXMLLoader, DynamicsClassXMLWriter
+from nineml.abstraction_layer.dynamics.utils import flattener as flattening
+from .connectionrule import ConnectionRule
+from .randomdistribution import RandomDistribution
+from .dynamics import DynamicsXMLLoader, DynamicsXMLWriter
 from .randomdistribution import (
-    RandomDistributionClassXMLLoader, RandomDistributionClassXMLWriter)
-from .connectionrule import (ConnectionRuleClassXMLLoader,
-                             ConnectionRuleClassXMLWriter)
+    RandomDistributionXMLLoader, RandomDistributionXMLWriter)
+from .connectionrule import (ConnectionRuleXMLLoader,
+                             ConnectionRuleXMLWriter)

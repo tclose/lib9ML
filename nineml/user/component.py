@@ -12,8 +12,8 @@ from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_tag, check_units
 from nineml.units import Unit, unitless
-from ..abstraction import (
-    ComponentClass, DynamicsClass, ConnectionRuleClass, RandomDistributionClass)
+from ..abstraction_layer import (
+    ComponentClass, Dynamics, ConnectionRule, RandomDistribution)
 from .values import SingleValue, ArrayValue, ExternalArrayValue
 from . import BaseULObject
 from nineml.document import Document
