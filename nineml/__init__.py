@@ -17,6 +17,5 @@ from .units import Unit, Dimension
 from abstraction import (
     DynamicsClass, ConnectionRuleClass, RandomDistributionClass,
     ComponentClass)
-from user import (
-    Dynamics, ConnectionRule, RandomDistribution, Selection, Population,
-    Projection, Property, Definition, Component)
+from user_layer import (
+    Selection, Population, Projection, Property, Definition, Component)
