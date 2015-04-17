@@ -7,10 +7,11 @@ docstring needed
 
 from ..base import ComponentActionVisitor
 from ...base import ComponentClass, Parameter
-from nineml.abstraction.expressions import Alias, Constant
+from nineml.abstraction.expressions import (
+    Alias, Constant, RandomVariable, RandomDistribution)
 
 
-class TypesComponentValidator(ComponentActionVisitor):    
+class TypesComponentValidator(ComponentActionVisitor):
 
     def __init__(self, component_class):
         super(TypesComponentValidator, self).__init__()
@@ -29,5 +30,8 @@ class TypesComponentValidator(ComponentActionVisitor):
     def action_constant(self, constant, **kwargs):  # @UnusedVariable
         assert isinstance(constant, Constant)
 
-    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
-        assert isinstance(randomvariable, RandomVariable)        
+    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable @IgnorePep8
+        assert isinstance(randomvariable, RandomVariable)
+
+    def action_randomdistribution(self, random_distribution, **kwargs):  # @UnusedVariable @IgnorePep8
+        assert isinstance(random_distribution, RandomDistribution)

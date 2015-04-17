@@ -35,8 +35,12 @@ class ComponentActionVisitor(ComponentVisitor):
     def visit_constant(self, constant, **kwargs):
         self.action_constant(constant, **kwargs)
 
-    def visit_randomvariable(self, randomvariable, **kwargs):
-        self.action_randomvariable(randomvariable, **kwargs)
+    def visit_randomvariable(self, random_variable, **kwargs):
+        self.action_randomvariable(random_variable, **kwargs)
+        self.visit(random_variable.distribution, **kwargs)
+
+    def visit_randomdistribution(self, random_distribution, **kwargs):
+        self.action_randomdistribution(random_distribution, **kwargs)
 
     def check_pass(self):
         if self.require_explicit_overrides:
@@ -60,3 +64,6 @@ class ComponentActionVisitor(ComponentVisitor):
 
     def action_constant(self, constant, **kwargs):  # @UnusedVariable
         self.check_pass()
+
+    def action_randomdistribution(self, random_distribution, **kwargs):  # @UnusedVariable @IgnorePep8
+        self.check_pass()        
