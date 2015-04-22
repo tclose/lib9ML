@@ -27,7 +27,7 @@ from .expressions import (
 from .dynamics import (Dynamics, Regime,
                        OutputEvent, StateAssignment, TimeDerivative,
                        OnCondition, Trigger, StateVariable, OnEvent, On,
-                       SpikeOutputEvent)
+                       SpikeOutputEvent, DynamicsXMLLoader, DynamicsXMLWriter)
 from .ports import (AnalogSendPort, AnalogReceivePort,
                     AnalogReducePort, EventSendPort,
                     EventReceivePort, AnalogPort, EventPort, Port)
@@ -36,6 +36,8 @@ from .connectionrule import ConnectionRule
 from .randomdistribution import RandomDistribution
 from .dynamics import DynamicsXMLLoader, DynamicsXMLWriter
 from .randomdistribution import (
-    RandomDistributionXMLLoader, RandomDistributionXMLWriter)
-from .connectionrule import (ConnectionRuleXMLLoader,
-                             ConnectionRuleXMLWriter)
+    RandomDistribution, RandomDistributionXMLLoader,
+    RandomDistributionXMLWriter)
+from .connectionrule import (
+    ConnectionRule, ConnectionRuleXMLLoader, ConnectionRuleXMLWriter, Number,
+    Mask, Preference, RepeatWhile, WasSelected, NumberSelected, Select)
