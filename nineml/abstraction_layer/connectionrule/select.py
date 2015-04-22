@@ -62,18 +62,18 @@ class RepeatWhile(BaseALObject, Expression):
         """ |VISITATION| """
         return visitor.visit_repeatwhile(self, **kwargs)
 
-    def __init__(self, rhs, levels=1):
+    def __init__(self, rhs, stages=1):
         BaseALObject.__init__(self)
         Expression.__init__(self, rhs)
-        assert isinstance(levels, int)
-        self._levels = levels
+        assert isinstance(stages, int)
+        self._stages = stages
 
     @property
-    def levels(self):
-        return self._levels
+    def stages(self):
+        return self._stages
 
     def __repr__(self):
-        return "RepeatWhile('{}', levels {})".format(self.rhs, self.levels)
+        return "RepeatWhile('{}', stages {})".format(self.rhs, self.stages)
 
 
 class WasSelected(BaseALObject):
@@ -226,7 +226,7 @@ class Select(BaseALObject, MemberContainerObject):
         self._was_selecteds = dict((s.name, s) for s in was_selecteds)
         self._number_selecteds = dict((ns.name, ns) for ns in number_selecteds)
         self._random_variables = dict((rv.name, rv) for rv in random_variables)
-        self._repeat_whiles = dict((rw.levels, rw) for rw in repeat_whiles)
+        self._repeat_whiles = dict((rw.stages, rw) for rw in repeat_whiles)
 
     def __copy__(self):
         return ConnectionRuleCloner(self)
@@ -289,7 +289,7 @@ class Select(BaseALObject, MemberContainerObject):
         return self._repeat_whiles.itervalues()
 
     @property
-    def repeat_while_levels(self):
+    def repeat_while_stages(self):
         return self._repeat_whiles.iterkeys()
 
     @property
