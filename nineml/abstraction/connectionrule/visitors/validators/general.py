@@ -28,7 +28,6 @@ class NoUnresolvedSymbolsConnectionRuleValidator(
     Check that aliases and timederivatives are defined in terms of other
     parameters, aliases, statevariables and ports
     """
-    pass
 
 
 class NoDuplicatedObjectsConnectionRuleValidator(

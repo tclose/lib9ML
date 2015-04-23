@@ -33,6 +33,34 @@ class ConnectionRuleElementFinder(ComponentElementFinder,
                                              require_explicit_overrides=True)
         ComponentElementFinder.__init__(self, element)
 
+    def visit_number(self, number, **kwargs):  # @UnusedVariable
+        if self.element is number:
+            self._found()
+
+    def visit_mask(self, mask, **kwargs):  # @UnusedVariable
+        if self.element is mask:
+            self._found()
+
+    def visit_preference(self, preference, **kwargs):  # @UnusedVariable
+        if self.element is preference:
+            self._found()
+
+    def visit_repeatwhile(self, repeatwhile, **kwargs):  # @UnusedVariable
+        if self.element is repeatwhile:
+            self._found()
+
+    def visit_selected(self, selected, **kwargs):  # @UnusedVariable
+        if self.element is selected:
+            self._found()
+
+    def visit_numberselected(self, numberselected, **kwargs):  # @UnusedVariable @IgnorePep8
+        if self.element is numberselected:
+            self._found()
+
+    def visit_select(self, select, **kwargs):  # @UnusedVariable
+        if self.element is select:
+            self._found()
+
 
 class ConnectionRuleExpressionExtractor(ComponentExpressionExtractor,
                                         ConnectionRuleActionVisitor):

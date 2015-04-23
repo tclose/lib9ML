@@ -13,7 +13,17 @@ from .base import ConnectionRuleActionVisitor
 class ConnectionRuleExpandPortDefinition(ConnectionRuleActionVisitor,
                                          ComponentExpandPortDefinition):
 
-    pass
+    def action_number(self, number, **kwargs):  # @UnusedVariable
+        number.rhs_name_transform_inplace(self.namemap)
+
+    def action_mask(self, mask, **kwargs):  # @UnusedVariable
+        mask.rhs_name_transform_inplace(self.namemap)
+
+    def action_preference(self, preference, **kwargs):  # @UnusedVariable
+        preference.rhs_name_transform_inplace(self.namemap)
+
+    def action_repeatwhile(self, repeatwhile, **kwargs):  # @UnusedVariable
+        repeatwhile.rhs_name_transform_inplace(self.namemap)
 
 
 class ConnectionRuleExpandAliasDefinition(ConnectionRuleActionVisitor,
@@ -24,7 +34,17 @@ class ConnectionRuleExpandAliasDefinition(ConnectionRuleActionVisitor,
     Aliases
     """
 
-    pass
+    def action_number(self, number, **kwargs):  # @UnusedVariable
+        number.rhs_name_transform_inplace(self.namemap)
+
+    def action_mask(self, mask, **kwargs):  # @UnusedVariable
+        mask.rhs_name_transform_inplace(self.namemap)
+
+    def action_preference(self, preference, **kwargs):  # @UnusedVariable
+        preference.rhs_name_transform_inplace(self.namemap)
+
+    def action_repeatwhile(self, repeatwhile, **kwargs):  # @UnusedVariable
+        repeatwhile.rhs_name_transform_inplace(self.namemap)
 
 
 class ConnectionRuleCloner(ComponentCloner):
@@ -35,5 +55,14 @@ class ConnectionRuleCloner(ComponentCloner):
             name=component_class.name,
             parameters=[p.accept_visitor(self, **kwargs)
                         for p in component_class.parameters],
-            standard_libary=component_class.standard_library)
+            analog_ports=[p.accept_visitor(self, **kwargs)
+                          for p in component_class.analog_ports],
+            event_ports=[p.accept_visitor(self, **kwargs)
+                         for p in component_class.event_ports],
+            select=component_class.select.accept_visitor(self),
+            aliases=[
+                a.accept_visitor(self, **kwargs)
+                for a in component_class.aliases],
+            constants=[c.accept_visitor(self, **kwargs)
+                       for c in component_class.constants])
         return ccn

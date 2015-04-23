@@ -139,6 +139,15 @@ class EventPort(Port):
         return isinstance(port, AnalogPort)
 
 
+class PropertyPort(DimensionedPort):
+    """AnalogPort
+
+    An |AnalogPort| represents a continuous input or output to/from a
+    Component. For example, this could be the membrane-voltage into a synapse
+    component, or the current provided by a ion-channel.
+    """
+
+
 class AnalogSendPort(AnalogPort, SendPort):
     """AnalogSendPort
 
@@ -165,6 +174,20 @@ class AnalogReceivePort(AnalogPort, ReceivePort):
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
         return visitor.visit_analogreceiveport(self, **kwargs)
+
+
+class PropertyReceivePort(PropertyPort, ReceivePort):
+    """AnalogReceivePort
+
+    An |AnalogReceivePort| represents a continuous input to a
+    Component. For example, this could be the membrane-voltage into a synapse
+    component, or the current provided by a ion-channel.
+
+    """
+
+    def accept_visitor(self, visitor, **kwargs):
+        """ |VISITATION| """
+        return visitor.visit_propertyreceiveport(self, **kwargs)
 
 
 class EventSendPort(EventPort, SendPort):

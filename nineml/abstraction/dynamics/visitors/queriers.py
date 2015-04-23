@@ -74,6 +74,14 @@ class DynamicsRequiredDefinitions(ComponentRequiredDefinitions,
     def state_variable_names(self):
         return (r.name for r in self.state_variables)
 
+    def action_analogreceiveport(self, port, **kwargs):  # @UnusedVariable
+        if self._is_required(port):
+            self.ports.add(port)
+
+    def action_analogreduceport(self, port, **kwargs):  # @UnusedVariable
+        if self._is_required(port):
+            self.ports.add(port)
+
 
 class DynamicsElementFinder(ComponentElementFinder, DynamicsActionVisitor):
 

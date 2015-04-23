@@ -76,9 +76,9 @@ class RepeatWhile(BaseALObject, Expression):
         return "RepeatWhile('{}', stages {})".format(self.rhs, self.stages)
 
 
-class WasSelected(BaseALObject):
+class Selected(BaseALObject):
 
-    """WasSelected
+    """Selected
     """
 
     defining_attributes = ('_name', '_scope')
@@ -96,7 +96,7 @@ class WasSelected(BaseALObject):
             ``NineMLRuntimeException`` will be raised.
 
         """
-        super(WasSelected, self).__init__()
+        super(Selected, self).__init__()
         self._name = name.strip()
         self._scope = scope
         ensure_valid_identifier(self._name)
@@ -110,11 +110,11 @@ class WasSelected(BaseALObject):
         return self._scope
 
     def __str__(self):
-        return 'WasSelected( name: {}, scope: {} )'.format(self.name,
+        return 'Selected(name: {}, scope: {} )'.format(self.name,
                                                            self.scope)
 
     def __repr__(self):
-        return "WasSelected(name='{}', scope='{}')".format(self.name,
+        return "Selected(name='{}', scope='{}')".format(self.name,
                                                            self.scope)
 
 
@@ -171,7 +171,7 @@ class Select(BaseALObject, MemberContainerObject):
                            '_was_selecteds', '_number_selecteds',
                            '_random_variables', '_select',
                            '_repeat_while')
-    class_to_member_dict = {WasSelected: '_was_selecteds',
+    class_to_member_dict = {Selected: '_was_selecteds',
                             NumberSelected: '_number_selecteds',
                             RandomVariable: '_random_variables',
                             RepeatWhile: '_repeat_whiles'}
@@ -187,7 +187,7 @@ class Select(BaseALObject, MemberContainerObject):
 
         :param was_selecteds: A list of the state-assignments performed
             when this transition occurs. Objects in this list are either
-            `string` (e.g A = A+13) or |WasSelected| objects.
+            `string` (e.g A = A+13) or |Selected| objects.
         :param number_selecteds: A list of |NumberSelected| objects emitted
             when this transition occurs.
         :param target_regime_name: The name of the regime to go into after this
@@ -212,7 +212,7 @@ class Select(BaseALObject, MemberContainerObject):
         self._preference = preference
         self._select = select
 
-        # Load state-assignment objects as strings or WasSelected objects
+        # Load state-assignment objects as strings or Selected objects
         was_selecteds = normalise_parameter_as_list(was_selecteds)
         number_selecteds = normalise_parameter_as_list(number_selecteds)
         random_variables = normalise_parameter_as_list(random_variables)

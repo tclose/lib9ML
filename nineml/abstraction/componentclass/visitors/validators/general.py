@@ -178,7 +178,7 @@ class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
     def action_parameter(self, parameter, **kwargs):  # @UnusedVariable
         self.check_lhssymbol_is_valid(parameter.name)
 
-    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
+    def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable @IgnorePep8
         self.check_lhssymbol_is_valid(randomvariable.name)
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable

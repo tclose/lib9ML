@@ -13,6 +13,7 @@ docstring goes here
 :license: BSD-3, see LICENSE for details.
 """
 from ..componentclass import ComponentClass
+from nineml.abstraction_layer.ports import PropertyReceivePort
 
 
 class ConnectionRule(ComponentClass):
@@ -20,7 +21,8 @@ class ConnectionRule(ComponentClass):
     element_name = 'ConnectionRule'
     defining_attributes = ('name', '_parameters', '_select', '_constants',
                            '_aliases')
-   
+    class_to_member_dict = {PropertyReceivePort: '_property_receive_ports'}
+
     def __init__(self, name, select, parameters=None, constants=None,
                  aliases=None):
         super(ConnectionRule, self).__init__(
@@ -28,6 +30,22 @@ class ConnectionRule(ComponentClass):
             constants=constants)
         self._select = select
 
+    @property
+    def select(self):
+        return self._select
+
+    @property
+    def property_receive_ports(self):
+        return self._property_receive_ports.itervalues()
+
+    @property
+    def property_receive_port_names(self):
+        return self._property_receive_ports.iterkeys()
+
+    def property_receive_port(self, name):
+        return self._property_receive_ports[name]
+
+    @property
     def selects(self):
         """
         Iterate through nested select statements
@@ -39,11 +57,6 @@ class ConnectionRule(ComponentClass):
             yield select
         else:
             raise StopIteration
-        self._standard_library = standard_library
-
-    @property
-    def standard_library(self):
-        return self._standard_library
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
