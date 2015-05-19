@@ -4,6 +4,7 @@ import sympy
 from sympy.parsing.sympy_parser import (
     parse_expr as sympy_parse, standard_transformations, convert_xor)
 from sympy.parsing.sympy_tokenize import NAME, OP
+from sympy.functions.elementary.piecewise import Piecewise, ExprCondPair
 import operator
 import re
 from nineml.exceptions import NineMLMathParseError
@@ -58,7 +59,11 @@ class Parser(object):
             # cases
             expr = sympy.Symbol(expr)
         elif isinstance(expr, basestring):
-            return self._parse_expr(expr)
+            # Check to see whether expression contains a ternary op.
+            if '?' in expr:
+               return Piecewise(self._split_into_piecies(expr))
+            else:
+               return self._parse_expr(expr)
         else:
             raise TypeError("Cannot convert value '{}' of type '{}' to "
                             " SymPy expression".format(repr(expr),
