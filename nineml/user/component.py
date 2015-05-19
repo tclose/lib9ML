@@ -7,13 +7,11 @@ from nineml.reference import BaseReference
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
 from nineml.xmlns import nineml_namespace
-from operator import and_
 from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
-from nineml.utils import expect_single, check_tag, check_units
+from nineml.utils import expect_single, check_units
 from nineml.units import Unit, unitless
-from ..abstraction_layer import (
-    ComponentClass, Dynamics, ConnectionRule, RandomDistribution)
+from ..abstraction_layer import ComponentClass
 from .values import SingleValue, ArrayValue, ExternalArrayValue
 from . import BaseULObject
 from nineml.document import Document
@@ -443,8 +441,9 @@ class Quantity(BaseULObject):
         if self.is_random():
             return self._value.componentclass
         else:
-            raise NineMLRuntimeError("Cannot access random randomdistribution for "
-                                     "component_class or single value types")
+            raise NineMLRuntimeError("Cannot access random randomdistribution "
+                                     "for component_class or single value "
+                                     "types")
 
     def set_units(self, units):
         if units.dimension != self.units.dimension:
@@ -639,32 +638,32 @@ class InitialValueSet(PropertySet):
         return cls(*initial_values)
 
 
-# class Dynamics(Component):
-# 
-#     def check_initial_values(self):
-#         for var in self.definition.componentclass.state_variables:
-#             try:
-#                 initial_value = self.initial_values[var.name]
-#             except KeyError:
-#                 raise Exception("Initial value not specified for %s" %
-#                                 var.name)
-#             check_units(initial_value.units, var.dimension)
-# 
-# 
-# class ConnectionRule(Component):
-#     """
-#     docstring needed
-#     """
-#     pass
-# 
-# 
-# class RandomDistribution(Component):
-#     """
-#     Component representing a random number randomdistribution, e.g. normal,
-#     gamma, binomial.
-# 
-#     *Example*::
-# 
-#         example goes here
-#     """
-#     pass
+class DynamicsProperties(Component):
+
+    def check_initial_values(self):
+        for var in self.definition.componentclass.state_variables:
+            try:
+                initial_value = self.initial_values[var.name]
+            except KeyError:
+                raise Exception("Initial value not specified for %s" %
+                                var.name)
+            check_units(initial_value.units, var.dimension)
+
+
+class ConnectionRuleProperties(Component):
+    """
+    docstring needed
+    """
+    pass
+
+
+class RandomDistributionProperties(Component):
+    """
+    Component representing a random number randomdistribution, e.g. normal,
+    gamma, binomial.
+
+    *Example*::
+
+        example goes here
+    """
+    pass
