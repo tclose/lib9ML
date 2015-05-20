@@ -1,5 +1,5 @@
 from __future__ import division
-from itertools import chain, izip
+from itertools import chain, izip, izip_longest
 import sympy
 from sympy.parsing.sympy_parser import (
     parse_expr as sympy_parse, standard_transformations, convert_xor)
@@ -168,11 +168,62 @@ class Parser(object):
         """
         return self._preprocess(tokens)
 
+    def _split_pieces(self, expr):
+        if '?' in expr:
+            cond, remaining = expr.split('?', 1)
+            try:
+                if remaining.index('?') < remaining.find(':'):
+                    raise NineMLMathParseError(
+                        "Nested ternary statements are only permitted in the "
+                        "second branch of the enclosing ternary statement: {}"
+                        .format(expr))
+            except ValueError:
+                pass  # If there are no more '?'s in the expression
+            try:
+                subexpr, remaining = remaining.split(':', 1)
+            except ValueError:
+                raise NineMLMathParseError(
+                    "Missing ':' in ternary statement: {}".format(expr))
+            # Concatenate sub expressions of the piecewise.
+            pieces = ([(self._parse_expr(subexpr), self._parse_expr(cond))] +
+                      self._split_pieces(remaining))
+        else:
+            pieces = [(self._parse_expr(expr), True)]
+        return pieces
+
     @classmethod
     def valid_identifier(cls, expr, safe_symbols=set([])):
         if expr in reserved_identifiers - safe_symbols:
             return False
         return cls._valid_identifier_re.match(expr)
+
+    @classmethod
+    def _parse_equalities(cls, expr):
+        """
+        Escapes '==' operators which aren't interpreted as equalities in Sympy
+        and temporarily replaces them with '__equals__', which is reverted to
+        SymPy's Eq after the variable name escaping is performed.
+        """
+        if '==' in expr:
+            parts = cls._logical_ops_re.split(expr)
+            expr = ''
+            for sub_expr, op in izip_longest(parts[::2], parts[1::2],
+                                             fillvalue=None):
+                if '==' in sub_expr:
+                    sub_expr = sub_expr.strip()
+                    if len(parts) > 1:
+                        if not (sub_expr.startswith('(') and
+                                sub_expr.endswith(')')):
+                            raise NineMLMathParseError(
+                                "Sub expressions need to be enclosed in "
+                                "parenthesis: {}".format(expr))
+                        sub_expr = sub_expr[1:-1]
+                    # Can't use 'Eq' here as it will be escaped, so start off
+                    # with an escaped name and change it back.
+                    expr += '__equals__({}, {})'.format(*sub_expr.split('=='))
+                    if op is not None:
+                        expr += op
+        return expr
 
     @classmethod
     def _escape(self, s):

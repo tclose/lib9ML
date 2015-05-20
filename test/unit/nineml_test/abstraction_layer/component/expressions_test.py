@@ -4,7 +4,7 @@ from nineml.abstraction import (Expression,
                                       Alias, StateAssignment, TimeDerivative)
 from nineml.abstraction.expressions import (
     ExpressionWithSimpleLHS, Constant)
-from nineml.abstraction.expressions.parser import Parser
+from sympy.functions import Piecewise
 from nineml.exceptions import NineMLMathParseError
 from nineml.units import coulomb, S_per_cm2, mV
 from nineml.abstraction.componentclass.visitors.xml import (
@@ -183,6 +183,20 @@ class AnsiC89ToSympy_test(unittest.TestCase):
     def test_triple_negation(self):
         expr = Expression('!!!a')
         self.assertEqual(expr.rhs, sympy.Not(self.a))
+
+    def test_ternary_simple(self):
+        expr = Expression('a < b ? c : d')
+        self.assertEqual(
+            expr.rhs, Piecewise((self.c, sympy.Lt(self.a, self.b)),
+                                (self.d, True)))
+
+    def test_ternary_nested(self):
+        expr = Expression('a < b ? c : d > e ? f : g == h ? i : j')
+        self.assertEqual(
+            expr.rhs, Piecewise((self.c, sympy.Lt(self.a, self.b)),
+                                (self.f, sympy.Gt(self.d, self.e)),
+                                (self.i, sympy.Eq(self.g, self.h)),
+                                (self.j, True)))
 
 
 class SympyToC89_test(unittest.TestCase):
