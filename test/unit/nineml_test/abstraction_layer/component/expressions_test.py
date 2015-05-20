@@ -251,6 +251,33 @@ class SympyToC89_test(unittest.TestCase):
         expr = Expression(sympy.Not(self.a))
         self.assertEqual(expr.rhs_cstr, '!a')
 
+    def test_ternary_simple(self):
+        expr = Expression(Piecewise((self.c, sympy.Lt(self.a, self.b)),
+                                    (self.d, True)))
+        self.assertEqual(expr.rhs_cstr, '((a < b) ? (\n   c\n)\n: (\n   d\n))')
+
+    def test_ternary_nested(self):
+        expr = Expression(Piecewise((self.c, sympy.Lt(self.a, self.b)),
+                                    (self.f, sympy.Gt(self.d, self.e)),
+                                    (self.i, sympy.Eq(self.g, self.h)),
+                                    (self.j, True)))
+        self.assertEqual(
+            expr.rhs_cstr, ('((a < b) ? (\n   c\n)\n: ((d > e) ? (\n   '
+                            'f\n)\n: ((g == h) ? (\n   i\n)\n: (\n   j\n))))'))
+
+
+    def test_ternary_bad(self):
+        self.assertRaises(NineMLMathParseError,
+                          Expression, 'a < b ? (c ? d : e) : f')
+
+    def test_ternary_nested(self):
+        expr = Expression('a < b ? c : d > e ? f : g == h ? i : j')
+        self.assertEqual(
+            expr.rhs, Piecewise((self.c, sympy.Lt(self.a, self.b)),
+                                (self.f, sympy.Gt(self.d, self.e)),
+                                (self.i, sympy.Eq(self.g, self.h)),
+                                (self.j, True)))
+
 
 class Rationals_test(unittest.TestCase):
 
