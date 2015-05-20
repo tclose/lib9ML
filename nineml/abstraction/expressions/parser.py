@@ -35,6 +35,7 @@ class Parser(object):
                                     r'(?:\w+|!|~)?\s*\(|\))\s*')
     # Matches function names+plus opening paren and just opening paren
     _left_paren_func_re = re.compile(r'(?:\w+|!|~)?\s*\(')
+    _ternary_split_re = re.compile(r'[\?:]')    
     _sympy_transforms = list(standard_transformations) + [convert_xor]
     _precedence = {'&&': 2, '&': 2, '|': 3, '||': 3, '>=': 1, '>': 1,
                    '<': 1, '<=': 1, '==': 1, '=': 1}
