@@ -190,6 +190,10 @@ class AnsiC89ToSympy_test(unittest.TestCase):
             expr.rhs, Piecewise((self.c, sympy.Lt(self.a, self.b)),
                                 (self.d, True)))
 
+    def test_ternary_bad(self):
+        self.assertRaises(NineMLMathParseError,
+                          Expression, 'a < b ? (c ? d : e) : f')
+
     def test_ternary_nested(self):
         expr = Expression('a < b ? c : d > e ? f : g == h ? i : j')
         self.assertEqual(

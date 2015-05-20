@@ -35,7 +35,9 @@ class Parser(object):
                                     r'(?:\w+|!|~)?\s*\(|\))\s*')
     # Matches function names+plus opening paren and just opening paren
     _left_paren_func_re = re.compile(r'(?:\w+|!|~)?\s*\(')
-    _ternary_split_re = re.compile(r'[\?:]')    
+    _ternary_split_re = re.compile(r'[\?:]')
+    _match_first_re = re.compile(r'((?:-)?(?:\w+|[\d\.]+) *)$')
+    _match_second_re = re.compile(r' *(?:-)?[\w\d\.]+')
     _sympy_transforms = list(standard_transformations) + [convert_xor]
     _precedence = {'&&': 2, '&': 2, '|': 3, '||': 3, '>=': 1, '>': 1,
                    '<': 1, '<=': 1, '==': 1, '=': 1}
@@ -62,9 +64,9 @@ class Parser(object):
         elif isinstance(expr, basestring):
             # Check to see whether expression contains a ternary op.
             if '?' in expr:
-               return Piecewise(self._split_into_piecies(expr))
+                expr = Piecewise(*self._split_pieces(expr))
             else:
-               return self._parse_expr(expr)
+                expr = self._parse_expr(expr)
         else:
             raise TypeError("Cannot convert value '{}' of type '{}' to "
                             " SymPy expression".format(repr(expr),
