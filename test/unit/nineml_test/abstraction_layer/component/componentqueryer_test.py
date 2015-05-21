@@ -2,7 +2,7 @@
 
 import unittest
 from nineml.abstraction import (Regime, On, AnalogSendPort,
-                                AnalogReceivePort, NamespaceAddress,
+                                AnalogReceivePort, NamespaceAddress, 
                                 OutputEvent)
 from nineml.abstraction.dynamics import Dynamics
 

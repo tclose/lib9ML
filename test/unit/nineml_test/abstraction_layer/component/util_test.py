@@ -54,9 +54,9 @@ class MathUtil_test(unittest.TestCase):
 
         rhs_sub = e.rhs_substituted({'b': 'B', 'e': 'E'})
         self.assertEqual(
-            rhs_sub,
-            sympy.sympify('B*c + b1 + e_*exp(-12*g) + d/(E*sin(f + g/E))',
-                          locals={'E': sympy.Symbol('E')}))
+            (rhs_sub -
+             sympy.sympify('B*c + b1 + e_*exp(-12*g) + d/(E*sin(f + g/E))',
+                           locals={'E': sympy.Symbol('E')})), 0)
 
     def test_str_expr_replacement(self):
         # Signature: name(cls, frm, to, expr_string, func_ok=False)

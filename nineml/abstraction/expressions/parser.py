@@ -64,7 +64,7 @@ class Parser(object):
         elif isinstance(expr, basestring):
             # Check to see whether expression contains a ternary op.
             if '?' in expr:
-                expr = Piecewise(*self._split_pieces(expr))
+                expr = self._parse_piecewise(expr)
             else:
                 expr = self._parse_expr(expr)
         else:
@@ -89,6 +89,44 @@ class Parser(object):
                 "Could not parse math-inline expression: "
                 "{}\n\n{}".format(expr, e))
         return self._postprocess(expr)
+
+    def _parse_piecewise(self, expr):
+        tokens = (['('] +
+                  [t for t in self._ternary_split_re.split(expr)
+                   if t.strip()] + [')'])
+        within_parens = ['']
+        first_branch = False
+        conds = []
+        sub_exprs = []
+        for tok in tokens:
+            if tok == '(':
+                within_parens.append('')
+            elif tok == ')':
+                # concat the current level
+                stack_top = '(' + within_parens.pop() + ')'
+                within_parens[-1] += stack_top
+            elif tok == '?':
+                if first_branch:
+                    raise NineMLMathParseError(
+                        "Nested ternary statements are only permitted in "
+                        "the second branch of the enclosing ternary "
+                        "statement: {}".format(expr))
+                conds.append(within_parens[-1])
+                within_parens[-1] = ''  # Reset the parentheses
+                first_branch = True
+            elif tok == ':':
+                sub_exprs.append(within_parens[-1])
+                within_parens[-1] = ''
+                first_branch = False
+            else:
+                within_parens[-1] += tok
+        # Add final expression ('otherwise') to end of list
+        sub_exprs.append(within_parens[-1])
+        conds.append(True)
+        assert len(sub_exprs) == len(conds)
+        return Piecewise(*zip(sub_exprs,
+                              (self._parse_relationals(c, escape='')
+                               for c in conds)))
 
     def _preprocess(self, tokens):
         """

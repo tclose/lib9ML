@@ -9,7 +9,6 @@ analysis.
 from os.path import dirname, normpath, realpath, exists, join
 import sys
 import re
-import types
 
 import itertools
 import hashlib

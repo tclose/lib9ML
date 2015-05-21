@@ -23,6 +23,7 @@ class ComponentClassInterfaceInferer(ComponentActionVisitor):
         # state variables
         self.component_class = component_class
         self.declared_symbols = copy(reserved_identifiers)
+        self.declared_symbols.add('Piecewise')
         self.atoms = set()
         self.input_event_port_names = set()
         self.event_out_port_names = set()

@@ -5,7 +5,7 @@
   <Population name="Exc">
     <Size>4000</Size>
     <Cell>
-      <Component name="nrn">
+      <DynamicsProperties name="nrn">
         <Definition name="BrunelIaF" url="BrunelIaF.xml"/>
         <Property units="Mohm" name="R">
           <SingleValue>1.5</SingleValue>
@@ -28,7 +28,7 @@
         <Initial units="ms" name="t_rpend">
           <SingleValue>0.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Cell>
   </Population>
   <Projection name="Excitation">
@@ -40,15 +40,15 @@
       <FromResponse send_port="Isyn" receive_port="Isyn"/>
     </Post>
     <Connectivity>
-      <Component name="RandomExc">
+      <ConnectionRuleProperties name="RandomExc">
         <Definition name="RandomFanIn" url="RandomFanIn.xml"/>
         <Property units="unitless" name="number">
           <SingleValue>400</SingleValue>
         </Property>
-      </Component>
+      </ConnectionRuleProperties>
     </Connectivity>
     <Response>
-      <Component name="syn">
+      <DynamicsProperties name="syn">
         <Definition name="AlphaPSR" url="AlphaPSR.xml"/>
         <Property units="ms" name="tau_syn">
           <SingleValue>0.1</SingleValue>
@@ -59,16 +59,16 @@
         <Initial units="nA" name="B">
           <SingleValue>0.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
       <FromPlasticity send_port="weight" receive_port="q"/>
     </Response>
     <Plasticity>
-      <Component name="ExcitatoryPlasticity">
+      <DynamicsProperties name="ExcitatoryPlasticity">
         <Definition name="StaticConnection" url="StaticConnection.xml"/>
         <Initial units="nA" name="weight">
           <SingleValue>2.4</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Plasticity>
     <Delay units="ms">
       <SingleValue>1.5</SingleValue>
@@ -92,7 +92,7 @@
   <Population name="Ext">
     <Size>5000</Size>
     <Cell>
-      <Component name="stim">
+      <DynamicsProperties name="stim">
         <Definition name="Poisson" url="Poisson.xml"/>
         <Property units="Hz" name="rate">
           <SingleValue>20000.0</SingleValue>
@@ -100,7 +100,7 @@
         <Initial units="ms" name="t_next">
           <SingleValue>5.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Cell>
   </Population>
   <Projection name="Inhibition">
@@ -112,15 +112,15 @@
       <FromResponse send_port="Isyn" receive_port="Isyn"/>
     </Post>
     <Connectivity>
-      <Component name="RandomInh">
+      <ConnectionRuleProperties name="RandomInh">
         <Definition name="RandomFanIn" url="RandomFanIn.xml"/>
         <Property units="unitless" name="number">
           <SingleValue>100</SingleValue>
         </Property>
-      </Component>
+      </ConnectionRuleProperties>
     </Connectivity>
     <Response>
-      <Component name="syn">
+      <DynamicsProperties name="syn">
         <Definition name="AlphaPSR" url="AlphaPSR.xml"/>
         <Property units="ms" name="tau_syn">
           <SingleValue>0.1</SingleValue>
@@ -131,16 +131,16 @@
         <Initial units="nA" name="B">
           <SingleValue>0.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
       <FromPlasticity send_port="weight" receive_port="q"/>
     </Response>
     <Plasticity>
-      <Component name="InhibitoryPlasticity">
+      <DynamicsProperties name="InhibitoryPlasticity">
         <Definition name="StaticConnection" url="StaticConnection.xml"/>
         <Initial units="nA" name="weight">
           <SingleValue>-7.2</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Plasticity>
     <Delay units="ms">
       <SingleValue>1.5</SingleValue>
@@ -149,7 +149,7 @@
   <Population name="Inh">
     <Size>1000</Size>
     <Cell>
-      <Component name="nrn">
+      <DynamicsProperties name="nrn">
         <Definition name="BrunelIaF" url="BrunelIaF.xml"/>
         <Property units="Mohm" name="R">
           <SingleValue>1.5</SingleValue>
@@ -172,7 +172,7 @@
         <Initial units="ms" name="t_rpend">
           <SingleValue>0.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Cell>
   </Population>
   <Projection name="External">
@@ -184,12 +184,12 @@
       <FromResponse send_port="Isyn" receive_port="Isyn"/>
     </Post>
     <Connectivity>
-      <Component name="OneToOne">
+      <ConnectionRuleProperties name="OneToOne">
         <Definition name="OneToOne" url="OneToOne.xml"/>
-      </Component>
+      </ConnectionRuleProperties>
     </Connectivity>
     <Response>
-      <Component name="syn">
+      <DynamicsProperties name="syn">
         <Definition name="AlphaPSR" url="AlphaPSR.xml"/>
         <Property units="ms" name="tau_syn">
           <SingleValue>0.1</SingleValue>
@@ -200,16 +200,16 @@
         <Initial units="nA" name="B">
           <SingleValue>0.0</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
       <FromPlasticity send_port="weight" receive_port="q"/>
     </Response>
     <Plasticity>
-      <Component name="ExternalPlasticity">
+      <DynamicsProperties name="ExternalPlasticity">
         <Definition name="StaticConnection" url="StaticConnection.xml"/>
         <Initial units="nA" name="weight">
           <SingleValue>2.4</SingleValue>
         </Initial>
-      </Component>
+      </DynamicsProperties>
     </Plasticity>
     <Delay units="ms">
       <SingleValue>1.5</SingleValue>
