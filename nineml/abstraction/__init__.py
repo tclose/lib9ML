@@ -40,4 +40,4 @@ from .randomdistribution import (
     RandomDistributionXMLWriter)
 from .connectionrule import (
     ConnectionRule, ConnectionRuleXMLLoader, ConnectionRuleXMLWriter, Number,
-    Mask, Preference, RepeatWhile, Selected, NumberSelected, Select)
+    Mask, Preference, RepeatUntil, Selected, NumberSelected, Select)

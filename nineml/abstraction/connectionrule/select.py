@@ -6,12 +6,10 @@ This file contains the definitions for the Events
 """
 
 from nineml.utils import ensure_valid_identifier
-from nineml.abstraction_layer.componentclass import BaseALObject
+from nineml.abstraction.componentclass import BaseALObject
 from ..expressions import Expression, RandomVariable
-from .utils.cloner import ConnectionRuleCloner
 from nineml.base import MemberContainerObject
 from nineml.utils import normalise_parameter_as_list, assert_no_duplicates
-from .utils.visitors import ConnectionRuleElementFinder
 
 
 class Number(BaseALObject, Expression):
@@ -56,7 +54,7 @@ class Preference(BaseALObject, Expression):
         return "Preference('%s')" % (self.rhs)
 
 
-class RepeatWhile(BaseALObject, Expression):
+class RepeatUntil(BaseALObject, Expression):
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
@@ -73,7 +71,7 @@ class RepeatWhile(BaseALObject, Expression):
         return self._stages
 
     def __repr__(self):
-        return "RepeatWhile('{}', stages {})".format(self.rhs, self.stages)
+        return "RepeatUntil('{}', stages {})".format(self.rhs, self.stages)
 
 
 class Selected(BaseALObject):
@@ -170,24 +168,24 @@ class NumberSelected(BaseALObject):
 class Select(BaseALObject, MemberContainerObject):
 
     defining_attributes = ('_mask', '_number', '_preference',
-                           '_was_selecteds', '_number_selecteds',
+                           '_selecteds', '_number_selecteds',
                            '_random_variables', '_select',
-                           '_repeat_while')
-    class_to_member_dict = {Selected: '_was_selecteds',
+                           '_repeat_until')
+    class_to_member_dict = {Selected: '_selecteds',
                             NumberSelected: '_number_selecteds',
                             RandomVariable: '_random_variables',
-                            RepeatWhile: '_repeat_whiles'}
+                            RepeatUntil: '_repeat_untils'}
 
     def __init__(self, mask=None, number=None, preference=None,
-                 was_selecteds=None, number_selecteds=None,
-                 random_variables=None, select=None, repeat_whiles=None):
+                 selecteds=None, number_selecteds=None,
+                 random_variables=None, select=None, repeat_untils=None):
         """Abstract class representing a transition from one |Regime| to
         another.
 
         |Transition| objects are not created directly, but via the subclasses
         |OnEvent| and |OnCondition|.
 
-        :param was_selecteds: A list of the state-assignments performed
+        :param selecteds: A list of the state-assignments performed
             when this transition occurs. Objects in this list are either
             `string` (e.g A = A+13) or |Selected| objects.
         :param number_selecteds: A list of |NumberSelected| objects emitted
@@ -215,20 +213,20 @@ class Select(BaseALObject, MemberContainerObject):
         self._select = select
 
         # Load state-assignment objects as strings or Selected objects
-        was_selecteds = normalise_parameter_as_list(was_selecteds)
+        selecteds = normalise_parameter_as_list(selecteds)
         number_selecteds = normalise_parameter_as_list(number_selecteds)
         random_variables = normalise_parameter_as_list(random_variables)
-        repeat_whiles = normalise_parameter_as_list(repeat_whiles)
+        repeat_untils = normalise_parameter_as_list(repeat_untils)
 
-        assert_no_duplicates(s.name for s in was_selecteds)
+        assert_no_duplicates(s.name for s in selecteds)
         assert_no_duplicates(ns.name for ns in number_selecteds)
         assert_no_duplicates(rv.name for rv in random_variables)
-        assert_no_duplicates(rw.level for rw in repeat_whiles)
+        assert_no_duplicates(rw.level for rw in repeat_untils)
 
-        self._was_selecteds = dict((s.name, s) for s in was_selecteds)
+        self._selecteds = dict((s.name, s) for s in selecteds)
         self._number_selecteds = dict((ns.name, ns) for ns in number_selecteds)
         self._random_variables = dict((rv.name, rv) for rv in random_variables)
-        self._repeat_whiles = dict((rw.stages, rw) for rw in repeat_whiles)
+        self._repeat_untils = dict((rw.stages, rw) for rw in repeat_untils)
 
     def __copy__(self):
         return ConnectionRuleCloner(self)
@@ -253,15 +251,15 @@ class Select(BaseALObject, MemberContainerObject):
         return self._select
 
     @property
-    def was_selecteds(self):
-        return self._was_selecteds.itervalues()
+    def selecteds(self):
+        return self._selecteds.itervalues()
 
-    def was_selected(self, name):
-        return self._was_selecteds[name]
+    def selected(self, name):
+        return self._selecteds[name]
 
     @property
-    def was_selected_names(self):
-        return self._was_selecteds.iterkeys()
+    def selected_names(self):
+        return self._selecteds.iterkeys()
 
     @property
     def number_selecteds(self):
@@ -287,13 +285,16 @@ class Select(BaseALObject, MemberContainerObject):
         return self._random_variables[name]
 
     @property
-    def repeat_whiles(self):
-        return self._repeat_whiles.itervalues()
+    def repeat_untils(self):
+        return self._repeat_untils.itervalues()
 
     @property
-    def repeat_while_stages(self):
-        return self._repeat_whiles.iterkeys()
+    def repeat_until_stages(self):
+        return self._repeat_untils.iterkeys()
 
     @property
-    def repeat_while(self, name):
-        return self._repeat_whiles[name]
+    def repeat_until(self, name):
+        return self._repeat_untils[name]
+
+from .visitors.cloner import ConnectionRuleCloner
+from .visitors.queriers import ConnectionRuleElementFinder

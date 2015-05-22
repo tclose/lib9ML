@@ -41,7 +41,7 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
     def load_select(self, element):
         block_names = ('Mask', 'Number', 'Preference', 'Selected',
                        'NumberSelected', 'RandomVariables', 'Select', 'RepeatUntil')
-        blocks = self.load_blocks(element,block_names=block_names)
+        blocks = self.load_blocks(element, block_names=block_names)
         return Select(  
             mask=blocks["Mask"],
             number=blocks["Number"],#Does the appropriate object get expanded here
@@ -56,10 +56,7 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
     tag_to_loader = dict(
         tuple(ComponentClassXMLLoader.tag_to_loader.iteritems()) +
         (("ConnectionRule", load_connectionruleclass),
-         ("Select", load_select),
-         ("Alias", load_alias),
-         ("Constant", load_constant)
-        ))
+         ("Select", load_select)))
 
 
 class ConnectionRuleXMLWriter(ComponentClassXMLWriter):
@@ -69,12 +66,11 @@ class ConnectionRuleXMLWriter(ComponentClassXMLWriter):
         return E('ConnectionRule',
                  *self._sort(e.accept_visitor(self) for e in component_class),
                  name=component_class.name)
-    
+
     @annotate_xml
-    def visit_select(self, parameter):
-        return E(Select.element_name,
-                 name=parameter.name,
-                 dimension=parameter.dimension.name)
+    def visit_select(self, select):
+        return E.Select(name=select.name)
 
 
 from ..base import ConnectionRule
+from ..select import Select

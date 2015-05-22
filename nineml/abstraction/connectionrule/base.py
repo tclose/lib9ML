@@ -13,7 +13,12 @@ docstring goes here
 :license: BSD-3, see LICENSE for details.
 """
 from ..componentclass import ComponentClass
+<<<<<<< HEAD
 from nineml.abstraction_layer.ports import PropertyReceivePort
+=======
+from nineml.annotations import annotate_xml, read_annotations
+from nineml.abstraction.ports import PropertyReceivePort
+>>>>>>> 1260b1e... updated syntax of connection rule
 
 
 class ConnectionRule(ComponentClass):
@@ -103,6 +108,7 @@ class ConnectionRule(ComponentClass):
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         return ConnectionRuleXMLLoader(document).load_connectionruleclass(
             element)
+
 
 from .visitors.cloner import ConnectionRuleCloner
 from .visitors.modifiers import (

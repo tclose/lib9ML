@@ -1,4 +1,4 @@
 from .base import ConnectionRule
-from .visitors import ConnectionRuleXMLLoader, ConnectionRuleXMLWriter
-from .select import (Number, Mask, Preference, RepeatWhile, Selected,
+from .select import (Number, Mask, Preference, RepeatUntil, Selected,
                      NumberSelected, Select)
+from .visitors.xml import ConnectionRuleXMLLoader, ConnectionRuleXMLWriter
