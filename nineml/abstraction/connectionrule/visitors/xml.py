@@ -26,7 +26,8 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
     @read_annotations
     @handle_xml_exceptions
     def load_connectionruleclass(self, element, **kwargs):  # @UnusedVariable
-        block_names = ('Parameter',)
+        block_names = ('Parameter', 'PropertyRecievePort', 'Constant',
+                       'Alias', 'Select')
         blocks = self._load_blocks(element, block_names=block_names)
         return ConnectionRule(
             name=element.attrib['name'],            
@@ -34,38 +35,22 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
             parameters=blocks["Parameter"],
             constant=blocks["Constant"],
             alias=blocks["Alias"],
-            select=blocks["Select"]
-            )
+            select=blocks["Select"])
     
     @read_annotations
     def load_select(self, element):
-        block_names = ('Select')
+        block_names = ('Mask', 'Number', 'Preference', 'Selected',
+                       'NumberSelected', 'RandomVariables', 'Select', 'RepeatUntil')
         blocks = self.load_blocks(element,block_names=block_names)
-
         return Select(  
-            mask=blocks["mask"],
-            number=blocks["number"],#Does the appropriate object get expanded here
-            preference=blocks["preference"],
-            was_selecteds=blocks["was_selected"], 
-            number_selected=blocks["number_selected"],
-            random_variables=blocks["random_variables"], 
-            select=blocks["select"], 
-            repeat_whiles=blocks["repeat_while"])
-            )
-
-    @read_annotations
-    def load_alias(self, element):
-        name = element.attrib["name"]
-        rhs = self.load_single_internmaths_block(element)
-        return Alias(lhs=name, rhs=rhs)
-
-    @read_annotations
-    def load_constant(self, element):
-        return Constant(
-            name=element.attrib['name'],
-            value=float(element.text),
-            units=self.document[element.get('units')]
-            )
+            mask=blocks["Mask"],
+            number=blocks["Number"],#Does the appropriate object get expanded here
+            preference=blocks["Preference"],
+            selecteds=blocks["Selected"], 
+            number_selecteds=blocks["NumberSelected"],
+            random_variables=blocks["RandomVariables"], 
+            select=blocks["Select"], 
+            repeat_untils=blocks["RepeatUntil"])
 
 
     tag_to_loader = dict(
@@ -91,16 +76,5 @@ class ConnectionRuleXMLWriter(ComponentClassXMLWriter):
                  name=parameter.name,
                  dimension=parameter.dimension.name)
 
-    @annotate_xml
-    def visit_alias(self, alias):
-        return E(Alias.element_name,
-                 E("MathInline", alias.rhs_cstr),
-                 name=alias.lhs)
-
-    @annotate_xml
-    def visit_constant(self, constant):
-        return E('Constant', str(constant.value),
-                 name=constant.name,
-                 units=constant.units.name)
 
 from ..base import ConnectionRule

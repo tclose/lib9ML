@@ -78,7 +78,8 @@ class RepeatWhile(BaseALObject, Expression):
 
 class Selected(BaseALObject):
 
-    """Selected
+    """
+    Selected
     """
 
     defining_attributes = ('_name', '_scope')
@@ -120,7 +121,8 @@ class Selected(BaseALObject):
 
 class NumberSelected(BaseALObject):
 
-    """NumberSelected
+    """
+    NumberSelected
     """
 
     defining_attributes = ('_name', '_scope', '_perspective')

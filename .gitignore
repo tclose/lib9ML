@@ -21,7 +21,7 @@ cover
 *.pdf
 *.synctex.gz
 .9build
-.swp
+*.swp
 *~
 *.egg-info
 *.dvi
@@ -31,3 +31,4 @@ cover
 .sass-cache
 /_site
 .texlipse
+/build
