@@ -93,7 +93,7 @@ class Dimensionality_test(unittest.TestCase):
         )
         self.assertRaises(
             NineMLDimensionError,
-            DynamicsClass,
+            Dynamics,
             name='A',
             state_variables=[
                 StateVariable('SV1', dimension=un.voltage)],
