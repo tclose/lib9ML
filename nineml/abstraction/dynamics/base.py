@@ -547,6 +547,35 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return self._event_receive_ports.iterkeys()
 
     @property
+    def all_components(self):
+        """
+        Returns an iterator over this component_class and all subcomponents
+        """
+        yield self
+        for subcomponent in self.subnodes.values():
+            for subcomp in subcomponent.all_components:
+                yield subcomp
+
+    @property
+    def fully_qualified_port_connections(self):
+        """Used by the flattening code.
+
+        This method returns a list of tuples of the
+        the fully-qualified port connections.
+        For example,
+        [("a.b.C","d.e.F"),("g.h.I","j.k.L"), ..., ("u.W","x.y.Z") ]
+        but note that it is not ``string`` objects that are returned, but
+        NamespaceAddress objects.
+        """
+        namespace = self.get_node_addr()
+        conns = []
+        for src, sink in self.portconnections:
+            src_new = namespace.get_subns_addr(src)
+            sink_new = namespace.get_subns_addr(sink)
+            conns.append((src_new, sink_new))
+        return conns
+
+    @property
     def transitions(self):
         return self.all_transitions()
 
