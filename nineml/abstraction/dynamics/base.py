@@ -557,6 +557,10 @@ class Dynamics(ComponentClass, _NamespaceMixin):
                 yield subcomp
 
     @property
+    def all_expressions(self):
+        return DynamicsExpressionExtractor().visit(self)
+
+    @property
     def fully_qualified_port_connections(self):
         """Used by the flattening code.
 
@@ -690,7 +694,8 @@ def inf_check(l1, l2, desc):
 from .visitors.validators import DynamicsValidator
 from .visitors import DynamicsInterfaceInferer
 from .visitors.queriers import (DynamicsElementFinder,
-                                DynamicsRequiredDefinitions)
+                                DynamicsRequiredDefinitions,
+                                DynamicsExpressionExtractor)
 from .visitors.modifiers import (
     DynamicsRenameSymbol, DynamicsAssignIndices)
 from .visitors.xml import DynamicsXMLLoader, DynamicsXMLWriter

@@ -33,6 +33,10 @@ class RandomDistribution(ComponentClass):
     def validate(self):
         RandomDistributionValidator.validate_componentclass(self)
 
+    @property
+    def all_expressions(self):
+        return RandomDistributionExpressionExtractor().visit(self)
+
     @annotate_xml
     def to_xml(self):
         self.standardize_unit_dimensions()
@@ -49,7 +53,8 @@ from .visitors.cloner import RandomDistributionCloner
 from .visitors.modifiers import(
     RandomDistributionRenameSymbol, RandomDistributionAssignIndices)
 from .visitors.queriers import (RandomDistributionRequiredDefinitions,
-                                RandomDistributionElementFinder)
+                                RandomDistributionElementFinder,
+                                RandomDistributionExpressionExtractor)
 from .visitors.validators import RandomDistributionValidator
 from .visitors.xml import (
     RandomDistributionXMLLoader, RandomDistributionXMLWriter)

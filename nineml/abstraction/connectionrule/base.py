@@ -47,6 +47,10 @@ class ConnectionRule(ComponentClass):
     def validate(self):
         ConnectionRuleValidator.validate_componentclass(self)
 
+    @property
+    def all_expressions(self):
+        return ConnectionRuleExpressionExtractor().visit(self)
+
     @annotate_xml
     def to_xml(self):
         self.standardize_unit_dimensions()
@@ -63,7 +67,8 @@ from .visitors.cloner import ConnectionRuleCloner
 from .visitors.modifiers import (
     ConnectionRuleRenameSymbol, ConnectionRuleAssignIndices)
 from .visitors.queriers import (
-    ConnectionRuleRequiredDefinitions, ConnectionRuleElementFinder)
+    ConnectionRuleRequiredDefinitions, ConnectionRuleElementFinder,
+    ConnectionRuleExpressionExtractor)
 from .visitors.validators import ConnectionRuleValidator
 from .visitors.xml import (
     ConnectionRuleXMLLoader, ConnectionRuleXMLWriter)
