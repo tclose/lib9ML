@@ -19,8 +19,8 @@ from ..ports import (AnalogReceivePort, AnalogSendPort,
                      EventSendPort)
 from nineml.utils import (check_list_contain_same_items, invert_dictionary,
                             assert_no_duplicates)
-from .utils import DynamicsQueryer
-from .utils.cloner import (
+from .visitors import DynamicsQueryer
+from .visitors.cloner import (
     DynamicsExpandAliasDefinition, DynamicsCloner)
 
 
@@ -668,10 +668,10 @@ def inf_check(l1, l2, desc):
     check_list_contain_same_items(l1, l2, desc1='Declared',
                                   desc2='Inferred', ignore=['t'], desc=desc)
 
-from .validators import DynamicsValidator
-from .utils import DynamicsInterfaceInferer
-from .utils.visitors import (DynamicsElementFinder,
+from .visitors.validators import DynamicsValidator
+from .visitors import DynamicsInterfaceInferer
+from .visitors.base import (DynamicsElementFinder,
                              DynamicsRequiredDefinitions)
-from .utils.modifiers import (
+from .visitors.modifiers import (
     DynamicsRenameSymbol, DynamicsAssignIndices)
-from .utils.xml import DynamicsXMLLoader, DynamicsXMLWriter
+from .visitors.xml import DynamicsXMLLoader, DynamicsXMLWriter

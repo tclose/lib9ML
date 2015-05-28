@@ -1,5 +1,5 @@
 from copy import copy
-from .visitors import ComponentActionVisitor
+from .base import ComponentActionVisitor
 from ...expressions import Expression, reserved_identifiers
 
 

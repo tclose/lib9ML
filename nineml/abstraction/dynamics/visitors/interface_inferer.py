@@ -1,5 +1,5 @@
-from ...componentclass.utils import ComponentClassInterfaceInferer
-from .visitors import DynamicsActionVisitor
+from ...componentclass.visitors import ComponentClassInterfaceInferer
+from .base import DynamicsActionVisitor
 
 
 class DynamicsInterfaceInferer(ComponentClassInterfaceInferer,

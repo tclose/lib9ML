@@ -6,7 +6,7 @@ docstring needed
 """
 
 from nineml.utils import safe_dict
-from ...componentclass.utils.equality_checker import (
+from ...componentclass.visitors.equality_checker import (
     ComponentEqualityChecker, assert_equal,
     assert_equal_list)
 
