@@ -15,14 +15,4 @@ class ConnectionRuleQueryer(ComponentQueryer):
     ConnectionRuleQueryer provides a way of adding methods to query a
     ComponentClass object, without polluting the class
     """
-
-    def __init__(self, component_class):
-        """Constructor for the ConnectionRuleQueryer"""
-        self.component_class = component_class
-
-    @property
-    def ports(self):
-        """Return an iterator over all the port (Event & Analog) in the
-        component_class"""
-        # TODO: ConnectionRule-specific ports to go here
-        return chain(super(ConnectionRuleQueryer, self).ports, [])
+    pass
