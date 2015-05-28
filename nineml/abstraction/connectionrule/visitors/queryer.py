@@ -6,7 +6,7 @@ Definitions for the ComponentQuery Class
 """
 
 from itertools import chain
-from ...componentclass.utils.queryer import ComponentQueryer
+from ...componentclass.visitors.queryer import ComponentQueryer
 
 
 class ConnectionRuleQueryer(ComponentQueryer):

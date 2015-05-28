@@ -5,7 +5,7 @@ docstring needed
 :license: BSD-3, see LICENSE for details.
 """
 
-from ...componentclass.utils.equality_checker import (ComponentEqualityChecker,
+from ...componentclass.visitors.equality_checker import (ComponentEqualityChecker,
                                                       assert_equal)
 
 

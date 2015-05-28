@@ -1,5 +1,5 @@
-from ...componentclass.utils import ComponentClassInterfaceInferer
-from .visitors import ConnectionRuleActionVisitor
+from ...componentclass.visitors import ComponentClassInterfaceInferer
+from .base import ConnectionRuleActionVisitor
 
 
 class ConnectionRuleInterfaceInferer(ComponentClassInterfaceInferer,

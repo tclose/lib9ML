@@ -8,7 +8,7 @@ from nineml.abstraction import (
     Dynamics as Dynamics, Regime, On, OutputEvent,
     AnalogSendPort as SendPort, AnalogReceivePort as RecvPort,
     NamespaceAddress)
-from nineml.abstraction.dynamics.utils.cloner import (
+from nineml.abstraction.dynamics.visitors.cloner import (
     DynamicsClonerPrefixNamespace)
 
 NSA = NamespaceAddress

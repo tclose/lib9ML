@@ -7,9 +7,9 @@ docstring needed
 
 
 # from itertools import chain
-from ...componentclass.utils import (
+from ...componentclass.visitors import (
     ComponentActionVisitor, ComponentElementFinder)
-from ...componentclass.utils.visitors import ComponentRequiredDefinitions
+from ...componentclass.visitors.base import ComponentRequiredDefinitions
 
 
 class DynamicsActionVisitor(ComponentActionVisitor):

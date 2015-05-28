@@ -1,5 +1,5 @@
-from ...componentclass.utils import ComponentClassInterfaceInferer
-from .visitors import RandomDistributionActionVisitor
+from ...componentclass.visitors import ComponentClassInterfaceInferer
+from .base import RandomDistributionActionVisitor
 
 
 class RandomDistributionInterfaceInferer(ComponentClassInterfaceInferer,

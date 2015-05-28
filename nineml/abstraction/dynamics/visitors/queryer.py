@@ -7,7 +7,7 @@ Definitions for the ComponentQuery Class
 
 from itertools import chain
 from nineml.utils import filter_expect_single
-from ...componentclass.utils.queryer import ComponentQueryer
+from ...componentclass.visitors.queryer import ComponentQueryer
 
 
 class DynamicsQueryer(ComponentQueryer):

@@ -7,8 +7,8 @@ docstring needed
 from collections import defaultdict
 from . import PerNamespaceComponentValidator
 from nineml.exceptions import NineMLRuntimeError, NineMLDimensionError
-from ...expressions.utils import is_valid_lhs_target
-from ...expressions import reserved_identifiers
+from nineml.abstraction.expressions.utils import is_valid_lhs_target
+from nineml.abstraction.expressions import reserved_identifiers
 from nineml.utils import assert_no_duplicates
 import operator
 import sympy
