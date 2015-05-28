@@ -697,8 +697,8 @@ def inf_check(l1, l2, desc):
 
 from .visitors.validators import DynamicsValidator
 from .visitors import DynamicsInterfaceInferer
-from .visitors.base import (DynamicsElementFinder,
-                             DynamicsRequiredDefinitions)
+from .visitors.queriers import (DynamicsElementFinder,
+                                DynamicsRequiredDefinitions)
 from .visitors.modifiers import (
     DynamicsRenameSymbol, DynamicsAssignIndices)
 from .visitors.xml import DynamicsXMLLoader, DynamicsXMLWriter

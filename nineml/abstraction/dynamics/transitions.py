@@ -14,7 +14,7 @@ from ...exceptions import (NineMLRuntimeError,
 from .visitors.cloner import DynamicsCloner
 from nineml.base import MemberContainerObject
 from nineml.utils import normalise_parameter_as_list
-from .visitors.base import DynamicsElementFinder
+from .visitors.queriers import DynamicsElementFinder
 
 
 class StateAssignment(BaseALObject, ExpressionWithSimpleLHS):
