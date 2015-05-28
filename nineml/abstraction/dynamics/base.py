@@ -19,7 +19,6 @@ from ..ports import (AnalogReceivePort, AnalogSendPort,
                      EventSendPort)
 from nineml.utils import (check_list_contain_same_items, invert_dictionary,
                             assert_no_duplicates)
-from .visitors import DynamicsQueryer
 from .visitors.cloner import (
     DynamicsExpandAliasDefinition, DynamicsCloner)
 
@@ -237,8 +236,6 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         self._regimes = dict((r.name, r) for r in regimes)
         self._state_variables = dict((s.name, s) for s in state_variables)
 
-        self._query = DynamicsQueryer(self)
-
         # Ensure analog_ports is a list not an iterator
         analog_ports = list(analog_ports)
         event_ports = list(event_ports)
@@ -350,11 +347,6 @@ class Dynamics(ComponentClass, _NamespaceMixin):
     def validate(self):
         self._resolve_transition_regimes()
         DynamicsValidator.validate_componentclass(self)
-
-    @property
-    def query(self):
-        """ Returns the ``ComponentQuery`` object associated with this class"""
-        return self._query
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
@@ -530,6 +522,12 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return chain(self.analog_send_port_names,
                      self.analog_receive_port_names,
                      self.analog_reduce_port_names)
+
+    @property
+    def event_port_names(self):
+        """Returns an iterator over the local analog port objects"""
+        return chain(self.event_send_port_names,
+                     self.event_receive_port_names)
 
     @property
     def analog_send_port_names(self):

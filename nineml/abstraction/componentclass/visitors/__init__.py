@@ -1,4 +1,4 @@
-from .queryer import ComponentQueryer
+# from .queryer import ComponentQueryer
 from .base import (
     ComponentVisitor, ComponentActionVisitor, ComponentElementFinder)
 from .xml import (
