@@ -1,6 +1,6 @@
 import unittest
 from copy import copy
-from nineml.abstraction_layer.dynamics import (
+from nineml.abstraction.dynamics import (
     Dynamics, Regime, On, OutputEvent, StateAssignment, StateVariable,
     OnCondition, TimeDerivative)
 from nineml.abstraction import Alias, Parameter

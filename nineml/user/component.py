@@ -1,7 +1,7 @@
 # encoding: utf-8
 from itertools import chain
 from lxml import etree
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 import collections
 from nineml.reference import BaseReference
 from nineml.exceptions import (
@@ -11,7 +11,7 @@ from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml.units import Unit, unitless
-from ..abstraction_layer import ComponentClass
+from ..abstraction import ComponentClass
 from .values import SingleValue, ArrayValue, ExternalArrayValue
 from . import BaseULObject
 from nineml.document import Document
@@ -90,7 +90,7 @@ class Component(BaseULObject, DocumentLevelObject):
     :class:`~nineml.abstraction.ComponentClass`.
 
     A component_class may be created either from a
-    :class:`~nineml.abstraction_layer.ComponentClass`  together with a set
+    :class:`~nineml.abstraction.ComponentClass`  together with a set
     of properties (parameter values), or by cloning then modifying an
     existing component_class (the prototype).
 
@@ -108,8 +108,7 @@ class Component(BaseULObject, DocumentLevelObject):
             :class:`PropertySet` for the component_class's state variables.
 
     """
-
-    element_name = "Component"
+    __metaclass__ = ABCMeta  # Abstract base class
     defining_attributes = ('name', 'component_class', 'property_set')
     children = ("Property", "Definition", 'Prototype')
 
@@ -161,6 +160,11 @@ class Component(BaseULObject, DocumentLevelObject):
             self.check_initial_values()
         except AttributeError:  # 'check_initial_values' is only in dynamics
             pass
+
+    @abstractmethod
+    def get_element_name(self):
+        "Used to stop accidental construction of this class"
+        pass
 
     def __getinitargs__(self):
         return (self.name, self.definition, self.property_set,
@@ -304,9 +308,8 @@ class Component(BaseULObject, DocumentLevelObject):
         props_and_initial_values = (self._properties.to_xml() +
                                     [iv.to_xml()
                                      for iv in self.initial_values])
-        element = E.Component(self._definition.to_xml(),
-                              *props_and_initial_values,
-                              name=self.name)
+        element = E(self.element_name, self._definition.to_xml(),
+                    *props_and_initial_values, name=self.name)
         return element
 
     @classmethod
@@ -328,8 +331,8 @@ class Component(BaseULObject, DocumentLevelObject):
                 raise Exception("A component_class must contain either a "
                                 "defintion or a prototype")
             definition = Prototype.from_xml(prototype_element, document)
-        return Component(name, definition, properties=properties,
-                             initial_values=initial_values, url=document.url)
+        return cls(name, definition, properties=properties,
+                   initial_values=initial_values, url=document.url)
 
     @property
     def used_units(self):
@@ -380,7 +383,8 @@ class Quantity(BaseULObject):
         if not isinstance(value, (int, float, SingleValue, ArrayValue,
                                   ExternalArrayValue)):
             raise Exception("Invalid type '{}' for value, can be one of "
-                            "'Value', 'Reference', 'Component', 'ValueList', "
+                            "'Value', 'Reference',"
+                            "'RandomDistributionProperties', 'ValueList', "
                             "'ExternalValueList'"
                             .format(value.__class__.__name__))
         if units is None:
@@ -631,6 +635,8 @@ class InitialValueSet(PropertySet):
 
 class DynamicsProperties(Component):
 
+    element_name = 'DynamicsProperties'
+
     def check_initial_values(self):
         for var in self.definition.componentclass.state_variables:
             try:
@@ -640,12 +646,18 @@ class DynamicsProperties(Component):
                                 var.name)
             check_units(initial_value.units, var.dimension)
 
+    def get_element_name(self):
+        return self.element_name
+
 
 class ConnectionRuleProperties(Component):
     """
     docstring needed
     """
-    pass
+    element_name = 'ConnectionRuleProperties'
+
+    def get_element_name(self):
+        return self.element_name
 
 
 class RandomDistributionProperties(Component):
@@ -657,4 +669,7 @@ class RandomDistributionProperties(Component):
 
         example goes here
     """
-    pass
+    element_name = 'RandomDistributionProperties'
+
+    def get_element_name(self):
+        return self.element_name

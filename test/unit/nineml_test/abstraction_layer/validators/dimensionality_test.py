@@ -1,6 +1,6 @@
 from __future__ import division
 import unittest
-from nineml.abstraction_layer import (
+from nineml.abstraction import (
     Parameter, Constant, Dynamics, Regime, On, OutputEvent, StateVariable,
     StateAssignment)
 from nineml.abstraction.ports import AnalogSendPort, AnalogReceivePort

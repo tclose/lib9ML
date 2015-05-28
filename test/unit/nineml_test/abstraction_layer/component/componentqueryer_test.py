@@ -4,7 +4,7 @@ import unittest
 from nineml.abstraction import (Regime, On, AnalogSendPort,
                                       AnalogReceivePort, NamespaceAddress,
                                       OutputEvent)
-from nineml.abstraction_layer.dynamics import Dynamics as Dynamics
+from nineml.abstraction.dynamics import Dynamics as Dynamics
 
 
 class ComponentClassQueryer_test(unittest.TestCase):
