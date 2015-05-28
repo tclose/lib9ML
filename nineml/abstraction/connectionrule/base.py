@@ -49,7 +49,9 @@ class ConnectionRule(ComponentClass):
 
     @property
     def all_expressions(self):
-        return ConnectionRuleExpressionExtractor().visit(self)
+        extractor = ConnectionRuleExpressionExtractor()
+        extractor.visit(self)
+        return extractor.expressions
 
     @annotate_xml
     def to_xml(self):

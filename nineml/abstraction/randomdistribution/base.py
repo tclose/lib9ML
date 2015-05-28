@@ -35,7 +35,9 @@ class RandomDistribution(ComponentClass):
 
     @property
     def all_expressions(self):
-        return RandomDistributionExpressionExtractor().visit(self)
+        extractor = RandomDistributionExpressionExtractor()
+        extractor.visit(self)
+        return extractor.expressions
 
     @annotate_xml
     def to_xml(self):
