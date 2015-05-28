@@ -1,6 +1,6 @@
 # from .queryer import ComponentQueryer
-from .base import (
-    ComponentVisitor, ComponentActionVisitor, ComponentElementFinder)
+from .base import ComponentVisitor
+from .queriers import ComponentActionVisitor, ComponentElementFinder
 from .xml import (
     ComponentClassXMLLoader, ComponentClassXMLWriter)
-from .interface_inferer import ComponentClassInterfaceInferer
+from .queriers import ComponentClassInterfaceInferer

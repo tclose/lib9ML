@@ -48,8 +48,8 @@ class RandomDistribution(ComponentClass):
 from .visitors.cloner import RandomDistributionCloner
 from .visitors.modifiers import(
     RandomDistributionRenameSymbol, RandomDistributionAssignIndices)
-from .visitors.base import (RandomDistributionRequiredDefinitions,
-                             RandomDistributionElementFinder)
+from .visitors.queriers import (RandomDistributionRequiredDefinitions,
+                                RandomDistributionElementFinder)
 from .visitors.validators import RandomDistributionValidator
 from .visitors.xml import (
     RandomDistributionXMLLoader, RandomDistributionXMLWriter)
