@@ -69,7 +69,7 @@
           <Description>And time-derivatives too</Description>
         </Annotations>
       </TimeDerivative>
-      <OnEvent port="incomingSpike">
+      <OnEvent port="incomingSpike" target_regime="single">
         <StateAssignment variable="v">
           <Annotations>
             <Description>Even State assignments can be annotated</Description>
@@ -77,7 +77,7 @@
           <MathInline>v + spikeImpulse</MathInline>
         </StateAssignment>
       </OnEvent>
-      <OnCondition>
+      <OnCondition target_regime="single">
         <Trigger>
           <MathInline>v &gt; vThreshold</MathInline>
         </Trigger>
