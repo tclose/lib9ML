@@ -104,7 +104,12 @@ class Parser(object):
             elif tok == ')':
                 # concat the current level
                 stack_top = '(' + within_parens.pop() + ')'
-                within_parens[-1] += stack_top
+                try:
+                    within_parens[-1] += stack_top
+                except IndexError:
+                    raise NineMLMathParseError(
+                        "Unbalanced parentheses in piecewise expression: {}"
+                        .format(expr))
             elif tok == '?':
                 if first_branch:
                     raise NineMLMathParseError(
