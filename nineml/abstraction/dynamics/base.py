@@ -706,18 +706,13 @@ class Dynamics(ComponentClass, _NamespaceMixin):
                                 .format(trans.target_regime, trans._name))
                     trans.set_target_regime(target)
 
-<<<<<<< Upstream, based on origin/refactor_v2
+
     def to_xml(self, document, **kwargs):  # @UnusedVariable
-=======
-    @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
->>>>>>> 6cb2970 finished implementing parse_relationals
         self.standardize_unit_dimensions()
         self.validate()
         return DynamicsXMLWriter(document).visit(self)
 
     @classmethod
-    @read_annotations
     def from_xml(cls, element, document, **kwargs):
         return DynamicsXMLLoader(document).load_dynamics(
             element, url=document.url, **kwargs)

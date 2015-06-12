@@ -29,15 +29,15 @@ class Parser(object):
     _valid_identifier_re = re.compile(r'^[a-zA-Z_]\w*$')
     _escape_random_re = re.compile(r'(?<!\w)random\.(\w+)(?!\w)')
     _unescape_random_re = re.compile(r'(?<!\w)random_(\w+)_(?!\w)')
+    _ternary_split_re = re.compile(r'(\?|\:|\(|\))')
+    _match_first_re = re.compile(r'((?:-)?(?:\w+|[\d\.]+) *)$')
+    _match_second_re = re.compile(r' *(?:-)?[\w\d\.]+')
     _logic_relation_re = re.compile(r'(?:&|\||<|>|=)')
     # Matches logic and relational expressions, as well as parens and funcname(
     _tokenize_logic_re = re.compile(r'\s*(&{1,2}|\|{1,2}|<=?|>=?|==?|'
                                     r'(?:\w+|!|~)?\s*\(|\))\s*')
     # Matches function names+plus opening paren and just opening paren
     _left_paren_func_re = re.compile(r'(?:\w+|!|~)?\s*\(')
-    _ternary_split_re = re.compile(r'[\?:]')
-    _match_first_re = re.compile(r'((?:-)?(?:\w+|[\d\.]+) *)$')
-    _match_second_re = re.compile(r' *(?:-)?[\w\d\.]+')
     _sympy_transforms = list(standard_transformations) + [convert_xor]
     _precedence = {'&&': 2, '&': 2, '|': 3, '||': 3, '>=': 1, '>': 1,
                    '<': 1, '<=': 1, '==': 1, '=': 1}
@@ -212,29 +212,6 @@ class Parser(object):
         to the Sympy parser
         """
         return self._preprocess(tokens)
-
-    def _split_pieces(self, expr):
-        if '?' in expr:
-            cond, remaining = expr.split('?', 1)
-            try:
-                if remaining.index('?') < remaining.find(':'):
-                    raise NineMLMathParseError(
-                        "Nested ternary statements are only permitted in the "
-                        "second branch of the enclosing ternary statement: {}"
-                        .format(expr))
-            except ValueError:
-                pass  # If there are no more '?'s in the expression
-            try:
-                subexpr, remaining = remaining.split(':', 1)
-            except ValueError:
-                raise NineMLMathParseError(
-                    "Missing ':' in ternary statement: {}".format(expr))
-            # Concatenate sub expressions of the piecewise.
-            pieces = ([(self._parse_expr(subexpr), self._parse_expr(cond))] +
-                      self._split_pieces(remaining))
-        else:
-            pieces = [(self._parse_expr(expr), True)]
-        return pieces
 
     @classmethod
     def valid_identifier(cls, expr, safe_symbols=set([])):

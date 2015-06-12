@@ -300,7 +300,7 @@ class DimensionalityComponentValidator(PerNamespaceComponentValidator):
                 arg_dims = self._flatten_dims(arg, element)
                 if arg_dims != 1:
                     raise NineMLDimensionError(self._construct_error_message(
-                        "Dimensionless arguments required for function",
+                        "Dimensionless arguments are required for function in",
                         arg_dims, element=element, expr=arg))
             dims = 1
         elif (type(expr).__name__ in ('Pi',) or

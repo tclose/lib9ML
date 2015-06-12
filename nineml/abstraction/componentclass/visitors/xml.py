@@ -56,12 +56,30 @@ class ComponentClassXMLLoader(object):
     def load_single_internmaths_block(self, element, checkOnlyBlock=True):
         if checkOnlyBlock:
             elements = list(element.iterchildren(tag=etree.Element))
-            if len(elements) != 1:
+            if not elements:
                 raise NineMLRuntimeError(
-                    "Unexpected tags found '{}'"
-                    .format("', '".join(e.tag for e in elements)))
-        assert (len(element.findall(MATHML + "MathML")) +
-                len(element.findall(NINEML + "MathInline"))) == 1
+                    "No blocks found in {}{} element (expected MathInline or "
+                    "MathML)".format("'{}' ".format(
+                        (element.get('name')
+                         if 'name' in element.attrib else '')),
+                        element.tag[len(NINEML):]))
+            elif len(elements) > 1:
+                raise NineMLRuntimeError(
+                    "Unexpected tags found '{}' in {}{} element "
+                    "(expected MathInline or MathML)"
+                    .format("', '".join(e.tag for e in elements),
+                            "'{}' ".format(
+                                (element.get('name')
+                                 if 'name' in element.attrib else '')),
+                            element.tag[len(NINEML):]))
+        num_blocks = (len(element.findall(MATHML + "MathML")) +
+                      len(element.findall(NINEML + "MathInline")))
+        if num_blocks != 1:
+            raise NineMLRuntimeError(
+                "Missing (or multiple) maths block in {}{} element"
+                .format("'{}' ".format(
+                    (element.get('name') if 'name' in element.attrib else '')),
+                    element.tag[len(NINEML):]))
         if element.find(NINEML + "MathInline") is not None:
             mblock = expect_single(
                 element.findall(NINEML + 'MathInline')).text.strip()
