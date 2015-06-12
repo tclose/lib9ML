@@ -278,6 +278,23 @@ class DimensionalityComponentValidator(PerNamespaceComponentValidator):
                     raise NineMLDimensionError(self._construct_error_message(
                         "Logical expression provided non-boolean argument '{}'"
                         .format(arg), dims, expr))
+        elif isinstance(expr, sympy.Piecewise):
+            prev_dims = None
+            for piece in expr.args:
+                dims = self._flatten_dims(piece, element)
+                if prev_dims is None:
+                    prev_dims = dims
+                elif dims != prev_dims:
+                    raise NineMLDimensionError(self._construct_error_message(
+                        "Dimensions of piecewise branches",
+                        dims - prev_dims, expr, postamble="do not match"))
+        elif isinstance(expr, ExprCondPair):
+            dims = self._flatten_dims(expr.args[0], element)
+            test_dims = self._flatten_dims(expr.args[1], element)
+            if test_dims != 0 and dims != 1:  # FIXME: allow dimless until bool params @IgnorePep8
+                raise NineMLDimensionError(self._construct_error_message(
+                    "Piecewise condition is not boolean '{}'"
+                    .format(expr.args[1]), test_dims, expr.args[1]))
         elif isinstance(type(expr), sympy.FunctionClass):
             for arg in expr.args:
                 arg_dims = self._flatten_dims(arg, element)
