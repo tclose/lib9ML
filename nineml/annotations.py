@@ -1,8 +1,9 @@
 from copy import copy
 from collections import defaultdict
-from nineml.xmlns import E, NINEML
+from nineml.xmlns import E, NINEML, ElementMaker
 from nineml import DocumentLevelObject
 from itertools import chain
+from nineml.exceptions import NineMLRuntimeError
 
 
 class Annotations(defaultdict, DocumentLevelObject):
@@ -12,13 +13,9 @@ class Annotations(defaultdict, DocumentLevelObject):
 
     element_name = 'Annotations'
 
-    @classmethod
-    def _dict_tree(cls):
-        return defaultdict(cls._dict_tree)
-
     def __init__(self, *args, **kwargs):
         # Create an infinite (on request) tree of defaultdicts
-        super(Annotations, self).__init__(self._dict_tree, *args, **kwargs)
+        super(Annotations, self).__init__(dict, *args, **kwargs)
 
     # FIXME: Disabled Annotations deepcopy because it was causing problems.
     #        Need to rework the annotations so that it doesn't use nested
@@ -27,11 +24,15 @@ class Annotations(defaultdict, DocumentLevelObject):
         return Annotations()
 
     def __repr__(self):
-        return ("Annotations({})"
-                .format(', '.join('{}={}'.format(k, v)
-                                  for k, v in self.iteritems())))
+        return ("Annotations({})".format(', '.join(
+            '{}={}'.format(k, v) for k, v in self.iteritems())))
 
     def to_xml(self, **kwargs):  # @UnusedVariable
+        args = []
+        for ns, dct in self.iteritems():
+            E_NS = ElementMaker(namespace=ns, nsmap={None: ns})
+            for name, value in dct.iteritems():
+                args.append(self._dict_to_xml(name, value, E_NS))
         return E(self.element_name,
                  *chain(*[[E(k, str(v)) for k, v in dct.iteritems()]
                           for dct in self.itervalues()]))
@@ -44,8 +45,27 @@ class Annotations(defaultdict, DocumentLevelObject):
         kwargs = {NINEML: children}
         return cls(**kwargs)
 
+    @classmethod
+    def _dict_to_xml(cls, element_name, dct, E_NS):
+        kwargs = {}
+        args = []
+        for k, v in dct.iteritems():
+            if isinstance(v, dict):
+                args.append(cls._dict_to_xml(k, v, E_NS))
+            elif isinstance(v, (int, float, str)):
+                kwargs[k] = str(v)
+            else:
+                raise NineMLRuntimeError(
+                    "Could not write annotation '{}' because its"
+                    "value, {}, is not basic type or dictionary")
+        return E_NS(element_name, *args, **kwargs)
+
 
 def read_annotations(from_xml):
+    """
+    Decorator to read annotations from element before it is
+    read
+    """
     def annotate_from_xml(cls, element, *args, **kwargs):
         annot_elem = expect_none_or_single(
             element.findall(NINEML + Annotations.element_name))
@@ -70,6 +90,9 @@ def read_annotations(from_xml):
 
 
 def annotate_xml(to_xml):
+    """
+    Decorator to insert annotations into created xml element
+    """
     def annotate_to_xml(self, document_or_obj, **kwargs):
         # If Abstraction Layer class
         if hasattr(self, 'document'):
@@ -78,10 +101,7 @@ def annotate_xml(to_xml):
         else:
             obj = self
         elem = to_xml(self, document_or_obj, **kwargs)
-        try:
-            elem.append(obj.annotations.to_xml(**kwargs))
-        except:
-            raise
+        elem.append(obj.annotations.to_xml(**kwargs))
         return elem
     return annotate_to_xml
 
