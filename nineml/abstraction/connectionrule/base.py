@@ -53,14 +53,12 @@ class ConnectionRule(ComponentClass):
         extractor.visit(self)
         return extractor.expressions
 
-    @annotate_xml
-    def to_xml(self):
+    def to_xml(self, **kwargs):  # @UnusedVariable
         self.standardize_unit_dimensions()
         self.validate()
         return ConnectionRuleXMLWriter().visit(self)
 
     @classmethod
-    @read_annotations
     def from_xml(cls, element, document):
         return ConnectionRuleXMLLoader(document).load_connectionruleclass(
             element)

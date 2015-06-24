@@ -39,14 +39,12 @@ class RandomDistribution(ComponentClass):
         extractor.visit(self)
         return extractor.expressions
 
-    @annotate_xml
-    def to_xml(self):
+    def to_xml(self, **kwargs):  # @UnusedVariable
         self.standardize_unit_dimensions()
         self.validate()
         return RandomDistributionXMLWriter().visit(self)
 
     @classmethod
-    @read_annotations
     def from_xml(cls, element, document):
         return RandomDistributionXMLLoader(
             document).load_randomdistributionclass(element)
