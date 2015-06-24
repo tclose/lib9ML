@@ -315,7 +315,7 @@ class Component(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
         name = element.attrib.get("name", None)
         properties = PropertySet.from_xml(
@@ -468,7 +468,7 @@ class Quantity(BaseULObject):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         if element.find(NINEML + 'SingleValue') is not None:
             value = SingleValue.from_xml(
                 expect_single(element.findall(NINEML + 'SingleValue')),
@@ -544,7 +544,7 @@ class Property(Quantity):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         cls.check_tag(element)
         quantity = Quantity.from_xml(element, document)
         try:

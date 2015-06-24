@@ -54,7 +54,7 @@ class BaseReference(BaseNineMLObject):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag != NINEML + cls.element_name:
             raise Exception("Expecting tag name %s%s, actual tag name %s" % (
                 NINEML, cls.element_name, element.tag))
@@ -129,7 +129,7 @@ class Prototype(BaseReference):
 
 
 def resolve_reference(from_xml):
-    def resolving_from_xml(cls, element, document):
+    def resolving_from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag == NINEML + Reference.element_name:
             reference = Reference.from_xml(element, document)
             ul_object = reference.user_object

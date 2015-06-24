@@ -144,7 +144,7 @@ class Projection(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         cls.check_tag(element)
         # Get Name
         name = element.get('name')
@@ -208,7 +208,7 @@ class Terminus(BaseULObject):
         return (pc.to_xml() for pc in self.port_connections)
 
     @classmethod
-    def _port_connections_from_xml(cls, element, document):
+    def _port_connections_from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         return (PortConnection.from_xml(e, document)
                 for e in element.findall(NINEML + 'PortConnection'))
 
@@ -239,7 +239,7 @@ class PopulationTerminus(Terminus):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):  # @UnusedVariable
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable  # @UnusedVariable
         cls.check_tag(element)
         population = Reference.from_xml(
             expect_single(element.findall(NINEML + 'Reference')),
@@ -265,7 +265,7 @@ class ComponentTerminus(Terminus):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):  # @UnusedVariable
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable  # @UnusedVariable
         cls.check_tag(element)
         component = DynamicsProperties.from_xml(
             expect_single(element.findall(NINEML + 'DynamicsProperties')),
@@ -479,7 +479,7 @@ class Connectivity(ConnectionRuleProperties):
 
     @classmethod
     @read_annotations
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         assert element.tag in ('Connectivity', NINEML + 'Connectivity'), (
             "Found '{}' element, expected '{}'".format(element.tag,
                                                        'Connectivity'))

@@ -689,7 +689,7 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return DynamicsXMLWriter().visit(self)
 
     @classmethod
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         return DynamicsXMLLoader(document).load_dynamics(element)
 
 

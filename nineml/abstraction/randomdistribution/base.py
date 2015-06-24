@@ -45,7 +45,7 @@ class RandomDistribution(ComponentClass):
         return RandomDistributionXMLWriter().visit(self)
 
     @classmethod
-    def from_xml(cls, element, document):
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         return RandomDistributionXMLLoader(
             document).load_randomdistributionclass(element)
 
