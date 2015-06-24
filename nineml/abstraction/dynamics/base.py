@@ -22,7 +22,7 @@ from nineml.utils import (check_list_contain_same_items, invert_dictionary,
 from .visitors.cloner import (
     DynamicsExpandAliasDefinition, DynamicsCloner)
 from nineml.xmlns import NINEML
-from nineml.annotations import NO_DIMENSION_CHECK
+from nineml.annotations import VALIDATE_DIMENSIONS
 
 
 class _NamespaceMixin(object):
@@ -315,7 +315,7 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         # Store flattening Information:
         self._flattener = None
 
-        self.annotations[NINEML][NO_DIMENSION_CHECK] = validate_dimensions
+        self.annotations[NINEML][VALIDATE_DIMENSIONS] = validate_dimensions
         # Is the finished component_class valid?:
         self.validate()
 
@@ -340,9 +340,9 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return "<dynamics.Dynamics %s>" % self.name
 
     def validate(self, validate_dimensions=None):
-        if validate_dimensions:
+        if validate_dimensions is None:
             validate_dimensions = self.annotations[NINEML].get(
-                NO_DIMENSION_CHECK, True)
+                VALIDATE_DIMENSIONS, True)
         self._resolve_transition_regimes()
         DynamicsValidator.validate_componentclass(self, validate_dimensions)
 
