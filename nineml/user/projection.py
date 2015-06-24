@@ -11,8 +11,12 @@ from nineml.utils import (
     expect_single, expect_none_or_single)
 from .component import Quantity
 from nineml import DocumentLevelObject
+<<<<<<< Upstream, based on origin/bleeding_edge
 from .port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
+=======
+from .port_connections import AnalogPortConnection, EventPortConnection
+>>>>>>> d38713f cleaned up after rebase to include document and kwargs to to_xml methods
 
 
 class Projection(BaseULObject, DocumentLevelObject):

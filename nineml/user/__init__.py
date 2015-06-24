@@ -10,3 +10,4 @@ from .component import (Property, Component, Definition,
                         Initial, DynamicsProperties,
                         ConnectionRuleProperties, RandomDistributionProperties,
                         Quantity)
+from .multicomponent import MultiComponent, MultiCompartment 
