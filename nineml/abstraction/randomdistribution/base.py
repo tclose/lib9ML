@@ -27,6 +27,9 @@ class RandomDistribution(ComponentClass):
     def required_for(self, expressions):
         return RandomDistributionRequiredDefinitions(self, expressions)
 
+    def dimension_of(self, element):
+        return RandomDistributionDimensionResolver(self)[element]
+
     def _find_element(self, element):
         return RandomDistributionElementFinder(element).found_in(self)
 
@@ -54,7 +57,8 @@ from .visitors.modifiers import(
     RandomDistributionRenameSymbol, RandomDistributionAssignIndices)
 from .visitors.queriers import (RandomDistributionRequiredDefinitions,
                                 RandomDistributionElementFinder,
-                                RandomDistributionExpressionExtractor)
+                                RandomDistributionExpressionExtractor,
+                                RandomDistributionDimensionResolver)
 from .visitors.validators import RandomDistributionValidator
 from .visitors.xml import (
     RandomDistributionXMLLoader, RandomDistributionXMLWriter)
