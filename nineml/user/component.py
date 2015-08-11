@@ -1,85 +1,21 @@
 # encoding: utf-8
 from itertools import chain
-from lxml import etree
 from abc import ABCMeta, abstractmethod
 import collections
-from nineml.reference import BaseReference
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
-from nineml.xmlns import nineml_namespace
 from nineml.xmlns import NINEML, E
+from nineml.reference import (
+    Reference, Prototype, Definition, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml.units import Unit, unitless
 from ..abstraction import ComponentClass
-from .values import SingleValue, ArrayValue, ExternalArrayValue
+from .values import SingleValue, ArrayValue, ExternalArrayValue#, ComponentValue
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
 from os import path
-
-
-class Reference(BaseReference):
-    """
-    A reference to a NineML user layer object previously defined or defined
-    elsewhere.
-
-    **Arguments**:
-        *name*
-            The name of a NineML object which already exists, or which is
-            defined in a separate XML file.
-        *document*
-            A dictionary or :class:`Document` object containing the object
-            being referred to, if the object already exists.
-        *url*
-            If the object is defined in a separate XML file, the URL
-            of the file.
-
-    """
-    element_name = "Reference"
-
-    def __init__(self, name, document, url=None):
-        """
-        docstring needed
-
-        `name`     -- a name of an existing component_class to refer to
-        `document` -- a Document object containing the top-level
-                      objects in the current file
-        `url`      -- a url of the file containing the exiting component_class
-        """
-        super(Reference, self).__init__(name, document, url)
-        if not isinstance(self._referred_to, BaseULObject):
-            msg = ("Reference points to a non-user-layer object '{}'"
-                   .format(self._referred_to.name))
-            raise NineMLRuntimeError(msg)
-        self._referred_to.from_reference = self
-
-    @property
-    def user_object(self):
-        """The object being referred to."""
-        return self._referred_to
-
-
-def resolve_reference(from_xml):
-    def resolving_from_xml(cls, element, document):
-        if element.tag == NINEML + Reference.element_name:
-            reference = Reference.from_xml(element, document)
-            ul_object = reference.user_object
-        else:
-            cls.check_tag(element)
-            ul_object = from_xml(cls, element, document)
-        return ul_object
-    return resolving_from_xml
-
-
-def write_reference(to_xml):
-    def unresolving_to_xml(self, as_reference=True):
-        if self.from_reference is not None and as_reference:
-            xml = self.from_reference.to_xml()
-        else:
-            xml = to_xml(self)
-        return xml
-    return unresolving_to_xml
 
 
 class Component(BaseULObject, DocumentLevelObject):
@@ -342,27 +278,6 @@ class Component(BaseULObject, DocumentLevelObject):
         return self.property_set[name]
 
 
-class Definition(BaseReference):
-
-    """
-    Base class for model components that are defined in the abstraction layer.
-    """
-    element_name = "Definition"
-
-    @property
-    def component_class(self):
-        return self._referred_to
-
-
-class Prototype(BaseReference):
-
-    element_name = "Prototype"
-
-    @property
-    def component(self):
-        return self._referred_to
-
-
 class Quantity(BaseULObject):
 
     """
@@ -380,8 +295,10 @@ class Quantity(BaseULObject):
     defining_attributes = ("name", "value", "units")
 
     def __init__(self, value, units=None):
-        if not isinstance(value, (int, float, SingleValue, ArrayValue,
-                                  ExternalArrayValue)):
+        if isinstance(value, (list, tuple)):
+            value = ArrayValue(value)
+        elif not isinstance(value, (int, float, SingleValue, ArrayValue,
+                                    ExternalArrayValue)):
             raise Exception("Invalid type '{}' for value, can be one of "
                             "'Value', 'Reference',"
                             "'RandomDistributionProperties', 'ValueList', "
@@ -398,7 +315,11 @@ class Quantity(BaseULObject):
         self.units = units
 
     def __hash__(self):
-        return hash(self.value) ^ hash(self.units)
+        if self.is_single():
+            hsh = hash(self.value) ^ hash(self.units)
+        else:
+            hsh = hash(self.units)
+        return hsh
 
     def is_single(self):
         return isinstance(self._value, SingleValue)
@@ -415,21 +336,30 @@ class Quantity(BaseULObject):
         if self.is_single():
             return self._value.value
         else:
-            raise NineMLRuntimeError("Cannot access single value for array or "
-                                     "component_class type")
+            return self._value.values
 
     @property
     def quantity(self):
         """The value of the parameter (magnitude and units)."""
         return (self.value, self.units)
 
-    @property
-    def value_array(self):
+    def __iter__(self):
         if self.is_array():
-            raise NotImplementedError
+            return iter(self._value.values)
+        elif self.is_single():
+            return iter([self._value.value])
         else:
-            raise NineMLRuntimeError("Cannot access value array for "
-                                     "component_class or single value types")
+            raise NineMLRuntimeError(
+                "Cannot iterate random distribution")
+
+    def __getitem__(self, index):
+        if self.is_array():
+            return self._value.values[index]
+        elif self.is_single():
+            return self._value.value
+        else:
+            raise NineMLRuntimeError(
+                "Cannot get item from random distribution")
 
     @property
     def random_distribution(self):
@@ -478,13 +408,13 @@ class Quantity(BaseULObject):
                 expect_single(element.findall(NINEML + 'ArrayValue')),
                 document)
         elif element.find(NINEML + 'ExternalArrayValue') is not None:
-            value = ArrayValue.from_xml(
-                expect_single(element.findall(NINEML + 'ArrayValue')),
+            value = ExternalArrayValue.from_xml(
+                expect_single(element.findall(NINEML + 'ExternalArrayValue')),
                 document)
-        elif element.find(NINEML + 'ComponentValue') is not None:
-            value = ArrayValue.from_xml(
-                expect_single(element.findall(NINEML + 'ArrayValue')),
-                document)
+#        elif element.find(NINEML + 'ComponentValue') is not None:
+#            value = ComponentValue.from_xml(
+#                expect_single(element.findall(NINEML + 'ComponentValue')),
+#                document)
         else:
             raise Exception(
                 "Did not find recognised value tag in property (found {})"
@@ -496,12 +426,12 @@ class Quantity(BaseULObject):
                 "{} element '{}' is missing 'units' attribute (found '{}')"
                 .format(element.tag, element.get('name', ''),
                         "', '".join(element.attrib.iterkeys())))
-        try:
-            units = document[units_str]
-        except KeyError:
-            raise NineMLMissingElementError(
-                "Did not find definition of '{}' units in the current "
-                "document.".format(units_str))
+#         try:
+        units = document[units_str]
+#         except KeyError:
+#             raise NineMLMissingElementError(
+#                 "Did not find definition of '{}' units in the current "
+#                 "document.".format(units_str))
         return cls(value=value, units=units)
 
 
@@ -576,7 +506,12 @@ class PropertySet(dict):
         dict.__init__(self)
         for prop in properties:
             self[prop.name] = prop  # should perhaps do a copy
-        for name, (value, units) in kwproperties.items():
+        for name, qty in kwproperties.items():
+            try:
+                value, units = qty
+            except TypeError:
+                value = qty
+                units = None
             self[name] = Property(name, value, units)
 
     def __hash__(self):
