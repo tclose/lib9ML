@@ -3,15 +3,15 @@ from itertools import chain
 from abc import ABCMeta, abstractmethod
 import collections
 from nineml.exceptions import (
-    NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
+    NineMLUnitMismatchError, NineMLRuntimeError)
 from nineml.xmlns import NINEML, E
 from nineml.reference import (
-    Reference, Prototype, Definition, write_reference, resolve_reference)
+    Prototype, Definition, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml.units import Unit, unitless
 from ..abstraction import ComponentClass
-from .values import SingleValue, ArrayValue, ExternalArrayValue#, ComponentValue
+from .values import SingleValue, ArrayValue, ExternalArrayValue
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
@@ -144,6 +144,9 @@ class Component(BaseULObject, DocumentLevelObject):
         # them with properties defined locally
         return self.property_set.itervalues()
 
+    def __iter__(self):
+        return self.property_set.itervalues()
+
     @property
     def property_names(self):
         return self.property_set.iterkeys()
@@ -222,7 +225,7 @@ class Component(BaseULObject, DocumentLevelObject):
                        ",".join(diff_b))
         if msg:
             # need a more specific type of Exception
-            raise Exception(". ".join(msg))
+            raise NineMLRuntimeError(". ".join(msg))
         # Check dimensions match
         for param in self.component_class.parameters:
             prop_units = self.property(param.name).units
@@ -276,6 +279,17 @@ class Component(BaseULObject, DocumentLevelObject):
 
     def property(self, name):
         return self.property_set[name]
+
+    def write(self, fname):
+        """
+        Writes the top-level NineML object to file in XML.
+        """
+        to_write = [self]
+        # Also write the component class definition to file if cannot be
+        # referenced from a separate url
+        if self.definition.url is None:
+            to_write.append(self.component_class)
+        Document(*to_write).write(fname)
 
 
 class Quantity(BaseULObject):

@@ -184,7 +184,7 @@ class Dynamics(ComponentClass, _NamespaceMixin):
                  subnodes=None,
                  portconnections=None, regimes=None,
                  aliases=None, state_variables=None,
-                 constants=None, validate_dimensions=True):
+                 constants=None, validate_dimensions=True, url=None):
         """Constructs a Dynamics
 
         :param name: The name of the component_class.
@@ -221,7 +221,8 @@ class Dynamics(ComponentClass, _NamespaceMixin):
 
         """
         ComponentClass.__init__(self, name=name, parameters=parameters,
-                                aliases=aliases, constants=constants)
+                                aliases=aliases, constants=constants,
+                                url=url)
         regimes = normalise_parameter_as_list(regimes)
         state_variables = normalise_parameter_as_list(state_variables)
 
@@ -700,8 +701,9 @@ class Dynamics(ComponentClass, _NamespaceMixin):
         return DynamicsXMLWriter().visit(self)
 
     @classmethod
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
-        return DynamicsXMLLoader(document).load_dynamics(element)
+    def from_xml(cls, element, document, **kwargs):
+        return DynamicsXMLLoader(document).load_dynamics(
+            element, url=document.url, **kwargs)
 
 
 def inf_check(l1, l2, desc):

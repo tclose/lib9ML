@@ -68,7 +68,7 @@ from .projection import (
     Post, FromPre, FromPost, FromPlasticity, FromResponse)
 from .component import (PropertySet, Property, Component, Definition,
                         Prototype, resolve_reference, write_reference,
-                        Reference, InitialValue, InitialValueSet,
+                        InitialValue, InitialValueSet,
                         DynamicsProperties, ConnectionRuleProperties,
                         RandomDistributionProperties, Quantity)
 from .syntactic_sugar import (
