@@ -20,9 +20,14 @@ class ConnectionRule(ComponentClass):
     element_name = 'ConnectionRule'
     defining_attributes = ('name', '_parameters', 'standard_library')
 
-    def __init__(self, name, parameters=None):
+    def __init__(self, name, standard_library, parameters=None):
         super(ConnectionRule, self).__init__(
             name, parameters)
+        self._standard_library = standard_library
+
+    @property
+    def standard_library(self):
+        return self._standard_library
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
