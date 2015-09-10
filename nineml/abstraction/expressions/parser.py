@@ -87,11 +87,12 @@ class Parser(object):
                 if tokval in self._to_escape:
                     self.escaped_names.add(tokval)
                     tokval = self._escape(tokval)
-                # Convert logical identities from ANSI to Python names
+                # Convert logical identities from ANSI C -> Python names
                 elif tokval == 'true':
                     tokval = 'True'
                 elif tokval == 'false':
                     tokval = 'False'
+                # Unescape relationals escaped in _parse_relationals
                 elif tokval.endswith('__'):
                     tokval = tokval[:-2]
             # Handle multiple negations
@@ -156,7 +157,8 @@ class Parser(object):
     @classmethod
     def _func_to_op(self, expr):
         """Maps functions to SymPy operators (i.e. 'pow')"""
-        if isinstance(expr, sympy.Function):
+        if isinstance(expr, (sympy.function.Application,
+                             sympy.relational.Relational)):
             args = (self._func_to_op(a) for a in expr.args)
             try:
                 expr = self._func_to_op_map[type(expr)](*args)
