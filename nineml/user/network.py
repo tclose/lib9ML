@@ -63,7 +63,7 @@ class Network(BaseULObject, DocumentLevelObject):
 
     @write_reference
     @annotate_xml
-    def to_xml(self):
+    def to_xml(self, **kwargs):  # @UnusedVariable
         return E(self.element_name,
                  name=self.name,
                  *[p.to_xml() for p in chain(self.populations.values(),

@@ -69,6 +69,9 @@ class Document(dict, BaseNineMLObject):
         return (super(Document, self).__eq__(other) and
                 self.url == other.url)
 
+    def __ne__(self, other):
+        return not self == other
+
     def __getitem__(self, name):
         """
         Returns the element referenced by the given name
@@ -167,6 +170,9 @@ class Document(dict, BaseNineMLObject):
         elem = unloaded.cls.from_xml(unloaded.xml, self)
         assert self._loading[-1] is unloaded
         self._loading.pop()
+        if not isinstance(unloaded.name, basestring):
+            print unloaded.name
+        assert isinstance(unloaded.name, basestring)
         self[unloaded.name] = elem
         return elem
 
@@ -227,7 +233,7 @@ class Document(dict, BaseNineMLObject):
                          " of units")
                 a.set_units(std_units)
 
-    def to_xml(self):
+    def to_xml(self, **kwargs):  # @UnusedVariable
         self.standardize_units()
         return E(
             self.element_name,
@@ -280,7 +286,15 @@ class Document(dict, BaseNineMLObject):
                     .format(child.tag))
             # Units use 'symbol' as their unique identifier (from LEMS) all
             # other elements use 'name'
-            name = child.attrib.get('name', child.attrib.get('symbol'))
+            try:
+                try:
+                    name = child.attrib['name']
+                except KeyError:
+                    name = child.attrib['symbol']
+            except KeyError:
+                raise NineMLRuntimeError(
+                    "Missing 'name' (or 'symbol') attribute from document "
+                    "level object '{}'".format(child))
             if name in elements:
                 raise NineMLRuntimeError(
                     "Duplicate identifier '{ob1}:{name}'in NineML file '{url}'"

@@ -13,7 +13,7 @@ from __future__ import division
 import os.path
 import unittest
 from nineml.user import (
-    PropertySet, SpikingNodeType, SynapseType, Projection, Network,
+    PropertySet, Projection, Network,
     PortConnection, DynamicsProperties, Connectivity, Population,
     FromResponse, FromPlasticity)
 from nineml import Document, load
@@ -55,18 +55,18 @@ class TestNetwork(unittest.TestCase):
                                  "t_rpend": (0.0, ms)}
         synapse_initial_values = {"A": (0.0, nA), "B": (0.0, nA)}
 
-        celltype = SpikingNodeType("nrn",
+        celltype = DynamicsProperties("nrn",
                                           path.join(self.xml_dir,
                                                     'BrunelIaF.xml'),
                                           properties=neuron_parameters,
                                           initial_values=neuron_initial_values)
-        ext_stim = SpikingNodeType("stim",
+        ext_stim = DynamicsProperties("stim",
                                           path.join(self.xml_dir,
                                                     "Poisson.xml"),
                                           PropertySet(rate=(input_rate,
                                                                    Hz)),
                                           initial_values={"t_next": (0.5, ms)})
-        psr = SynapseType("syn",
+        psr = DynamicsProperties("syn",
                                  path.join(self.xml_dir, "AlphaPSR.xml"),
                                  properties=psr_parameters,
                                  initial_values=synapse_initial_values)
@@ -108,12 +108,14 @@ class TestNetwork(unittest.TestCase):
         model = Network("Three-neuron network with alpha synapses")
         model.add(inpt, p1, p2)
         model.add(exc_prj, inh_prj)
-        doc = Document(model, all_to_all, static_exc, static_inh, exc_prj,
-                       inh_prj)
+        doc = Document(model, static_exc, static_inh, exc_prj,
+                       inh_prj, ext_stim, psr, p1, p2, inpt, celltype)
         xml = doc.to_xml()
         loaded_doc = load(xml)
         if loaded_doc != doc:
-            loaded_doc.find_mismatch(doc)
+            mismatch = loaded_doc.find_mismatch(doc)
+        else:
+            mismatch = ''
         self.assertEqual(loaded_doc, doc,
-                         "Brunel network model failed xml roundtrip")
-        os.remove(self.tmp_xml_file)
+                         "Brunel network model failed xml roundtrip:\n\n{}"
+                         .format(mismatch))
