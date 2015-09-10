@@ -7,11 +7,11 @@ from . import BaseULObject
 from .component import write_reference, resolve_reference
 from nineml.annotations import annotate_xml, read_annotations
 from nineml.xmlns import E, NINEML
-from nineml.utils import check_tag
+from nineml.base import DocumentLevelObject
 import nineml
 
 
-class Network(BaseULObject):
+class Network(BaseULObject, DocumentLevelObject):
     """
     Container for populations and projections between those populations.
 
@@ -73,17 +73,17 @@ class Network(BaseULObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable @IgnorePep8
         cls.check_tag(element)
-        populations = []
-        for pop_elem in element.findall(NINEML + 'PopulationItem'):
+        populations = {}
+        for pop_elem in element.findall(NINEML + 'Population'):
             pop = Population.from_xml(pop_elem, document)
             populations[pop.name] = pop
-        projections = []
-        for proj_elem in element.findall(NINEML + 'ProjectionItem'):
+        projections = {}
+        for proj_elem in element.findall(NINEML + 'Projection'):
             proj = Projection.from_xml(proj_elem, document)
             projections[proj.name] = proj
-        selections = []
+        selections = {}
         for sel_elem in element.findall(NINEML + 'Selection'):
             sel = Selection.from_xml(sel_elem, document)
             selections[sel.name] = sel

@@ -45,8 +45,7 @@ class Document(dict, BaseNineMLObject):
         if not isinstance(element, (DocumentLevelObject, self._Unloaded)):
             raise NineMLRuntimeError(
                 "Could not add {} as it is not a document level NineML "
-                "object ('{}') ".format(element.element_name,
-                                        "', '".join(self.top_level_types)))
+                "object".format(element.element_name))
         if element.name in self:
             raise NineMLRuntimeError(
                 "Could not add element '{}' as an element with that name "
@@ -232,9 +231,7 @@ class Document(dict, BaseNineMLObject):
         self.standardize_units()
         return E(
             self.element_name,
-            *[c.to_xml(as_reference=False)
-              if isinstance(c, nineml.user.BaseULObject) else c.to_xml()
-              for c in self.itervalues()])
+            *[c.to_xml(as_reference=False) for c in self.itervalues()])
 
     def write(self, filename):
         doc = self.to_xml()
