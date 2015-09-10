@@ -21,6 +21,10 @@ class Document(dict, BaseNineMLObject):
 
     defining_attributes = ('elements',)
     element_name = 'NineML'
+    write_order = ['Population', 'Projection', 'Selection', 'Network',
+                   'Dynamics', 'ConnectionRule', 'RandomDistribution',
+                   'DynamicsProperties', 'ConnectionRuleProperties',
+                   'RandomDistributionProperties', 'Dimension', 'Unit']
 
     # A tuple to hold the unresolved elements
     _Unloaded = collections.namedtuple('_Unloaded', 'name xml cls')
@@ -45,7 +49,8 @@ class Document(dict, BaseNineMLObject):
         if not isinstance(element, (DocumentLevelObject, self._Unloaded)):
             raise NineMLRuntimeError(
                 "Could not add {} as it is not a document level NineML "
-                "object".format(element.element_name))
+                "object ('{}') ".format(
+                    element.element_name, "', '".join(self.write_order)))
         if element.name in self:
             raise NineMLRuntimeError(
                 "Could not add element '{}' as an element with that name "
@@ -56,8 +61,8 @@ class Document(dict, BaseNineMLObject):
         if not isinstance(element, DocumentLevelObject):
             raise NineMLRuntimeError(
                 "Could not remove {} as it is not a document level NineML "
-                "object ('{}') ".format(element.element_name,
-                                        "', '".join(self.top_level_types)))
+                "object ('{}') ".format(
+                    element.element_name, "', '".join(self.write_order)))
         name = element.name
         del self[name]
 
@@ -169,9 +174,7 @@ class Document(dict, BaseNineMLObject):
         self._loading.append(unloaded)
         elem = unloaded.cls.from_xml(unloaded.xml, self)
         assert self._loading[-1] is unloaded
-        self._loading.pop()
-        if not isinstance(unloaded.name, basestring):
-            print unloaded.name
+        self._loading.pop()       
         assert isinstance(unloaded.name, basestring)
         self[unloaded.name] = elem
         return elem
@@ -237,7 +240,8 @@ class Document(dict, BaseNineMLObject):
         self.standardize_units()
         return E(
             self.element_name,
-            *[c.to_xml(as_reference=False) for c in self.itervalues()])
+            *self._sort(c.to_xml(as_reference=False)
+                        for c in self.itervalues()))
 
     def write(self, filename):
         doc = self.to_xml()
@@ -315,6 +319,12 @@ class Document(dict, BaseNineMLObject):
                 result += s.find_mismatch(other[k])
         return result
 
+    def _sort(self, elements):
+        """Sorts the element into a consistent, logical order before write"""
+        return sorted(
+            elements,
+            key=lambda e: self.write_order.index(e.tag[len(NINEML):]))
+
 
 def load(root_element, read_from=None):
     """
@@ -340,7 +350,6 @@ def read(url, relative_to=None):
         if not isinstance(url, file):
             try:
                 with contextlib.closing(urlopen(url)) as f:
-                    f = urlopen(url)
                     xml = etree.parse(f)
             except IOError, e:
                 raise NineMLRuntimeError("Could not read 9ML URL '{}': \n{}"
