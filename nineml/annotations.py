@@ -20,6 +20,10 @@ class Annotations(defaultdict, DocumentLevelObject):
         # Create an infinite (on request) tree of defaultdicts
         super(Annotations, self).__init__(self._dict_tree, *args, **kwargs)
 
+    def __deepcopy__(self, memo):
+        # FIXME: This was causing some problems so I have disabled it
+        return Annotations()
+
     def __repr__(self):
         return ("Annotations({})"
                 .format(', '.join('{}={}'.format(k, v)
