@@ -146,15 +146,11 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
 
     def __mul__(self, other):
         "self * other"
-        if other == 1:
-            other = dimensionless
         return Dimension(self.make_name([self.name, other.name]),
                          dimensions=tuple(s + o for s, o in zip(self, other)))
 
     def __truediv__(self, other):
         "self / expr"
-        if other == 1:
-            other = dimensionless
         return Dimension(self.make_name([self.name], [other.name]),
                          dimensions=tuple(s - o for s, o in zip(self, other)))
 
@@ -167,8 +163,6 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
         return self.__mul__(other)
 
     def __rtruediv__(self, other):
-        if other == 1:
-            other = dimensionless
         return other.__truediv__(self)
 
     def __div__(self, other):

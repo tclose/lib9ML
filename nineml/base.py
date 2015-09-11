@@ -24,8 +24,7 @@ class BaseNineMLObject(object):
         return self._annotations
 
     def __eq__(self, other):
-        if not (isinstance(other, self.__class__) or
-                isinstance(self, other.__class__)):
+        if self.element_name != other.element_name:
             return False
         for name in self.defining_attributes:
             self_elem = getattr(self, name)

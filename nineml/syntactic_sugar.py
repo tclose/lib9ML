@@ -1,7 +1,7 @@
 from nineml.utils import filter_discrete_types
 from nineml.exceptions import NineMLRuntimeError
-from .transitions import (OutputEvent, Trigger, StateAssignment, OnEvent,
-                          OnCondition)
+from nineml.abstraction.dynamics.transitions import (
+    OutputEvent, Trigger, StateAssignment, OnEvent, OnCondition)
 from nineml.abstraction.expressions.utils import is_single_symbol
 
 
@@ -67,3 +67,45 @@ def DoOnCondition(condition, do=None, to=None):
                        state_assignments=assignments,
                        output_events=output_events,
                        target_regime=to)
+
+from . import DynamicsProperties
+
+
+class SpikingNodeType(DynamicsProperties):
+    """
+    DynamicsProperties representing a model of a spiking node, i.e. something
+    that can emit (and optionally receive) spikes.
+    """
+    pass
+
+
+class IonDynamicsType(DynamicsProperties):
+    """
+    DynamicsProperties representing either a ion channel or the dynamics of the
+    concentration of a pool of ions. Typically part of a SpikingNodeType.
+    """
+    pass
+
+
+class SynapseType(DynamicsProperties):
+    """
+    DynamicsProperties representing a model of a post-synaptic response, i.e.
+    the current produced in response to a spike.
+    """
+    pass
+
+
+class CurrentSourceType(DynamicsProperties):
+    """
+    DynamicsProperties representing a model of a current source that may be
+    injected into a spiking node.
+    """
+    pass
+
+
+class ConnectionType(DynamicsProperties):
+    """
+    DynamicsProperties representing a model of a synaptic connection, including
+    weight, delay, optionally a synaptic plasticity rule.
+    """
+    pass
