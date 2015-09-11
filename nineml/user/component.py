@@ -11,7 +11,7 @@ from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml import units as un
 from ..abstraction import ComponentClass
-from .values import SingleValue, ArrayValue, ExternalArrayValue
+from .values import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
@@ -108,6 +108,9 @@ class Component(BaseULObject, DocumentLevelObject):
         return (self.name, self.definition, self.property_set,
                 self.initial_value_set, self._url)
 
+    def __getitem__(self, name):
+        return self._properties[name].quantity
+
     @property
     def component_class(self):
         """
@@ -126,19 +129,6 @@ class Component(BaseULObject, DocumentLevelObject):
         return self._definition
 
     @property
-    def property_set(self):
-        """
-        The set of component_class properties (parameter values).
-        """
-        # Recursively retrieves properties defined in prototypes and updates
-        # them with properties defined locally
-        props = PropertySet()
-        if isinstance(self.definition, Prototype):
-            props.update(self.definition.component.property_set)
-        props.update(self._properties)
-        return props
-
-    @property
     def properties(self):
         """
         The set of component_class properties (parameter values).
@@ -147,8 +137,6 @@ class Component(BaseULObject, DocumentLevelObject):
         # them with properties defined locally
         return self.property_set.itervalues()
 
-    def __iter__(self):
-        return self.property_set.itervalues()
 
     @property
     def property_names(self):
@@ -299,168 +287,6 @@ class Component(BaseULObject, DocumentLevelObject):
         Document(*to_write).write(fname)
 
 
-class Quantity(BaseULObject):
-
-    """
-    Representation of a numerical- or string-valued parameter.
-
-    A numerical parameter is a (name, value, units) triplet, a string parameter
-    is a (name, value) pair.
-
-    Numerical values may either be numbers, or a component_class that generates
-    numbers, e.g. a RandomDistribution instance.
-    """
-    __metaclass__ = ABCMeta  # Abstract base class
-    element_name = 'Quantity'
-
-    defining_attributes = ("name", "value", "units")
-
-    def __init__(self, value, units=None):
-        if isinstance(value, (list, tuple)):
-            value = ArrayValue(value)
-        elif not isinstance(value, (int, float, SingleValue, ArrayValue,
-                                    ExternalArrayValue,
-                                    RandomDistributionProperties)):
-            raise Exception("Invalid type '{}' for value, can be one of "
-                            "'Value', 'Reference',"
-                            "'RandomDistributionProperties', 'ValueList', "
-                            "'ExternalValueList'"
-                            .format(value.__class__.__name__))
-        if units is None:
-            units = un.unitless
-        elif isinstance(units, basestring):
-            try:
-                units = getattr(un, units)
-            except AttributeError:
-                raise NineMLRuntimeError(
-                    "Did not find unit '{}' in units module".format(units))
-        if not isinstance(units, un.Unit):
-            raise NineMLRuntimeError(
-                "Units ({}) must of type <Unit>".format(units))
-        super(Quantity, self).__init__()
-        if isinstance(value, (int, float)):
-            value = SingleValue(value)
-        self._value = value
-        self.units = units
-
-    def __hash__(self):
-        return hash(self._value) ^ hash(self.units)
-
-    def is_single(self):
-        return isinstance(self._value, SingleValue)
-
-    def is_random(self):
-        return isinstance(self._value, RandomDistributionProperties)
-
-    def is_array(self):
-        return (isinstance(self._value, ArrayValue) or
-                isinstance(self._value, ExternalArrayValue))
-
-    @property
-    def value(self):
-        if self.is_single():
-            return self._value.value
-        else:
-            return self._value.values
-
-    @property
-    def quantity(self):
-        """The value of the parameter (magnitude and units)."""
-        return (self.value, self.units)
-
-    def __iter__(self):
-        if self.is_array():
-            return iter(self._value.values)
-        elif self.is_single():
-            return iter([self._value.value])
-        else:
-            raise NineMLRuntimeError(
-                "Cannot iterate random distribution")
-
-    def __getitem__(self, index):
-        if self.is_array():
-            return self._value.values[index]
-        elif self.is_single():
-            return self._value.value
-        else:
-            raise NineMLRuntimeError(
-                "Cannot get item from random distribution")
-
-    @property
-    def random_distribution(self):
-        if self.is_random():
-            return self._value
-        else:
-            raise NineMLRuntimeError("Cannot access random randomdistribution "
-                                     "for component_class or single value "
-                                     "types")
-
-    def set_units(self, units):
-        if units.dimension != self.units.dimension:
-            raise NineMLRuntimeError(
-                "Can't change dimension of quantity from '{}' to '{}'"
-                .format(self.units.dimension, units.dimension))
-        self.units = units
-
-    def __repr__(self):
-        units = self.units.name
-        if u"µ" in units:
-            units = units.replace(u"µ", "u")
-        return ("{}(value={}, units={})"
-                .format(self.element_name, self.value, units))
-
-    def __eq__(self, other):
-        if self.units.dimension != other.units.dimension:
-            return False
-        return (self.value * 10 ** self.units.power ==
-                other.value * 10 ** other.units.power)
-
-    @annotate_xml
-    def to_xml(self, document, **kwargs):  # @UnusedVariable
-        return E(self.element_name,
-                 self._value.to_xml(document, **kwargs),
-                 units=self.units.name)
-
-    @classmethod
-    @read_annotations
-    @handle_xml_exceptions
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
-        if element.find(NINEML + 'SingleValue') is not None:
-            value = SingleValue.from_xml(
-                expect_single(element.findall(NINEML + 'SingleValue')),
-                document)
-        elif element.find(NINEML + 'ArrayValue') is not None:
-            value = ArrayValue.from_xml(
-                expect_single(element.findall(NINEML + 'ArrayValue')),
-                document)
-        elif element.find(NINEML + 'ExternalArrayValue') is not None:
-            value = ExternalArrayValue.from_xml(
-                expect_single(element.findall(NINEML + 'ExternalArrayValue')),
-                document)
-        elif element.find(NINEML + 'Component') is not None:
-            value = RandomDistributionComponent.from_xml(
-                expect_single(element.findall(NINEML + 'Component')),
-                document)
-        else:
-            raise NineMLRuntimeError(
-                "Did not find recognised value tag in property (found {})"
-                .format(', '.join(c.tag for c in element.getchildren())))
-        try:
-            units_str = element.attrib['units']
-        except KeyError:
-            raise NineMLRuntimeError(
-                "{} element '{}' is missing 'units' attribute (found '{}')"
-                .format(element.tag, element.get('name', ''),
-                        "', '".join(element.attrib.iterkeys())))
-#         try:
-        units = document[units_str]
-#         except KeyError:
-#             raise NineMLMissingElementError(
-#                 "Did not find definition of '{}' units in the current "
-#                 "document.".format(units_str))
-        return cls(value=value, units=units)
-
-
 class Property(Quantity):
 
     """
@@ -473,16 +299,30 @@ class Property(Quantity):
     numbers, e.g. a RandomDistribution instance.
     """
     element_name = "Property"
+    defining_attributes = ("_name", "_quantity")
 
-    def __init__(self, name, value, units=None):
-        super(Property, self).__init__(value, units)
-        self.name = name
+    def __init__(self, name, quantity):
+        self._name = name
+        self._quantity = quantity
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def quantity(self):
+        return self._quantity
+
+    @property
+    def value(self):
+        return self._quantity.value
+
+    @property
+    def units(self):
+        return self._quantity.units
 
     def __hash__(self):
-        return hash(self.name) ^ super(Property, self).__hash__()
-
-    def __eq__(self, other):
-        return self.name == other.name and super(Property, self).__eq__(other)
+        return hash(self.name) ^ hash(self.quantity)
 
     def __repr__(self):
         units = self.units.name
@@ -503,12 +343,10 @@ class Property(Quantity):
     @handle_xml_exceptions
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         cls.check_tag(element)
-        quantity = Quantity.from_xml(element, document)
-        try:
-            name = element.attrib['name']
-        except KeyError:
-            raise Exception("Property did not have a name")
-        return cls(name=name, value=quantity._value, units=quantity.units)
+        name = element.attrib['name']
+        quantity = Quantity.from_xml(
+            expect_single(element.findall(NINEML + 'Quantity'), document))
+        return cls(name=name, quantity=quantity)
 
 
 class Initial(Property):
@@ -517,82 +355,6 @@ class Initial(Property):
     temporary, longer-term plan is to use SEDML or something similar
     """
     element_name = "Initial"
-
-
-class PropertySet(dict):
-
-    """
-    Container for the set of properties for a component_class.
-    """
-
-    def __init__(self, *properties, **kwproperties):
-        """
-        `*properties` - should be Property instances
-        `**kwproperties` - should be name=(value,units)
-        """
-        dict.__init__(self)
-        for prop in properties:
-            self[prop.name] = prop  # should perhaps do a copy
-        for name, qty in kwproperties.items():
-            try:
-                value, units = qty
-            except TypeError:
-                value = qty
-                units = None
-            self[name] = Property(name, value, units)
-
-    def __hash__(self):
-        return hash(tuple(self.items()))
-
-    def __repr__(self):
-        return "PropertySet(%s)" % dict(self)
-
-    def complete(self, other_property_set):
-        """
-        Pull properties from another property set into this one, if they do
-        not already exist in this one.
-        """
-        for name, parameter in other_property_set.items():
-            if name not in self:
-                self[name] = parameter  # again, should perhaps copy
-
-    def get_random_distributions(self):
-        return [p.random_distribution for p in self.values() if p.is_random()]
-
-    def to_xml(self, document, **kwargs):  # @UnusedVariable
-        # serialization is in alphabetical order
-        return [self[name].to_xml(document, **kwargs) for name in sorted(self.keys())]
-
-    @classmethod
-    def from_xml(cls, elements, document):
-        properties = []
-        for parameter_element in elements:
-            properties.append(Property.from_xml(parameter_element, document))
-        return cls(*properties)
-
-
-class InitialSet(PropertySet):
-
-    def __init__(self, *ivs, **kwivs):
-        """
-        `*ivs` - should be Initial instances
-        `**kwivs` - should be name=(value,units)
-        """
-        dict.__init__(self)
-        for iv in ivs:
-            self[iv.name] = iv  # should perhaps do a copy
-        for name, (value, units) in kwivs.items():
-            self[name] = Initial(name, value, units)
-
-    def __repr__(self):
-        return "InitialSet(%s)" % dict(self)
-
-    @classmethod
-    def from_xml(cls, elements, document):
-        initial_values = []
-        for iv_element in elements:
-            initial_values.append(Initial.from_xml(iv_element, document))
-        return cls(*initial_values)
 
 
 class DynamicsProperties(Component):
