@@ -291,6 +291,7 @@ class Transition(BaseALObject, MemberContainerObject):
 
 class OnEvent(Transition):
 
+    element_name = "OnEvent"
     defining_attributes = (Transition.defining_attributes + ('src_port_name',))
 
     def accept_visitor(self, visitor, **kwargs):
