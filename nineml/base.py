@@ -34,8 +34,9 @@ class BaseNineMLObject(object):
                 # they are an iterable list, ask forgiveness and fall back to
                 # standard equality if they aren't
                 try:
-                    self_elem = sorted(self_elem, key=lambda x: x._name)
-                    other_elem = sorted(other_elem, key=lambda x: x._name)
+                    if len(self_elem) > 1 and len(other_elem) > 1:
+                        self_elem = sorted(self_elem, key=lambda x: x._name)
+                        other_elem = sorted(other_elem, key=lambda x: x._name)
                 except (TypeError, AttributeError):
                     pass
             if self_elem != other_elem:

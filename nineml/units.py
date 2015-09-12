@@ -357,9 +357,9 @@ class Unit(BaseNineMLObject, DocumentLevelObject):
         "self * other"
         if other == 1:
             other = unitless
-        assert (self.offset == 0 and
-                other.offset == 0), "Can't multiply units with nonzero offsets"
         try:
+            assert (self.offset == 0 and other.offset == 0), (
+                "Can't multiply units with nonzero offsets")
             return Unit(Dimension.make_name([self.name, other.name]),
                         dimension=self.dimension * other.dimension,
                         power=(self.power + other.power))
@@ -370,9 +370,9 @@ class Unit(BaseNineMLObject, DocumentLevelObject):
         "self / expr"
         if other == 1:
             other = unitless
-        assert (self.offset == 0 and
-                other.offset == 0), "Can't divide units with nonzero offsets"
         try:
+            assert (self.offset == 0 and other.offset == 0), (
+                "Can't divide units with nonzero offsets")
             return Unit(Dimension.make_name([self.name], [other.name]),
                         dimension=self.dimension / other.dimension,
                         power=(self.power - other.power))

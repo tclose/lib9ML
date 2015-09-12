@@ -79,6 +79,12 @@ class SingleValue(BaseValue):
         """Infinitely iterate the same value"""
         return itertools.repeat(self._value)
 
+    def __eq__(self, other):
+        return self._value == other._value
+
+    def __neq__(self, other):
+        return not self == other
+
     def __len__(self):
         return 0
 
@@ -87,9 +93,6 @@ class SingleValue(BaseValue):
 
     def __repr__(self):
         return "SingleValue(value={})".format(self.value)
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.value == other.value
 
     def __hash__(self):
         return hash(self.value)
@@ -478,7 +481,6 @@ class Quantity(BaseNineMLObject):
     numbers, e.g. a RandomDistribution instance.
     """
     element_name = 'Quantity'
-
     defining_attributes = ("value", "units")
 
     def __init__(self, value, units=None):
@@ -547,8 +549,7 @@ class Quantity(BaseNineMLObject):
     @classmethod
     @read_annotations
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
-        value = BaseValue.from_parent_xml(
-            expect_single(element.findall(NINEML, document, **kwargs)))
+        value = BaseValue.from_parent_xml(element, document, **kwargs)
         try:
             units_str = element.attrib['units']
         except KeyError:
