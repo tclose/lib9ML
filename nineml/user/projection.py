@@ -12,7 +12,7 @@ import nineml.units as un
 from nineml.utils import (
     expect_single, check_tag, normalise_parameter_as_list,
     expect_none_or_single)
-from .values import SingleValue
+from nineml.values import SingleValue
 from .component import Quantity
 from nineml import DocumentLevelObject
 from nineml.exceptions import handle_xml_exceptions

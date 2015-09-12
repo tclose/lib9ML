@@ -11,7 +11,7 @@ from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml import units as un
 from ..abstraction import ComponentClass
-from .values import Quantity
+from nineml.values import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
