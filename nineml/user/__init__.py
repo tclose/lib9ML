@@ -66,11 +66,8 @@ from .selection import Selection, Concatenate
 from .projection import (
     Projection, PortConnection, Delay, Connectivity, Response, Plasticity, Pre,
     Post, FromPre, FromPost, FromPlasticity, FromResponse)
-from .component import (PropertySet, Property, Component, Definition,
+from .component import (Property, Component, Definition,
                         Prototype, resolve_reference, write_reference,
-                        InitialValue, InitialValueSet,
-                        DynamicsProperties, ConnectionRuleProperties,
-                        RandomDistributionProperties, Quantity)
-from .syntactic_sugar import (
-    SpikingNodeType, IonDynamicsType, SynapseType, CurrentSourceType,
-    ConnectionType)
+                        InitialValue, DynamicsProperties,
+                        ConnectionRuleProperties, RandomDistributionProperties,
+                        Quantity)

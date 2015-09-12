@@ -1,4 +1,5 @@
 # encoding: utf-8
+from __future__ import division
 from . import BaseNineMLObject
 from nineml.xmlns import E, NINEML
 from abc import ABCMeta, abstractmethod
@@ -11,11 +12,10 @@ import itertools
 from operator import itemgetter
 from nineml.reference import Reference
 import numpy
+import nineml
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLMissingElementError, NineMLDimensionError)
 from nineml.utils import expect_single, expect_none_or_single
-from nineml.user.component import RandomDistributionProperties
-from nineml.units import unitless, Unit
 
 
 class BaseValue(BaseNineMLObject):
@@ -276,6 +276,10 @@ class ArrayValue(BaseValue):
     def _sympy_(self):
         return sympy.Matrix(self._value)
 
+    def __float__(self):
+        raise NineMLRuntimeError(
+            "ArrayValues cannot be converted to a single float")
+
     def __add__(self, num):
         try:
             return self._value + num
@@ -411,6 +415,10 @@ class RandomDistributionValue(BaseValue):
     def port(self):
         return self._distribution.port(self._port_name)
 
+    def __float__(self):
+        raise NineMLRuntimeError(
+            "RandomDistributionValues cannot be converted to a single float")
+
     @property
     def distribution(self):
         return self._distribution
@@ -453,7 +461,7 @@ class RandomDistributionValue(BaseValue):
                 expect_single(element.findall(NINEML +
                                               'Reference'))).user_object
         else:
-            distribution = RandomDistributionProperties.from_xml(
+            distribution = nineml.user.RandomDistributionProperties.from_xml(
                 rd_elem, document)
         return cls(distribution, port_name=element.attrib["port"])
 
@@ -563,10 +571,16 @@ class Quantity(BaseNineMLObject):
         return Quantity(self.value - self._scaled_value(qty), self.units)
 
     def __mul__(self, qty):
-        return Quantity(self.value * qty.value, self.units * qty.units)
+        try:
+            return Quantity(self.value * qty.value, self.units * qty.units)
+        except AttributeError:
+            return Quantity(self.value, self.units * qty)  # If qty is a Unit
 
     def __truediv__(self, qty):
-        return Quantity(self.value * qty.value, self.units * qty.units)
+        try:
+            return Quantity(self.value / qty.value, self.units / qty.units)
+        except AttributeError:
+            return Quantity(self.value, self.units / qty)  # If qty is a Unit
 
     def __div__(self, qty):
         return self.__truediv__(qty)
@@ -610,3 +624,5 @@ class Quantity(BaseNineMLObject):
                 raise NineMLDimensionError(
                     "Can only add/subtract numbers from dimensionless "
                     "quantities")
+
+from nineml.units import unitless, Unit
