@@ -332,6 +332,7 @@ class OnEvent(Transition):
 
 class OnCondition(Transition):
 
+    element_name = "OnCondition"
     defining_attributes = (Transition.defining_attributes + ('trigger',))
 
     def accept_visitor(self, visitor, **kwargs):

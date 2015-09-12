@@ -271,6 +271,7 @@ class Property(BaseULObject):
     defining_attributes = ("_name", "_quantity")
 
     def __init__(self, name, quantity):
+        super(Property, self).__init__()
         self._name = name
         self._quantity = quantity
 
