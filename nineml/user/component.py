@@ -10,7 +10,7 @@ from nineml.reference import (
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import check_units, expect_single
 from ..abstraction import ComponentClass
-from .values import Quantity
+from nineml.values import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
