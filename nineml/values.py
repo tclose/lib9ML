@@ -11,9 +11,11 @@ import itertools
 from operator import itemgetter
 from nineml.reference import Reference
 import numpy
-from nineml.exceptions import NineMLRuntimeError
+from nineml.exceptions import (
+    NineMLRuntimeError, NineMLMissingElementError, NineMLDimensionError)
 from nineml.utils import expect_single, expect_none_or_single
 from nineml.user.component import RandomDistributionProperties
+from nineml.units import unitless, Unit
 
 
 class BaseValue(BaseNineMLObject):
@@ -454,3 +456,157 @@ class RandomDistributionValue(BaseValue):
             distribution = RandomDistributionProperties.from_xml(
                 rd_elem, document)
         return cls(distribution, port_name=element.attrib["port"])
+
+
+class Quantity(BaseNineMLObject):
+
+    """
+    Representation of a numerical- or string-valued parameter.
+
+    A numerical parameter is a (name, value, units) triplet, a string parameter
+    is a (name, value) pair.
+
+    Numerical values may either be numbers, or a component_class that generates
+    numbers, e.g. a RandomDistribution instance.
+    """
+    element_name = 'Quantity'
+
+    defining_attributes = ("value", "units")
+
+    def __init__(self, value, units=None):
+        super(Quantity, self).__init__()
+        if not isinstance(value, (SingleValue, ArrayValue,
+                                  RandomDistributionValue)):
+            try:
+                # Convert value from float
+                value = SingleValue(float(value))
+            except TypeError:
+                # Convert value from iterable
+                value = ArrayValue(value)
+        if units is None:
+            units = unitless
+        if not isinstance(units, Unit):
+            raise Exception("Units ({}) must of type <Unit>".format(units))
+        if isinstance(value, (int, float)):
+            value = SingleValue(value)
+        self._value = value
+        self.units = units
+
+    def __hash__(self):
+        if self.is_single():
+            hsh = hash(self.value) ^ hash(self.units)
+        else:
+            hsh = hash(self.units)
+        return hsh
+
+    def __iter__(self):
+        """For conveniently expanding quantities like a tuple"""
+        return (self.value, self.units)
+
+    @property
+    def value(self):
+        return self._value
+
+    def __getitem__(self, index):
+        if self.is_array():
+            return self._value.values[index]
+        elif self.is_single():
+            return self._value.value
+        else:
+            raise NineMLRuntimeError(
+                "Cannot get item from random distribution")
+
+    def set_units(self, units):
+        if units.dimension != self.units.dimension:
+            raise NineMLRuntimeError(
+                "Can't change dimension of quantity from '{}' to '{}'"
+                .format(self.units.dimension, units.dimension))
+        self.units = units
+
+    def __repr__(self):
+        units = self.units.name
+        if u"µ" in units:
+            units = units.replace(u"µ", "u")
+        return ("{}(value={}, units={})"
+                .format(self.element_name, self.value, units))
+
+    @annotate_xml
+    def to_xml(self, **kwargs):  # @UnusedVariable
+        return E(self.element_name,
+                 self._value.to_xml(),
+                 units=self.units.name)
+
+    @classmethod
+    @read_annotations
+    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+        value = BaseValue.from_parent_xml(
+            expect_single(element.findall(NINEML, document, **kwargs)))
+        try:
+            units_str = element.attrib['units']
+        except KeyError:
+            raise NineMLRuntimeError(
+                "{} element '{}' is missing 'units' attribute (found '{}')"
+                .format(element.tag, element.get('name', ''),
+                        "', '".join(element.attrib.iterkeys())))
+        try:
+            units = document[units_str]
+        except KeyError:
+            raise NineMLMissingElementError(
+                "Did not find definition of '{}' units in the current "
+                "document.".format(units_str))
+        return cls(value=value, units=units)
+
+    def __add__(self, qty):
+        return Quantity(self.value + self._scaled_value(qty), self.units)
+
+    def __sub__(self, qty):
+        return Quantity(self.value - self._scaled_value(qty), self.units)
+
+    def __mul__(self, qty):
+        return Quantity(self.value * qty.value, self.units * qty.units)
+
+    def __truediv__(self, qty):
+        return Quantity(self.value * qty.value, self.units * qty.units)
+
+    def __div__(self, qty):
+        return self.__truediv__(qty)
+
+    def __pow__(self, power):
+        return Quantity(self.value ** power, self.units ** power)
+
+    def __radd__(self, qty):
+        return self.__add__(qty)
+
+    def __rsub__(self, qty):
+        return self._scaled_value(qty) - self._value
+
+    def __rmul__(self, qty):
+        return self.__mul__(qty)
+
+    def __rtruediv__(self, qty):
+        return qty.__truediv__(self._value)
+
+    def __rdiv__(self, qty):
+        return self.__rtruediv__(qty)
+
+    def __neg__(self):
+        return Quantity(-self._value, self.units)
+
+    def __abs__(self):
+        return Quantity(abs(self._value), self.units)
+
+    def _scaled_value(self, qty):
+        try:
+            if qty.units.dimension != self.units.dimension:
+                raise NineMLDimensionError(
+                    "Cannot scale value as dimensions do not match ('{}' and "
+                    "'{}')".format(self.units.dimension.name,
+                                   qty.units.dimension.name))
+            return qty.value * 10 ** (self.units.power - qty.units.power)
+        except AttributeError:
+            if self.units == unitless:
+                return float(qty.value)
+            else:
+                raise NineMLDimensionError(
+                    "Can only add/subtract numbers from dimensionless "
+                    "quantities")

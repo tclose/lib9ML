@@ -30,7 +30,8 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
             assert len(dimensions) == 7, "Incorrect dimension length"
             self._dims = tuple(dimensions)
         else:
-            self._dims = tuple(kwargs.pop(d, 0) for d in self.dimension_symbols)
+            self._dims = tuple(kwargs.pop(d, 0)
+                               for d in self.dimension_symbols)
         assert not len(kwargs), "Unrecognised kwargs ({})".format(kwargs)
 
     def __hash__(self):
@@ -69,7 +70,8 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
         """
         return reduce(
             operator.mul,
-            (Symbol(n) ** p for n, p in zip(self.dimension_symbols, self._dims)))
+            (Symbol(n) ** p
+             for n, p in zip(self.dimension_symbols, self._dims)))
 
     @property
     def m(self):
@@ -380,8 +382,6 @@ class Unit(BaseNineMLObject, DocumentLevelObject):
         return self.__mul__(other)
 
     def __rtruediv__(self, other):
-        if other == 1:
-            other = unitless
         return other.__truediv__(self)
 
     def __div__(self, other):
