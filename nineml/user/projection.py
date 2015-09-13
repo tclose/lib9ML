@@ -211,7 +211,7 @@ class Terminus(BaseULObject):
 
     @classmethod
     def _port_connections_from_xml(cls, element, document, **kwargs):  # @UnusedVariable @IgnorePep8
-        return (PortConnection.from_xml(e, document)
+        return (PortConnection.from_xml(e, document, **kwargs)
                 for e in element.findall(NINEML + 'PortConnection'))
 
 

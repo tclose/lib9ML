@@ -3,7 +3,8 @@ from itertools import chain
 from abc import ABCMeta, abstractmethod
 import collections
 from nineml.exceptions import (
-    NineMLUnitMismatchError, NineMLRuntimeError, handle_xml_exceptions)
+    NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError,
+    handle_xml_exceptions)
 from nineml.xmlns import NINEML, E
 from nineml.reference import (
     Prototype, Definition, write_reference, resolve_reference)
@@ -117,12 +118,20 @@ class Component(BaseULObject, DocumentLevelObject):
         """
         # Recursively retrieves properties defined in prototypes and updates
         # them with properties defined locally
-        return self._properties.itervalues()
+        if isinstance(self.definition, Prototype):
+            return (
+                self._properties[p.name] if p.name in self._properties else p
+                for p in self.definition.component.properties)
+        else:
+            return self._properties.itervalues())
 
 
     @property
     def property_names(self):
-        return self._properties.iterkeys()
+        if isinstance(self.definition, Prototype):
+            return (p.name for p in self.properties)
+        else:
+            return self._properties.iterkeys()
 
     def set(self, prop):
         try:
@@ -201,8 +210,10 @@ class Component(BaseULObject, DocumentLevelObject):
         docstring missing, although since the decorators don't
         preserve the docstring, it doesn't matter at the moment.
         """
-        element = E(self.element_name, self._definition.to_xml(document, **kwargs),
-                    *[p.to_xml(document, **kwargs) for p in self.properties],
+        element = E(self.element_name,
+                    self._definition.to_xml(document, **kwargs),
+                    *[p.to_xml(document, **kwargs)
+                      for p in self._properties.itervalues()],
                       name=self.name)
         return element
 
@@ -231,8 +242,17 @@ class Component(BaseULObject, DocumentLevelObject):
     def used_units(self):
         return set(p.units for p in self.properties.itervalues())
 
+    # Property is declared last so as not to overwrite the 'property' decorator
     def property(self, name):
-        return self._properties[name]
+        try:
+            return self._properties[name]
+        except KeyError:
+            try:
+                return self.definition.component.property(name)
+            except AttributeError:
+                raise NineMLMissingElementError(
+                    "No property named '{}' in component class".format(name))
+
 
     def write(self, fname):
         """
@@ -309,10 +329,10 @@ class Property(BaseULObject):
         name = element.attrib['name']
         quantity = Quantity.from_xml(
             expect_single(element.findall(NINEML + 'Quantity')), document)
-        return cls(name=name, quantity=quantity
-                   
+        return cls(name=name, quantity=quantity)
+
     def set_units(self, units):
-        self.quantity._units = units                   
+        self.quantity._units = units                
 
 
 class Initial(Property):
@@ -346,32 +366,34 @@ class DynamicsProperties(Component):
             try:
                 initial_value = self.initial_values[var.name]
             except KeyError:
-                raise Exception("Initial value not specified for %s" %
-                                var.name)
+                raise NineMLRuntimeError(
+                    "Initial value not specified for {}".format(var.name))
             check_units(initial_value.units, var.dimension)
 
     def get_element_name(self):
         return self.element_name
 
+    @property
+    def attributes_with_units(self):
+        return (super(DynamicsProperties, self).attributes_with_units |
+                set(p for p in self.initial_values if p.units is not None))
+
     @write_reference
     @annotate_xml
-    @handle_xml_exceptions
-    def to_xml(self, **kwargs):  # @UnusedVariable
-        """
-        docstring missing, although since the decorators don't
-        preserve the docstring, it doesn't matter at the moment.
-        """
-        element = E(self.element_name, self._definition.to_xml(),
-                    *[p.to_xml(**kwargs) for p in chain(self.properties,
-                                                        self.initial_values)],
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
+        element = E(self.element_name,
+                    self._definition.to_xml(document, **kwargs),
+                    *[p.to_xml(document, **kwargs) for p in chain(
+                        self._properties.itervalues(),
+                        self._initial_values.itervalues())],
                       name=self.name)
         return element
 
     @classmethod
     @resolve_reference
     @read_annotations
+    @handle_xml_exceptions
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
-        """docstring missing"""
         name = element.attrib["name"]
         definition_element = element.find(NINEML + Definition.element_name)
         if definition_element is not None:
@@ -384,8 +406,8 @@ class DynamicsProperties(Component):
             definition = Prototype.from_xml(prototype_element, document)
         properties = [Property.from_xml(e, document, **kwargs)
                       for e in element.findall(NINEML + 'Property')]
-        initial_values = [Property.from_xml(e, document, **kwargs)
-                          for e in element.findall(NINEML + 'Property')]
+        initial_values = [Initial.from_xml(e, document, **kwargs)
+                          for e in element.findall(NINEML + 'Initial')]
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
         
@@ -393,6 +415,9 @@ class DynamicsProperties(Component):
     def initial_values(self):
         return self._initial_values.itervalues()
     
+    def initial_value(self, name):
+        return self._initial_values[name]
+
 
 class ConnectionRuleProperties(Component):
     """
