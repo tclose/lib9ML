@@ -45,7 +45,8 @@ class Component(BaseULObject, DocumentLevelObject):
 
     """
     __metaclass__ = ABCMeta  # Abstract base class
-    defining_attributes = ('name', 'component_class', 'property_set')
+    defining_attributes = ('name', 'component_class', '_properties',
+                           '_initial_values')
     children = ("Property", "Definition", 'Prototype')
 
     # initial_values is temporary, the idea longer-term is to use a separate
@@ -78,15 +79,6 @@ class Component(BaseULObject, DocumentLevelObject):
                                     for name, qty in properties.iteritems())
         else:
             self._properties = dict((p.name, p) for p in properties)
-        if isinstance(initial_values, InitialSet):
-            self._initial_values = initial_values
-        elif isinstance(initial_values, dict):
-            self._initial_values = InitialSet(**initial_values)
-        elif isinstance(initial_values, collections.Iterable):
-            self._initial_values = InitialSet(*initial_values)
-        else:
-            raise TypeError("initial_values must be an InitialSet or a "
-                            "dict, not a %s" % type(initial_values))
         self.check_properties()
 
     @abstractmethod
@@ -125,12 +117,12 @@ class Component(BaseULObject, DocumentLevelObject):
         """
         # Recursively retrieves properties defined in prototypes and updates
         # them with properties defined locally
-        return self.property_set.itervalues()
+        return self._properties.itervalues()
 
 
     @property
     def property_names(self):
-        return self.property_set.iterkeys()
+        return self._properties.iterkeys()
 
     def set(self, prop):
         try:
@@ -148,27 +140,8 @@ class Component(BaseULObject, DocumentLevelObject):
         self._properties[prop.name] = prop
 
     @property
-    def initial_value_set(self):
-        """
-        The set of initial values for the state variables of the
-        component_class.
-        """
-        # Recursively retrieves initial values defined in prototypes and
-        # updates them with properties defined locally
-        vals = InitialSet()
-        if isinstance(self.definition, Prototype):
-            vals.update(self.definition.component.initial_values)
-        vals.update(self._initial_values)
-        return vals
-
-    @property
-    def initial_values(self):
-        return self.initial_value_set.itervalues()
-
-    @property
     def attributes_with_units(self):
-        return set(p for p in chain(self.properties, self.initial_values)
-                   if p.units is not None)
+        return set(p for p in self.properties if p.units is not None)
 
     def __hash__(self):
         return (hash(self.__class__) ^ hash(self.name) ^
@@ -229,8 +202,7 @@ class Component(BaseULObject, DocumentLevelObject):
         preserve the docstring, it doesn't matter at the moment.
         """
         element = E(self.element_name, self._definition.to_xml(document, **kwargs),
-                    *chain((p.to_xml(document, **kwargs) for p in self.properties),
-                           (i.to_xml(document, **kwargs) for i in self.initial_values)),
+                    *[p.to_xml(document, **kwargs) for p in self.properties],
                       name=self.name)
         return element
 
@@ -249,13 +221,10 @@ class Component(BaseULObject, DocumentLevelObject):
             if prototype_element is None:
                 raise Exception("A component_class must contain either a "
                                 "defintion or a prototype")
-            definition = Prototype.from_xml(prototype_element, document)        
+            definition = Prototype.from_xml(prototype_element, document)
         properties = [Property.from_xml(e, document, **kwargs)
                       for e in element.findall(NINEML + 'Property')]
-        initial_values = [Initial.from_xml(e, document, **kwargs))
-                          for e in element.findall(NINEML + 'Initial')]
-        return cls(name, definition, properties=properties,
-                   initial_values=initial_values, url=document.url)
+        return cls(name, definition, properties=properties, url=document.url)
 
 
     @property
@@ -263,7 +232,7 @@ class Component(BaseULObject, DocumentLevelObject):
         return set(p.units for p in self.properties.itervalues())
 
     def property(self, name):
-        return self.property_set[name]
+        return self._properties[name]
 
     def write(self, fname):
         """
@@ -276,6 +245,10 @@ class Component(BaseULObject, DocumentLevelObject):
             to_write.append(self.component_class)
         Document(*to_write).write(fname)
 
+
+    def get_random_distributions(self):
+        return [p.value.distribution for p in self.properties
+                if p.value.element_name == 'RandomDistributionValue']
 
 class Property(BaseULObject):
 
@@ -337,6 +310,9 @@ class Property(BaseULObject):
         quantity = Quantity.from_xml(
             expect_single(element.findall(NINEML + 'Quantity')), document)
         return cls(name=name, quantity=quantity
+                   
+    def set_units(self, units):
+        self.quantity._units = units                   
 
 
 class Initial(Property):
@@ -344,12 +320,14 @@ class Initial(Property):
     """
     temporary, longer-term plan is to use SEDML or something similar
     """
-    element_name = "Initial"
+    element_name = "InitialValue"
 
 
 class DynamicsProperties(Component):
 
     element_name = 'DynamicsProperties'
+    defining_attributes = ('name', 'component_class', '_properties',
+                           '_initial_values')    
 
     def __init__(self, name, definition, properties={}, initial_values={},
                  url=None):
@@ -394,7 +372,7 @@ class DynamicsProperties(Component):
     @read_annotations
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
-        name = element.attrib.get("name", None)
+        name = element.attrib["name"]
         definition_element = element.find(NINEML + Definition.element_name)
         if definition_element is not None:
             definition = Definition.from_xml(definition_element, document)
@@ -410,6 +388,11 @@ class DynamicsProperties(Component):
                           for e in element.findall(NINEML + 'Property')]
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
+        
+    @property
+    def initial_values(self):
+        return self._initial_values.itervalues()
+    
 
 class ConnectionRuleProperties(Component):
     """

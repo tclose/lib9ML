@@ -9,13 +9,14 @@ import contextlib
 import collections
 import sympy
 import itertools
+from itertools import izip
 from operator import itemgetter
 from nineml.reference import Reference
 import numpy
 import nineml
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLMissingElementError, NineMLDimensionError)
-from nineml.utils import expect_single, expect_none_or_single
+from nineml.utils import expect_single, expect_none_or_single, nearly_equal
 
 
 class BaseValue(BaseNineMLObject):
@@ -80,7 +81,7 @@ class SingleValue(BaseValue):
         return itertools.repeat(self._value)
 
     def __eq__(self, other):
-        return self._value == other._value
+        return nearly_equal(self._value, other._value)
 
     def __neq__(self, other):
         return not self == other
@@ -213,6 +214,10 @@ class ArrayValue(BaseValue):
     @property
     def values(self):
         return iter(self._values)
+
+    def __eq__(self, other):
+        return all(nearly_equal(s, o)
+                   for s, o in izip(self._values, other._values))
 
     def __iter__(self):
         return iter(self._values)
@@ -503,11 +508,7 @@ class Quantity(BaseNineMLObject):
         self.units = units
 
     def __hash__(self):
-        if self.is_single():
-            hsh = hash(self.value) ^ hash(self.units)
-        else:
-            hsh = hash(self.units)
-        return hsh
+        return hash(self.value) ^ hash(self.units)
 
     def __iter__(self):
         """For conveniently expanding quantities like a tuple"""
@@ -549,6 +550,7 @@ class Quantity(BaseNineMLObject):
     @classmethod
     @read_annotations
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+        cls.check_tag(element)
         value = BaseValue.from_parent_xml(element, document, **kwargs)
         try:
             units_str = element.attrib['units']
