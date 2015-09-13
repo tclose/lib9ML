@@ -24,7 +24,10 @@ class BaseNineMLObject(object):
         return self._annotations
 
     def __eq__(self, other):
-        if self.element_name != other.element_name:
+        try:
+            if self.element_name != other.element_name:
+                return False
+        except AttributeError:
             return False
         for name in self.defining_attributes:
             self_elem = getattr(self, name)

@@ -148,6 +148,8 @@ class AnalogSendPort(AnalogPort, SendPort):
 
     """
 
+    element_name = 'AnalogSendPort'
+
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
         return visitor.visit_analogsendport(self, **kwargs)
@@ -162,6 +164,8 @@ class AnalogReceivePort(AnalogPort, ReceivePort):
 
     """
 
+    element_name = 'AnalogReceivePort'
+
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
         return visitor.visit_analogreceiveport(self, **kwargs)
@@ -175,6 +179,8 @@ class EventSendPort(EventPort, SendPort):
     notify other components that it had fired.
     """
 
+    element_name = 'EventSendPort'
+
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
         return visitor.visit_eventsendport(self, **kwargs)
@@ -187,6 +193,8 @@ class EventReceivePort(EventPort, ReceivePort):
     points in time. For example, synapses could receive events
     to notify them to provide current to a post-synaptic neuron.
     """
+
+    element_name = 'EventReceivePort'
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """
@@ -206,6 +214,7 @@ class AnalogReducePort(AnalogPort, ReceivePort):
         Currently support ``operator`` s are: ``+``.
 
     """
+    element_name = 'AnalogReducePort'
     mode = "reduce"
     _operator_map = {'add': '+', '+': '+', }
 

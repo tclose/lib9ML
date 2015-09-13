@@ -32,6 +32,8 @@ class StateAssignment(BaseALObject, ExpressionWithSimpleLHS):
 
     """
 
+    element_name = 'StateAssignment'
+
     def __init__(self, lhs, rhs):
         """StateAssignment Constructor
 
@@ -79,6 +81,7 @@ class OutputEvent(BaseALObject):
     the component.
     """
 
+    element_name = 'OutputEvent'
     defining_attributes = ('port_name',)
 
     def accept_visitor(self, visitor, **kwargs):
@@ -378,6 +381,8 @@ class OnCondition(Transition):
 
 
 class Trigger(BaseALObject, Expression):
+
+    element_name = 'Trigger'
 
     def accept_visitor(self, visitor, **kwargs):
         """ |VISITATION| """

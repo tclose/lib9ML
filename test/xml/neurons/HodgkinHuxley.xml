@@ -16,8 +16,10 @@
   <Unit symbol="um2" dimension="length2"/>
   <DynamicsProperties name="HodgkinHuxley">
     <Definition name="HodgkinHuxleyClass" url="./HodgkinHuxleyClass.xml"/>
-    <Property name="m_alpha_A" units="per_ms_mV">
-      <SingleValue>0.1</SingleValue>
+    <Property name="m_alpha_A">
+      <Quantity units="per_ms_mV">
+        <SingleValue>0.1</SingleValue>
+      </Quantity>
       <Annotations>
         <Text>This is the alpha A value for the m gate of the Sodium channel</Text>
       </Annotations>

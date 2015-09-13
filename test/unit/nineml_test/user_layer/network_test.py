@@ -14,7 +14,7 @@ import os.path
 import unittest
 from nineml.user import (
     Projection, Network, PortConnection, DynamicsProperties, Connectivity,
-    Population, FromResponse, FromPlasticity)
+    Population, FromResponse, FromPlasticity, Delay)
 from nineml import Document, load
 from nineml.units import ms, mV, nA, Hz, Mohm
 from os import path
@@ -55,7 +55,7 @@ class TestNetwork(unittest.TestCase):
         ext_stim = DynamicsProperties(
             name="stim",
             definition=path.join(self.xml_dir, "Poisson.xml"),
-            rate={'input_rate': input_rate},
+            properties={'rate': input_rate},
             initial_values={"t_next": 0.5 * ms})
         psr = DynamicsProperties(
             name="syn",
@@ -95,7 +95,7 @@ class TestNetwork(unittest.TestCase):
                 'weight', FromPlasticity('weight'))),
             plasticity=static_inh,
             connectivity=all_to_all,
-            delay=delay * ms)
+            delay=Delay(delay, ms))
 
         model = Network("Three-neuron network with alpha synapses")
         model.add(inpt, p1, p2)

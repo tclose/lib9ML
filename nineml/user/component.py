@@ -44,7 +44,7 @@ class Component(BaseULObject, DocumentLevelObject):
 
     """
     __metaclass__ = ABCMeta  # Abstract base class
-    defining_attributes = ('name', 'component_class', 'property_set')
+    defining_attributes = ('name', 'component_class', '_properties')
     children = ("Property", "Definition", 'Prototype')
 
     # initial_values is temporary, the idea longer-term is to use a separate
@@ -85,8 +85,7 @@ class Component(BaseULObject, DocumentLevelObject):
         pass
 
     def __getinitargs__(self):
-        return (self.name, self.definition, self.property_set,
-                self.initial_value_set, self._url)
+        return (self.name, self.definition, self._properties, self._url)
 
     def __getitem__(self, name):
         return self._properties[name].quantity
@@ -114,11 +113,11 @@ class Component(BaseULObject, DocumentLevelObject):
         """
         # Recursively retrieves properties defined in prototypes and updates
         # them with properties defined locally
-        return self.property_set.itervalues()
+        return self._properties.itervalues()
 
     @property
     def property_names(self):
-        return self.property_set.iterkeys()
+        return self._properties.iterkeys()
 
     def set(self, prop):
         try:
@@ -136,27 +135,8 @@ class Component(BaseULObject, DocumentLevelObject):
         self._properties[prop.name] = prop
 
     @property
-    def initial_value_set(self):
-        """
-        The set of initial values for the state variables of the
-        component_class.
-        """
-        # Recursively retrieves initial values defined in prototypes and
-        # updates them with properties defined locally
-        vals = {}
-        if isinstance(self.definition, Prototype):
-            vals.update(self.definition.component.initial_values)
-        vals.update(self._initial_values)
-        return vals
-
-    @property
-    def initial_values(self):
-        return self.initial_value_set.itervalues()
-
-    @property
     def attributes_with_units(self):
-        return set(p for p in chain(self.properties, self.initial_values)
-                   if p.units is not None)
+        return set(p for p in self.properties if p.units is not None)
 
     def __hash__(self):
         return (hash(self.__class__) ^ hash(self.name) ^
@@ -242,7 +222,7 @@ class Component(BaseULObject, DocumentLevelObject):
         return set(p.units for p in self.properties.itervalues())
 
     def property(self, name):
-        return self.property_set[name]
+        return self._properties[name]
 
     def write(self, fname):
         """
@@ -254,6 +234,10 @@ class Component(BaseULObject, DocumentLevelObject):
         if self.definition.url is None:
             to_write.append(self.component_class)
         Document(*to_write).write(fname)
+
+    def get_random_distributions(self):
+        return [p.value.distribution for p in self.properties
+                if p.value.element_name == 'RandomDistributionValue']
 
 
 class Property(BaseULObject):
@@ -316,6 +300,9 @@ class Property(BaseULObject):
             expect_single(element.findall(NINEML + 'Quantity')), document)
         return cls(name=name, quantity=quantity)
 
+    def set_units(self, units):
+        self.quantity._units = units
+
 
 class InitialValue(Property):
 
@@ -328,9 +315,11 @@ class InitialValue(Property):
 class DynamicsProperties(Component):
 
     element_name = 'DynamicsProperties'
+    defining_attributes = ('name', 'component_class', '_properties',
+                           '_initial_values')
 
     def __init__(self, name, definition, properties={}, initial_values={},
-                 url=None):
+                 url=None, check_initial_values=False):
         super(DynamicsProperties, self).__init__(
             name=name, definition=definition, properties=properties, url=url)
         if isinstance(initial_values, dict):
@@ -339,19 +328,36 @@ class DynamicsProperties(Component):
                 for name, qty in initial_values.iteritems())
         else:
             self._initial_values = dict((iv.name, iv) for iv in initial_values)
-        self.check_initial_values()
+        if check_initial_values:
+            self.check_initial_values()
+
+    def get_element_name(self):
+        return self.element_name
 
     def check_initial_values(self):
-        for var in self.definition.componentclass.state_variables:
+        for var in self.definition.component_class.state_variables:
             try:
-                initial_value = self.initial_values[var.name]
+                initial_value = self.initial_value(var.name)
             except KeyError:
                 raise Exception("Initial value not specified for %s" %
                                 var.name)
             check_units(initial_value.units, var.dimension)
 
-    def get_element_name(self):
-        return self.element_name
+    def __getinitargs__(self):
+        return (self.name, self.definition, self._properties,
+                self._initial_values, self._url)
+
+    @property
+    def initial_values(self):
+        return self._initial_values.itervalues()
+
+    def initial_value(self, name):
+        return self._initial_values[name]
+
+    @property
+    def attributes_with_units(self):
+        return (super(DynamicsProperties, self).attributes_with_units |
+                set(p for p in self.initial_values if p.units is not None))
 
     @write_reference
     @annotate_xml
@@ -383,8 +389,8 @@ class DynamicsProperties(Component):
             definition = Prototype.from_xml(prototype_element, document)
         properties = [Property.from_xml(e, document, **kwargs)
                       for e in element.findall(NINEML + 'Property')]
-        initial_values = [Property.from_xml(e, document, **kwargs)
-                          for e in element.findall(NINEML + 'Property')]
+        initial_values = [InitialValue.from_xml(e, document, **kwargs)
+                          for e in element.findall(NINEML + 'InitialValue')]
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
 

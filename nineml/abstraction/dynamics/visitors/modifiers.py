@@ -168,8 +168,8 @@ class DynamicsRenameSymbol(ComponentRenameSymbol,
         if on_event.src_port_name == self.old_symbol_name:
             on_event._src_port_name = self.new_symbol_name
             self.note_rhs_changed(on_event)
-        if on_event._target_regime == self.old_symbol_name:
-            on_event._target_regime = self.new_symbol_name
+        if on_event._target_regime.name == self.old_symbol_name:
+            on_event._target_regime._name = self.new_symbol_name
         self._update_dicts(*on_event.all_member_dicts)
 
 

@@ -342,7 +342,7 @@ class PortConnection(BasePortConnection):
 
     def __repr__(self):
         return ("PortConnection('{}' with {} senders)"
-                .format(self.port_name, len(self.senders)))
+                .format(self.port_name, len(list(self.senders))))
 
     @property
     def senders(self):
