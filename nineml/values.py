@@ -542,9 +542,9 @@ class Quantity(BaseNineMLObject):
                 .format(self.element_name, self.value, units))
 
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         return E(self.element_name,
-                 self._value.to_xml(),
+                 self._value.to_xml(document, **kwargs),
                  units=self.units.name)
 
     @classmethod

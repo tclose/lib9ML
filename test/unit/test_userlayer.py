@@ -55,16 +55,10 @@ class RandomDistributionTest(unittest.TestCase):
 class ParameterTest(unittest.TestCase):
 
     def test_xml_roundtrip(self):
-<<<<<<< Upstream, based on origin/refactor_v2
-        p1 = Property("tau_m", 20.0, mV)
-        document = Document(mV)
-        element = p1.to_xml(document)
-        p2 = Property.from_xml(element, document)
-=======
+        document = Document()
         p1 = Property("tau_m", 20.0 * mV)
-        element = p1.to_xml()
+        element = p1.to_xml(document)
         p2 = Property.from_xml(element, Document(mV))
->>>>>>> c5eb78c finished implementing magic methods for values and quantities
         self.assertEqual(p1, p2)
 
 

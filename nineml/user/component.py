@@ -1,9 +1,8 @@
 # encoding: utf-8
 from itertools import chain
 from abc import ABCMeta, abstractmethod
-import collections
 from nineml.exceptions import (
-    NineMLUnitMismatchError, NineMLRuntimeError)
+    NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
 from nineml.xmlns import NINEML, E
 from nineml.reference import (
     Prototype, Definition, write_reference, resolve_reference)
@@ -88,7 +87,7 @@ class Component(BaseULObject, DocumentLevelObject):
         return (self.name, self.definition, self._properties, self._url)
 
     def __getitem__(self, name):
-        return self._properties[name].quantity
+        return self.property(name).quantity
 
     @property
     def component_class(self):
@@ -113,11 +112,19 @@ class Component(BaseULObject, DocumentLevelObject):
         """
         # Recursively retrieves properties defined in prototypes and updates
         # them with properties defined locally
-        return self._properties.itervalues()
+        if isinstance(self.definition, Prototype):
+            return (
+                self._properties[p.name] if p.name in self._properties else p
+                for p in self.definition.component.properties)
+        else:
+            return self._properties.itervalues()
 
     @property
     def property_names(self):
-        return self._properties.iterkeys()
+        if isinstance(self.definition, Prototype):
+            return (p.name for p in self.properties)
+        else:
+            return self._properties.iterkeys()
 
     def set(self, prop):
         try:
@@ -193,8 +200,10 @@ class Component(BaseULObject, DocumentLevelObject):
         docstring missing, although since the decorators don't
         preserve the docstring, it doesn't matter at the moment.
         """
-        element = E(self.element_name, self._definition.to_xml(document, **kwargs),
-                    *[p.to_xml(document, **kwargs) for p in self.properties],
+        element = E(self.element_name,
+                    self._definition.to_xml(document, **kwargs),
+                    *[p.to_xml(document, **kwargs)
+                      for p in self._properties.itervalues()],
                       name=self.name)
         return element
 
@@ -221,9 +230,6 @@ class Component(BaseULObject, DocumentLevelObject):
     def used_units(self):
         return set(p.units for p in self.properties.itervalues())
 
-    def property(self, name):
-        return self._properties[name]
-
     def write(self, fname):
         """
         Writes the top-level NineML object to file in XML.
@@ -238,6 +244,17 @@ class Component(BaseULObject, DocumentLevelObject):
     def get_random_distributions(self):
         return [p.value.distribution for p in self.properties
                 if p.value.element_name == 'RandomDistributionValue']
+
+    # Property is declared last so as not to overwrite the 'property' decorator
+    def property(self, name):
+        try:
+            return self._properties[name]
+        except KeyError:
+            try:
+                return self.definition.component.property(name)
+            except AttributeError:
+                raise NineMLMissingElementError(
+                    "No property named '{}' in component class".format(name))
 
 
 class Property(BaseULObject):
@@ -361,14 +378,16 @@ class DynamicsProperties(Component):
 
     @write_reference
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         """
         docstring missing, although since the decorators don't
         preserve the docstring, it doesn't matter at the moment.
         """
-        element = E(self.element_name, self._definition.to_xml(),
-                    *[p.to_xml(**kwargs) for p in chain(self.properties,
-                                                        self.initial_values)],
+        element = E(self.element_name,
+                    self._definition.to_xml(document, **kwargs),
+                    *[p.to_xml(document, **kwargs) for p in chain(
+                        self._properties.itervalues(),
+                        self._initial_values.itervalues())],
                       name=self.name)
         return element
 
