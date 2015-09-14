@@ -174,7 +174,7 @@ class Document(dict, BaseNineMLObject):
         self._loading.append(unloaded)
         elem = unloaded.cls.from_xml(unloaded.xml, self)
         assert self._loading[-1] is unloaded
-        self._loading.pop()       
+        self._loading.pop()
         assert isinstance(unloaded.name, basestring)
         self[unloaded.name] = elem
         return elem
@@ -240,15 +240,14 @@ class Document(dict, BaseNineMLObject):
         self.standardize_units()
         return E(
             self.element_name,
-            *self._sort(c.to_xml(as_reference=False)
+            *self._sort(c.to_xml(self, as_reference=False)
                         for c in self.itervalues()))
 
-    def write(self, filename):
-        doc = self.to_xml()
+    def write(self, filename, **kwargs):
+        doc = self.to_xml(**kwargs)
         with open(filename, 'w') as f:
-            etree.ElementTree(doc).write(f, encoding="UTF-8",
-                                         pretty_print=True,
-                                         xml_declaration=True)
+            etree.ElementTree(doc).write(
+                f, encoding="UTF-8", pretty_print=True, xml_declaration=True)
 
     @classmethod
     def from_xml(cls, element, url=None):

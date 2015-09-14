@@ -41,7 +41,7 @@ class SingleValue(BaseValue):
         return hash(self.value)
 
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         return E(self.element_name, str(self.value))
 
     @classmethod
@@ -77,9 +77,9 @@ class ArrayValue(BaseValue):
         return self._values[index]
 
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         return E(self.element_name,
-                 *[ArrayValueRow(i, v).to_xml()
+                 *[ArrayValueRow(i, v).to_xml(document, **kwargs)
                    for i, v in enumerate(self._values)])
 
     @classmethod
@@ -122,7 +122,7 @@ class ArrayValueRow(BaseValue):
                 all(r1 == r2 for r1, r2 in zip(self.rows, other.rows)))
 
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         return E(self.element_name, str(self.value), index=str(self.index))
 
     @classmethod
@@ -147,7 +147,7 @@ class ExternalArrayValue(BaseValue):
         return "ExternalArrayValue(with {} rows)".format(len(self.rows))
 
     @annotate_xml
-    def to_xml(self, **kwargs):  # @UnusedVariable
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
         try:
             numpy.savetxt(self.url, self.data)
         except Exception:
@@ -186,8 +186,8 @@ class ExternalArrayValue(BaseValue):
 #                self.component == other.component)
 #
 #    @annotate_xml
-#    def to_xml(self, **kwargs):  # @UnusedVariable
-#        return E(self.element_name, self.component.to_xml(), port=self.url)
+#    def to_xml(self, document, **kwargs):  # @UnusedVariable
+#        return E(self.element_name, self.component.to_xml(document, **kwargs), port=self.url)
 #
 #    @classmethod
 #    @read_annotations
