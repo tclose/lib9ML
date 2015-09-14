@@ -9,11 +9,9 @@ from nineml.xmlns import E
 from nineml.annotations import read_annotations
 from ...componentclass.visitors.xml import (
     ComponentClassXMLLoader, ComponentClassXMLWriter)
-from nineml.exceptions import handle_xml_exceptions
 from ...expressions import Alias, Constant
-
-
 #from nineml.abstraction_layer import ConnectionRule
+
 
 class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
 
@@ -24,19 +22,18 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
     """
 
     @read_annotations
-    @handle_xml_exceptions
     def load_connectionruleclass(self, element, **kwargs):  # @UnusedVariable
         block_names = ('Parameter', 'PropertyRecievePort', 'Constant',
                        'Alias', 'Select')
         blocks = self._load_blocks(element, block_names=block_names)
         return ConnectionRule(
-            name=element.attrib['name'],            
+            name=element.attrib['name'],
             propertyrecieveport=blocks["PropertyRecievePort"],
             parameters=blocks["Parameter"],
             constant=blocks["Constant"],
             alias=blocks["Alias"],
             select=blocks["Select"])
-    
+
     @read_annotations
     def load_select(self, element):
         block_names = ('Mask', 'Number', 'Preference', 'Selected',
