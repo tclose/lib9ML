@@ -13,7 +13,6 @@ from .values import SingleValue
 from .component import Quantity
 from nineml import DocumentLevelObject
 from .port_connections import AnalogPortConnection, EventPortConnection
-from nineml.exceptions import (NineMLRuntimeError, NineMLMissingElementError)
 
 
 class Projection(BaseULObject, DocumentLevelObject):
@@ -146,24 +145,12 @@ class Projection(BaseULObject, DocumentLevelObject):
     @write_reference
     @annotate_xml
     def to_xml(self, document, **kwargs):  # @UnusedVariable
-        ref_kwargs = copy(kwargs)
-        ref_kwargs['as_reference'] = True
+        as_ref_kwargs = copy(kwargs)
+        as_ref_kwargs['as_reference'] = True
         members = []
         for pop, tag_name in ((self.pre, 'Pre'), (self.post, 'Post')):
-            if pop.from_reference is None:  # Generated objects
-                try:
-                    doc_pop = document[pop.name]
-                    if doc_pop != pop:
-                        raise NineMLRuntimeError(
-                            "Cannot write poplulation '{}' in the document "
-                            "due to name clash with existing (and different) "
-                            "object")
-                except NineMLMissingElementError:
-                    document.add(pop)
-                elem = E.Reference(name=pop.name)
-            else:
-                elem = pop.to_xml(document, **ref_kwargs)
-            members.append(E(tag_name, elem))
+            pop.set_local_reference(document, overwrite=False)
+            members.append(E(tag_name, pop.to_xml(document, **as_ref_kwargs)))
         members.extend([
             E.Response(self.response.to_xml(document, **kwargs)),
             E.Connectivity(self.connectivity.to_xml(document, **kwargs)),

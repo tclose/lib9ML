@@ -3,10 +3,11 @@ from itertools import chain
 from abc import ABCMeta, abstractmethod
 import collections
 from nineml.exceptions import (
-    NineMLUnitMismatchError, NineMLRuntimeError)
+    NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
 from nineml.xmlns import NINEML, E
+from nineml.base import BaseNineMLObject
 from nineml.reference import (
-    Prototype, Definition, write_reference, resolve_reference)
+    BaseReference, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml.units import Unit, unitless
@@ -16,6 +17,69 @@ from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
 from os import path
+
+
+class Definition(BaseReference):
+
+    """
+    Base class for model components that are defined in the abstraction layer.
+    """
+    element_name = "Definition"
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:
+            if not isinstance(args[0], ComponentClass):
+                raise NineMLRuntimeError(
+                    "Object passed to component definition ({}) is not a "
+                    "component class".format(args[0]))
+            BaseNineMLObject.__init__(self)
+            self._referred_to = args[0]
+            if kwargs:
+                raise NineMLRuntimeError(
+                    "Cannot provide name, document or url arguments with "
+                    "explicit component class")
+            self._url = None
+        elif not args:
+            super(Definition, self).__init__(
+                name=kwargs['name'], document=kwargs['document'],
+                url=kwargs['url'])
+        else:
+            raise NineMLRuntimeError(
+                "Wrong number of arguments ({}), provided to Definition "
+                "__init__, can either be one (the component class) or zero"
+                .format(len(args)))
+
+    @property
+    def component_class(self):
+        return self._referred_to
+
+    def to_xml(self, document, **kwargs):  # @UnusedVariable
+        if self.url is None:
+            # If definition was created in Python, add component class
+            # reference to document argument before writing definition
+            try:
+                doc_obj = document[self._referred_to.name]
+                if doc_obj != self:
+                    raise NineMLRuntimeError(
+                        "Cannot create reference for '{}' {} in the provided "
+                        "document due to name clash with existing {} "
+                        "object".format(self.name, type(self), type(doc_obj)))
+            except NineMLMissingElementError:
+                document.add(self._referred_to)
+        return super(Definition, self).to_xml(document, **kwargs)
+
+
+class Prototype(Definition):
+
+    element_name = "Prototype"
+
+    @property
+    def component(self):
+        return self._referred_to
+
+    @property
+    def component_class(self):
+        return self.component.component_class
 
 
 class Component(BaseULObject, DocumentLevelObject):
@@ -66,9 +130,9 @@ class Component(BaseULObject, DocumentLevelObject):
                 document=Document(url=definition),
                 url=definition)
         elif isinstance(definition, ComponentClass):
-            definition = Definition(definition.name, Document(definition))
+            definition = Definition(definition)
         elif isinstance(definition, Component):
-            definition = Prototype(definition.name, Document(definition))
+            definition = Prototype(definition)
         elif not (isinstance(definition, Definition) or
                   isinstance(definition, Prototype)):
             raise ValueError("'definition' must be either a 'Definition' or "
