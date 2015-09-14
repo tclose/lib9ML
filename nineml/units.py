@@ -30,7 +30,8 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
             assert len(dimensions) == 7, "Incorrect dimension length"
             self._dims = tuple(dimensions)
         else:
-            self._dims = tuple(kwargs.pop(d, 0) for d in self.dimension_symbols)
+            self._dims = tuple(kwargs.pop(d, 0)
+                               for d in self.dimension_symbols)
         assert not len(kwargs), "Unrecognised kwargs ({})".format(kwargs)
 
     def __hash__(self):
@@ -69,7 +70,8 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
         """
         return reduce(
             operator.mul,
-            (Symbol(n) ** p for n, p in zip(self.dimension_symbols, self._dims)))
+            (Symbol(n) ** p
+             for n, p in zip(self.dimension_symbols, self._dims)))
 
     @property
     def m(self):
@@ -146,15 +148,11 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
 
     def __mul__(self, other):
         "self * other"
-        if other == 1:
-            other = dimensionless
         return Dimension(self.make_name([self.name, other.name]),
                          dimensions=tuple(s + o for s, o in zip(self, other)))
 
     def __truediv__(self, other):
         "self / expr"
-        if other == 1:
-            other = dimensionless
         return Dimension(self.make_name([self.name], [other.name]),
                          dimensions=tuple(s - o for s, o in zip(self, other)))
 
@@ -167,8 +165,6 @@ class Dimension(BaseNineMLObject, DocumentLevelObject):
         return self.__mul__(other)
 
     def __rtruediv__(self, other):
-        if other == 1:
-            other = dimensionless
         return other.__truediv__(self)
 
     def __div__(self, other):
@@ -357,23 +353,25 @@ class Unit(BaseNineMLObject, DocumentLevelObject):
 
     def __mul__(self, other):
         "self * other"
-        if other == 1:
-            other = unitless
-        assert (self.offset == 0 and
-                other.offset == 0), "Can't multiply units with nonzero offsets"
-        return Unit(Dimension.make_name([self.name, other.name]),
-                    dimension=self.dimension * other.dimension,
-                    power=(self.power + other.power))
+        try:
+            assert (self.offset == 0 and other.offset == 0), (
+                "Can't multiply units with nonzero offsets")
+            return Unit(Dimension.make_name([self.name, other.name]),
+                        dimension=self.dimension * other.dimension,
+                        power=(self.power + other.power))
+        except AttributeError:
+            return Quantity(float(other), self)
 
     def __truediv__(self, other):
         "self / expr"
-        if other == 1:
-            other = unitless
-        assert (self.offset == 0 and
-                other.offset == 0), "Can't divide units with nonzero offsets"
-        return Unit(Dimension.make_name([self.name], [other.name]),
-                    dimension=self.dimension / other.dimension,
-                    power=(self.power - other.power))
+        try:
+            assert (self.offset == 0 and other.offset == 0), (
+                "Can't divide units with nonzero offsets")
+            return Unit(Dimension.make_name([self.name], [other.name]),
+                        dimension=self.dimension / other.dimension,
+                        power=(self.power - other.power))
+        except AttributeError:
+            return Quantity(1.0 / float(other), self.units)
 
     def __pow__(self, power):
         "self ** expr"
@@ -386,9 +384,10 @@ class Unit(BaseNineMLObject, DocumentLevelObject):
         return self.__mul__(other)
 
     def __rtruediv__(self, other):
-        if other == 1:
-            other = unitless
-        return other.__truediv__(self)
+        try:
+            return other.__truediv__(self)
+        except NotImplementedError:
+            return Quantity(float(other), unitless / self)
 
     def __div__(self, other):
         return self.__truediv__(other)
@@ -515,6 +514,7 @@ kg_per_coulomb = Unit(name="kg_per_coulomb", dimension=mass_per_charge,
 cm_per_s = Unit(name="cm_per_s", dimension=velocity, power=-2)
 pF_per_nA = Unit(name='pF_per_nA', dimension=voltage / time, power=-6)
 
+from nineml.values import Quantity
 
 if __name__ == '__main__':
     print 1 / voltage

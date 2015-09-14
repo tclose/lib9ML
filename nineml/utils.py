@@ -9,8 +9,7 @@ analysis.
 from os.path import dirname, normpath, realpath, exists, join
 import sys
 import re
-import types
-
+import math
 import itertools
 import hashlib
 import collections
@@ -589,3 +588,15 @@ def check_units(units, dimension):
     if base != base_units[dimension]:
         raise ValueError("Units %s are invalid for dimension %s" %
                          (units, dimension))
+
+
+def nearly_equal(float1, float2, places=15):
+    """
+    Determines whether two floating point numbers are nearly equal (to
+    within reasonable rounding errors
+    """
+    mantissa1, exp1 = math.frexp(float1)
+    mantissa2, exp2 = math.frexp(float2)
+    return (round(mantissa1, places) == round(mantissa2, places) and
+            exp1 == exp2)
+

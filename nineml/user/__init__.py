@@ -45,12 +45,9 @@ from .network import Network
 from .population import Population, PositionList, Structure
 from .selection import Selection, Concatenate
 from .projection import (
-    Projection, AnalogPortConnection, EventPortConnection, Delay)
-from .component import (PropertySet, Property, Component, Definition,
+    Projection, AnalogPortConnection, EventPortConnection)
+from .component import (Property, Component, Definition,
                         Prototype, resolve_reference, write_reference,
-                        InitialValue, InitialValueSet,
-                        DynamicsProperties, ConnectionRuleProperties,
-                        RandomDistributionProperties, Quantity)
-from .syntactic_sugar import (
-    SpikingNodeType, IonDynamicsType, SynapseType, CurrentSourceType,
-    ConnectionType)
+                        InitialValue, DynamicsProperties,
+                        ConnectionRuleProperties, RandomDistributionProperties,
+                        Quantity)
