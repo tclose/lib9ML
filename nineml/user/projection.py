@@ -11,7 +11,6 @@ from nineml.utils import (
 from .values import SingleValue
 from .component import Quantity
 from nineml import DocumentLevelObject
-from nineml.abstraction.ports import AnalogSendPort, EventSendPort
 from .port_connections import AnalogPortConnection, EventPortConnection
 
 
