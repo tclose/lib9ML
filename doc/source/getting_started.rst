@@ -221,7 +221,7 @@ values of its state variables.
     >>> p_exc.cell.properties
     PropertySet({'Vreset': Property(name=Vreset, value=10.0, unit=mV), 'tau': Property(name=tau, value=20.0, unit=ms), 'R': Property(name=R, value=1.5, unit=Mohm), 'tau_rp': Property(name=tau_rp, value=2.0, unit=ms), 'theta': Property(name=theta, value=20.0, unit=mV)})
     >>> p_exc.cell.initial_values
-    InitialValueSet({'t_rpend': Property(name=t_rpend, value=0.0, unit=ms), 'V': Property(name=V, value=0.0, unit=mV)})
+    InitialSet({'t_rpend': Property(name=t_rpend, value=0.0, unit=ms), 'V': Property(name=V, value=0.0, unit=mV)})
 
 Turning from a population to a projection:
 

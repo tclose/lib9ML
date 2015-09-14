@@ -48,6 +48,6 @@ from .projection import (
     Projection, AnalogPortConnection, EventPortConnection)
 from .component import (Property, Component, Definition,
                         Prototype, resolve_reference, write_reference,
-                        InitialValue, DynamicsProperties,
+                        Initial, DynamicsProperties,
                         ConnectionRuleProperties, RandomDistributionProperties,
                         Quantity)

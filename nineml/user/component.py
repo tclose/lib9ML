@@ -390,12 +390,12 @@ class Property(BaseULObject):
         self.quantity._units = units
 
 
-class InitialValue(Property):
+class Initial(Property):
 
     """
     temporary, longer-term plan is to use SEDML or something similar
     """
-    element_name = "InitialValue"
+    element_name = "Initial"
 
 
 class DynamicsProperties(Component):
@@ -410,7 +410,7 @@ class DynamicsProperties(Component):
             name=name, definition=definition, properties=properties, url=url)
         if isinstance(initial_values, dict):
             self._initial_values = dict(
-                (name, InitialValue(name, qty))
+                (name, Initial(name, qty))
                 for name, qty in initial_values.iteritems())
         else:
             self._initial_values = dict((iv.name, iv) for iv in initial_values)
@@ -477,8 +477,8 @@ class DynamicsProperties(Component):
             definition = Prototype.from_xml(prototype_element, document)
         properties = [Property.from_xml(e, document, **kwargs)
                       for e in element.findall(NINEML + 'Property')]
-        initial_values = [InitialValue.from_xml(e, document, **kwargs)
-                          for e in element.findall(NINEML + 'InitialValue')]
+        initial_values = [Initial.from_xml(e, document, **kwargs)
+                          for e in element.findall(NINEML + 'Initial')]
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
 
