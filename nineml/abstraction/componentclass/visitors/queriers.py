@@ -166,6 +166,14 @@ class ComponentElementFinder(ComponentActionVisitor):
         if self.element is constant:
             self._found()
 
+    def action_randomvariable(self, random_variable, **kwargs):  # @UnusedVariable @IgnorePep8
+        if self.element is random_variable:
+            self._found()
+
+    def action_randomdistribution(self, random_distribution, **kwargs): # @UnusedVariable @IgnorePep8
+        if self.element is random_distribution:
+            self._found()
+
 
 class ComponentExpressionExtractor(ComponentActionVisitor):
 

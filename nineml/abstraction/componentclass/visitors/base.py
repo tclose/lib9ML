@@ -58,12 +58,12 @@ class ComponentActionVisitor(ComponentVisitor):
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable
         self.check_pass()
-        
+
     def action_randomvariable(self, randomvariable, **kwargs):  # @UnusedVariable
-        self.check_pass()        
+        self.check_pass()
 
     def action_constant(self, constant, **kwargs):  # @UnusedVariable
         self.check_pass()
 
     def action_randomdistribution(self, random_distribution, **kwargs):  # @UnusedVariable @IgnorePep8
-        self.check_pass()        
+        self.check_pass()
