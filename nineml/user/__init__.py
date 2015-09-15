@@ -68,6 +68,6 @@ from .projection import (
     Post, FromPre, FromPost, FromPlasticity, FromResponse)
 from .component import (Property, Component, Definition,
                         Prototype, resolve_reference, write_reference,
-                        InitialValue, DynamicsProperties,
+                        Initial, DynamicsProperties,
                         ConnectionRuleProperties, RandomDistributionProperties,
                         Quantity)

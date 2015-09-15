@@ -84,7 +84,7 @@ class TestNetwork(unittest.TestCase):
             (p1, PortConnection('Isyn', FromResponse('Isyn'))),
             response=(psr, PortConnection(
                 'weight', FromPlasticity('weight'))),
-            plasticity=static_exc,
+            plasticity=(static_exc,),
             connectivity=all_to_all,
             delay=(delay, ms))
 
@@ -93,7 +93,7 @@ class TestNetwork(unittest.TestCase):
             (p2, PortConnection('Isyn', FromResponse('Isyn'))),
             response=(psr, PortConnection(
                 'weight', FromPlasticity('weight'))),
-            plasticity=static_inh,
+            plasticity=(static_inh,),
             connectivity=all_to_all,
             delay=Delay(delay, ms))
 
