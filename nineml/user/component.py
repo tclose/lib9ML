@@ -12,7 +12,7 @@ from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import expect_single, check_units
 from nineml import units as un
 from ..abstraction import ComponentClass
-from nineml.values import Quantity
+from nineml.units import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
@@ -90,6 +90,9 @@ class Component(BaseULObject, DocumentLevelObject):
     def __getinitargs__(self):
         return (self.name, self.definition, self.property_set,
                 self.initial_value_set, self._url)
+
+    def __iter__(self):
+        return self.properties
 
     def __getitem__(self, name):
         return self._properties[name].quantity
@@ -286,6 +289,8 @@ class Property(BaseULObject):
 
     def __init__(self, name, quantity):
         super(Property, self).__init__()
+        assert isinstance(name, basestring)
+        quantity = Quantity.parse_quantity(quantity)
         self._name = name
         self._quantity = quantity
 
@@ -340,7 +345,7 @@ class Initial(Property):
     """
     temporary, longer-term plan is to use SEDML or something similar
     """
-    element_name = "InitialValue"
+    element_name = "Initial"
 
 
 class DynamicsProperties(Component):

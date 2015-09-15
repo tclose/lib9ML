@@ -490,9 +490,10 @@ def restore_sys_path(func):
 
 
 class curry:
-
-    """ http://code.activestate.com/recipes/52549-curry-associating-parameters-with-a-function/ """
-
+    """
+    http://code.activestate.com/recipes/
+    52549-curry-associating-parameters-with-a-function/
+    """
     def __init__(self, fun, *args, **kwargs):
         self.fun = fun
         self.pending = args[:]
