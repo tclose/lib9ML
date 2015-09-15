@@ -26,10 +26,6 @@ class Definition(BaseReference):
 
     def __init__(self, *args, **kwargs):
         if len(args) == 1:
-            if not isinstance(args[0], ComponentClass):
-                raise NineMLRuntimeError(
-                    "Object passed to component definition ({}) is not a "
-                    "component class".format(args[0]))
             BaseNineMLObject.__init__(self)
             self._referred_to = args[0]
             if kwargs:
@@ -149,6 +145,9 @@ class Component(BaseULObject, DocumentLevelObject):
 
     def __getinitargs__(self):
         return (self.name, self.definition, self._properties, self._url)
+
+    def __iter__(self):
+        return self.properties
 
     def __getitem__(self, name):
         return self.property(name).quantity
