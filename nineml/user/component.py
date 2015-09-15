@@ -10,7 +10,7 @@ from nineml.reference import (
 from nineml.annotations import read_annotations, annotate_xml
 from nineml.utils import check_units, expect_single
 from ..abstraction import ComponentClass
-from nineml.values import Quantity
+from nineml.units import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml import DocumentLevelObject
@@ -337,10 +337,7 @@ class Property(BaseULObject):
     def __init__(self, name, quantity):
         super(Property, self).__init__()
         assert isinstance(name, basestring)
-        try:
-            assert isinstance(quantity, Quantity)
-        except:
-            raise
+        quantity = Quantity.parse_quantity(quantity)
         self._name = name
         self._quantity = quantity
 
