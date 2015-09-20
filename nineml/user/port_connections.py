@@ -207,6 +207,30 @@ class BasePortConnection(BaseULObject):
     def _check_ports(self):
         pass
 
+    @classmethod
+    def from_tuple(cls, tple, container):
+        sender, send_port, receiver, receive_port = tple
+        init_kwargs = {}
+        try:
+            sender_dynamics = getattr(container, sender).component_class
+            init_kwargs['sender_role'] = sender
+        except AttributeError:
+            sender_dynamics = container[sender].component_class
+            init_kwargs['sender_name'] = sender
+        try:
+            getattr(container, receiver).component_class
+            init_kwargs['receiver_role'] = receiver
+        except AttributeError:
+            container[receiver].component_class
+            init_kwargs['receiver_name'] = receiver
+        if isinstance(sender_dynamics.port(send_port), AnalogSendPort):
+            port_connection = AnalogPortConnection(
+                receive_port=receive_port, send_port=send_port, **init_kwargs)
+        else:
+            port_connection = EventPortConnection(
+                receive_port=receive_port, send_port=send_port, **init_kwargs)
+        return port_connection
+
 
 class AnalogPortConnection(BasePortConnection):
 

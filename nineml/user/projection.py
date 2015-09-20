@@ -4,14 +4,14 @@ from nineml.reference import resolve_reference, write_reference, Reference
 from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
 from .component import ConnectionRuleProperties, DynamicsProperties
-from ..abstraction import AnalogSendPort
 from copy import copy
 from itertools import chain
 from nineml.utils import (
     expect_single, expect_none_or_single)
 from .component import Quantity
 from nineml import DocumentLevelObject
-from .port_connections import AnalogPortConnection, EventPortConnection
+from .port_connections import (
+    AnalogPortConnection, EventPortConnection, BasePortConnection)
 
 
 class Projection(BaseULObject, DocumentLevelObject):
@@ -72,17 +72,8 @@ class Projection(BaseULObject, DocumentLevelObject):
         self._port_connections = []
         for port_connection in port_connections:
             if isinstance(port_connection, tuple):
-                (sender_role, send_port,
-                 receiver_role, receive_port) = port_connection
-                sender = getattr(self, sender_role).component_class
-                if isinstance(sender.port(send_port), AnalogSendPort):
-                    port_connection = AnalogPortConnection(
-                        sender_role=sender_role, receiver_role=receiver_role,
-                        receive_port=receive_port, send_port=send_port)
-                else:
-                    port_connection = EventPortConnection(
-                        sender_role=sender_role, receiver_role=receiver_role,
-                        receive_port=receive_port, send_port=send_port)
+                port_connection = BasePortConnection.from_tuple(
+                    port_connection, self)
             port_connection.bind(self)
             self._port_connections.append(port_connection)
 
