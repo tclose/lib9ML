@@ -4,19 +4,14 @@ from nineml.reference import resolve_reference, write_reference, Reference
 from nineml.xmlns import NINEML, E
 from nineml.annotations import read_annotations, annotate_xml
 from .component import ConnectionRuleProperties, DynamicsProperties
-from ..abstraction import AnalogSendPort
 from copy import copy
 from itertools import chain
 from nineml.utils import (
     expect_single, expect_none_or_single)
 from .component import Quantity
 from nineml import DocumentLevelObject
-<<<<<<< Upstream, based on origin/bleeding_edge
 from .port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
-=======
-from .port_connections import AnalogPortConnection, EventPortConnection
->>>>>>> d38713f cleaned up after rebase to include document and kwargs to to_xml methods
 
 
 class Projection(BaseULObject, DocumentLevelObject):
