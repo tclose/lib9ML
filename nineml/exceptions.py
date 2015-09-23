@@ -30,6 +30,10 @@ class NineMLInvalidElementTypeException(TypeError):
     pass
 
 
+class NineMLImmutableError(NineMLRuntimeError):
+    pass
+
+
 def internal_error(s):
     assert False, 'INTERNAL ERROR:' + s
 
