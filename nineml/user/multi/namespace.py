@@ -17,9 +17,14 @@ from nineml.exceptions import NineMLImmutableError
 multiple_underscore_re = re.compile(r'(.*)(__+)()')
 # Match only double underscores (no more or less)
 double_underscore_re = re.compile(r'(?<!_)__(?!_)')
+# Match only triple underscores (no more or less)
+triple_underscore_re = re.compile(r'(?<!_)___(?!_)')
 # Match more than double underscores to reverse escaping of double underscores
 # in sub-component suffixes by adding an additional underscore.
-more_than_double_underscore_re = re.compile(r'(__)_+')
+more_than_double_underscore_re = re.compile(r'__(_+)')
+# Match more than double underscores to reverse escaping of double underscores
+# in sub-component suffixes by adding an additional underscore.
+more_than_triple_underscore_re = re.compile(r'___(_+)')
 
 
 def append_namespace(identifier, namespace):
@@ -35,7 +40,7 @@ def append_namespace(identifier, namespace):
             multiple_underscore_re.sub(r'/1/2_/3', namespace))
 
 
-def split_namespace(cls, identifier_in_namespace):
+def split_namespace(identifier_in_namespace):
     """
     Splits an identifer and a namespace that have been concatenated by
     'append_namespace'
@@ -43,7 +48,7 @@ def split_namespace(cls, identifier_in_namespace):
     parts = double_underscore_re.split(identifier_in_namespace)
     name = '__'.join(parts[:-1])
     comp_name = parts[-1]
-    comp_name = more_than_double_underscore_re.sub('_', comp_name)
+    comp_name = more_than_double_underscore_re.sub('_\1', comp_name)
     return name, comp_name
 
 
@@ -59,20 +64,34 @@ def make_delay_trigger_name(port_conn):
         (port_conn.receiver_role
          if port_conn.receiver_role is not None else port_conn.receiver_name),
         port_conn.receive_port_name)
-    return ('_'.join(multiple_underscore_re.sub(r'/1/2_/3', p) for p in parts)
-            + '_delay_trigger')
+    return ('___'.join(multiple_underscore_re.sub(r'/1/2__/3', p)
+                       for p in parts)
+            + '___delay_trigger')
 
 
-def make_regime_name(self, sub_regimes_dict):
+def split_delay_trigger_name(name):
+    parts = triple_underscore_re.split(name)[:-1]
+    return [more_than_triple_underscore_re.sub('_\1', p) for p in parts]
+
+
+def make_regime_name(sub_regimes_dict):
     sorted_keys = sorted(sub_regimes_dict.iterkeys())
-    return '_'.join(multiple_underscore_re.sub(r'/1/2_/3', sub_regimes_dict[k])
-                    for k in sorted_keys) + '_regime'
+    return '___'.join(multiple_underscore_re.sub(r'/1/2__/3',
+                                                 sub_regimes_dict[k].name)
+                      for k in sorted_keys) + '___regime'
+
+
+def split_multi_regime_name(name):
+    parts = triple_underscore_re.split(name)[:-1]
+    return [more_than_triple_underscore_re.sub('_\1', p) for p in parts]
 
 
 class _NamespaceNamed(object):
     """
     Abstract base class for wrappers of abstraction layer objects with names
     """
+
+    defining_attributes = ('_sub_component', '_element')
 
     def __init__(self, sub_component, element):
         self._sub_component = sub_component
@@ -92,6 +111,8 @@ class _NamespaceNamed(object):
 
 
 class _NamespaceExpression(object):
+
+    defining_attributes = ('_sub_component', '_element') 
 
     def __init__(self, sub_component, element):
         self._sub_component = sub_component
