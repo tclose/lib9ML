@@ -37,7 +37,7 @@ def append_namespace(identifier, namespace):
     # in underscores) we append an underscore to each multiple underscore
     # to avoid clash with the delimeter in the suffix
     return (identifier + '__' +
-            multiple_underscore_re.sub(r'/1/2_/3', namespace))
+            multiple_underscore_re.sub(r'\1\2_\3', namespace))
 
 
 def split_namespace(identifier_in_namespace):
@@ -64,7 +64,7 @@ def make_delay_trigger_name(port_conn):
         (port_conn.receiver_role
          if port_conn.receiver_role is not None else port_conn.receiver_name),
         port_conn.receive_port_name)
-    return ('___'.join(multiple_underscore_re.sub(r'/1/2__/3', p)
+    return ('___'.join(multiple_underscore_re.sub(r'\1\2__\3', p)
                        for p in parts)
             + '___delay_trigger')
 
@@ -76,7 +76,7 @@ def split_delay_trigger_name(name):
 
 def make_regime_name(sub_regimes_dict):
     sorted_keys = sorted(sub_regimes_dict.iterkeys())
-    return '___'.join(multiple_underscore_re.sub(r'/1/2__/3',
+    return '___'.join(multiple_underscore_re.sub(r'\1\2__\3',
                                                  sub_regimes_dict[k].name)
                       for k in sorted_keys) + '___regime'
 
@@ -112,7 +112,7 @@ class _NamespaceNamed(object):
 
 class _NamespaceExpression(object):
 
-    defining_attributes = ('_sub_component', '_element') 
+    defining_attributes = ('_sub_component', '_element')
 
     def __init__(self, sub_component, element):
         self._sub_component = sub_component
@@ -123,11 +123,19 @@ class _NamespaceExpression(object):
         return self._sub_component
 
     @property
+    def element(self):
+        return self._element
+
+    @property
     def lhs(self):
-        return self.name
+        return self.element.name
 
     def lhs_name_transform_inplace(self, name_map):
-        raise NotImplementedError  # Not sure if this should be implemented yet
+        raise NineMLImmutableError(
+            "Cannot change LHS of expression in global namespace of "
+            "multi-component element. The multi-component elemnt should either"
+            " be flattened or the substitution should be done in the "
+            "sub-component")
 
     @property
     def rhs(self):
@@ -135,7 +143,7 @@ class _NamespaceExpression(object):
         try:
             return self.element.rhs.xreplace(dict(
                 (s, sympy.Symbol(self.sub_component.append_namespace(s)))
-                for s in self.rhs_symbols))
+                for s in self._rhs.free_symbols))
         except AttributeError:  # If rhs has been simplified to ints/floats
             assert float(self.element.rhs)
             return self.rhs
@@ -291,7 +299,7 @@ class _NamespaceRegime(_NamespaceNamed, Regime):
 
     @property
     def on_conditions(self):
-        return (_NamespaceOnEvent(self.sub_component, oc)
+        return (_NamespaceOnCondition(self.sub_component, oc)
                 for oc in self.element.on_conditions)
 
     def time_derivative(self, name):
@@ -306,8 +314,8 @@ class _NamespaceRegime(_NamespaceNamed, Regime):
                                  self.element.on_event(name))
 
     def on_condition(self, name):
-        return _NamespaceOnEvent(self.sub_component,
-                                 self.element.on_condition(name))
+        return _NamespaceOnCondition(self.sub_component,
+                                     self.element.on_condition(name))
 
     @property
     def num_time_derivatives(self):
