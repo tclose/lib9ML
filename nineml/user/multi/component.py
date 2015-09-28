@@ -549,9 +549,7 @@ class MultiDynamics(Dynamics):
         return sorted(self.sub_component_names)
 
     def _create_multi_regime(self, sub_regimes):
-        return _MultiRegime(sub_regimes, self._event_send_port_exposures,
-                            self._event_receive_port_exposures,
-                            self._event_port_connections)
+        return _MultiRegime(sub_regimes, self)
 
 
 class SubDynamics(object):
@@ -616,7 +614,8 @@ class _MultiRegime(Regime):
         `event_port_connections` -- reference to the event send port
                                     connections in the MultiDynamics
         """
-        self._sub_regimes = dict((r.component.name, r) for r in sub_regimes)
+        self._sub_regimes = dict((r.sub_component.name, r)
+                                 for r in sub_regimes)
         self._parent = parent
 
     @property
@@ -677,7 +676,7 @@ class _MultiRegime(Regime):
         #     these lists are then chained to form a list of 2-tuples (ie. not
         #     a list of lists) containing port exposure and on event pairs
         exposed_on_events = chain(*[
-            izip((pe for pe in self.parent._event_receive_port_exposures
+            izip((pe for pe in self._parent._event_receive_port_exposures
                   if oe.port is pe.port), (oe,))
             for oe in self._all_sub_on_events])
         # Group on events by their port exposure and return as an _MultiOnEvent
@@ -704,7 +703,7 @@ class _MultiRegime(Regime):
         # delay
         nonzero_delay_receive_ports = [
             pc.receive_port
-            for pc in self.parent.nonzero_delay_event_port_connections]
+            for pc in self._parent.nonzero_delay_event_port_connections]
         key = lambda oc: oc.trigger  # Group key for on conditions
         # Chain delayed on events and grouped on conditions
         return chain(
