@@ -305,11 +305,11 @@ class MultiDynamics(Dynamics):
         'SubDynamics': 'sub_components',
         'AnalogPortConnection': 'analog_port_connections',
         'EventPortConnection': 'event_port_connections',
-        'AnalogSendPortExposure': 'analog_send_port_exposures',
-        'AnalogReceivePortExposure': 'analog_receive_port_exposures',
-        'AnalogReducePortExposure': 'analog_reduce_port_exposures',
-        'EventSendPortExposure': 'event_send_port_exposures',
-        'EventReceivePortExposure': 'event_receive_port_exposures'}
+        'AnalogSendPortExposure': 'analog_send_ports',
+        'AnalogReceivePortExposure': 'analog_receive_ports',
+        'AnalogReducePortExposure': 'analog_reduce_ports',
+        'EventSendPortExposure': 'event_send_ports',
+        'EventReceivePortExposure': 'event_receive_ports'}
 
     def __init__(self, name, sub_components, port_connections,
                  port_exposures=None, url=None, validate_dimensions=True):

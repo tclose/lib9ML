@@ -277,7 +277,10 @@ class _NamespaceStateVariable(_NamespaceNamed, _NamespaceDimensioned,
 
 
 class _NamespaceAlias(_NamespaceNamed, _NamespaceExpression, Alias):
-    pass
+
+    @property
+    def lhs(self):
+        return self.name
 
 
 class _NamespaceParameter(_NamespaceNamed, _NamespaceDimensioned, Parameter):
@@ -299,7 +302,10 @@ class _NamespaceTimeDerivative(_NamespaceNamed, _NamespaceExpression,
 
 class _NamespaceStateAssignment(_NamespaceNamed, _NamespaceExpression,
                                 StateAssignment):
-    pass
+
+    @property
+    def lhs(self):
+        return self.name
 
 
 class _NamespaceProperty(_NamespaceNamed, Property):
