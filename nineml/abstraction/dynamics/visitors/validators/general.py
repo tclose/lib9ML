@@ -29,9 +29,7 @@ class TimeDerivativesAreDeclaredDynamicsValidator(
             self, require_explicit_overrides=False)
         self.sv_declared = []
         self.time_derivatives_used = []
-
         self.visit(component_class)
-
         for td in self.time_derivatives_used:
             if td not in self.sv_declared:
                 raise NineMLRuntimeError(
@@ -56,9 +54,7 @@ class StateAssignmentsAreOnStateVariablesDynamicsValidator(
             self, require_explicit_overrides=False)
         self.sv_declared = []
         self.state_assignments_lhs = []
-
         self.visit(component_class)
-
         for sa in self.state_assignments_lhs:
             if sa not in self.sv_declared:
                 raise NineMLRuntimeError(
