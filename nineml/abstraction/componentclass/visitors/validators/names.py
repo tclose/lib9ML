@@ -35,18 +35,18 @@ class LocalNameConflictsComponentValidator(BaseValidator):
             raise NineMLRuntimeError(err)
         self.symbols[namespace].append(symbol)
 
-    def action_parameter(self, parameter, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
+    def action_parameter(self, parameter, **kwargs):  # @UnusedVariable @IgnorePep8
         self.check_conflicting_symbol(namespace=namespace,
                                       symbol=parameter.name)
 
-    def action_alias(self, alias, namespace, **kwargs):  # @UnusedVariable
+    def action_alias(self, alias, **kwargs):  # @UnusedVariable
         # Exclude aliases defined within sub scopes (as they should match the
         # outer scope anyway)
         if alias in self.component_class.aliases:
             self.check_conflicting_symbol(namespace=namespace,
                                           symbol=alias.lhs)
 
-    def action_constant(self, constant, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
+    def action_constant(self, constant, **kwargs):  # @UnusedVariable @IgnorePep8
         self.check_conflicting_symbol(namespace=namespace,
                                       symbol=constant.name)
 

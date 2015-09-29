@@ -27,7 +27,7 @@ class AliasesAreNotRecursiveComponentValidator(BaseValidator):
             self, require_explicit_overrides=False)
         self.visit(component_class)
 
-    def action_componentclass(self, component_class, namespace):
+    def action_componentclass(self, component_class):
 
         unresolved_aliases = dict((a.lhs, a) for a in component_class.aliases)
 
@@ -41,18 +41,16 @@ class AliasesAreNotRecursiveComponentValidator(BaseValidator):
                     if not alias_contains_unresolved_symbols(alias)]
 
         while(unresolved_aliases):
-
             resolved_aliases = get_resolved_aliases()
             if resolved_aliases:
                 for r in resolved_aliases:
                     del unresolved_aliases[r.lhs]
 
             else:
-                errmsg = "Unable to resolve all aliases in %s. " % namespace
-                errmsg += "You may have a recursion issue."
-                errmsg += ("Remaining Aliases: %s" %
-                           ','.join(unresolved_aliases.keys()))
-                raise NineMLRuntimeError(errmsg)
+                raise NineMLRuntimeError(
+                    "Unable to resolve all aliases, you may have a recursion "
+                    "issue. Remaining Aliases: {}".format(
+                        ','.join(unresolved_aliases.keys())))
 
 
 class NoUnresolvedSymbolsComponentValidator(BaseValidator):
@@ -110,15 +108,15 @@ class NoUnresolvedSymbolsComponentValidator(BaseValidator):
             raise NineMLRuntimeError(err)
         self.available_symbols[namespace].append(symbol)
 
-    def action_alias(self, alias, namespace, **kwargs):  # @UnusedVariable
+    def action_alias(self, alias, **kwargs):  # @UnusedVariable
         if alias in self.component_class.aliases:
             self.add_symbol(namespace=namespace, symbol=alias.lhs)
             self.aliases[namespace].append(alias)
 
-    def action_parameter(self, parameter, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
+    def action_parameter(self, parameter, **kwargs):  # @UnusedVariable @IgnorePep8
         self.add_symbol(namespace=namespace, symbol=parameter.name)
 
-    def action_constant(self, constant, namespace, **kwargs):  # @UnusedVariable @IgnorePep8
+    def action_constant(self, constant, **kwargs):  # @UnusedVariable @IgnorePep8
         self.add_symbol(namespace, constant.name)
 
 
