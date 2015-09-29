@@ -5,20 +5,19 @@ docstring needed
 :license: BSD-3, see LICENSE for details.
 """
 from collections import defaultdict
-from . import PerNamespaceComponentValidator
+from .base import BaseValidator
 from nineml.exceptions import NineMLRuntimeError
 from nineml.abstraction.componentclass.namespace import NamespaceAddress
 
 
-class PortConnectionsComponentValidator(PerNamespaceComponentValidator):
+class PortConnectionsComponentValidator(BaseValidator):
 
     """Check that all the port connections point to a port, and that
     each send & recv port only has a single connection.
     """
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
-            self, require_explicit_overrides=False)
+        BaseValidator.__init__(self, require_explicit_overrides=False)
 
         self.ports = defaultdict(list)
         self.portconnections = list()

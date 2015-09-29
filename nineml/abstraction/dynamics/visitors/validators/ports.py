@@ -7,13 +7,13 @@ docstring needed
 from itertools import chain
 from nineml.exceptions import NineMLRuntimeError
 from collections import defaultdict
-from . import PerNamespaceDynamicsValidator
+from . import BaseDynamicsValidator
 from ....componentclass.visitors.validators.ports import (
     PortConnectionsComponentValidator)
 from ..base import DynamicsActionVisitor
 
 
-class EventPortsDynamicsValidator(PerNamespaceDynamicsValidator):
+class EventPortsDynamicsValidator(BaseDynamicsValidator):
 
     """
     Check that each OutputEvent and OnEvent has a corresponding EventPort
@@ -81,7 +81,7 @@ class EventPortsDynamicsValidator(PerNamespaceDynamicsValidator):
 
 # Check that the sub-components stored are all of the
 # right types:
-class OutputAnalogPortsDynamicsValidator(PerNamespaceDynamicsValidator):
+class OutputAnalogPortsDynamicsValidator(BaseDynamicsValidator):
 
     """
     Check that all output AnalogPorts reference a local symbol, either an alias
