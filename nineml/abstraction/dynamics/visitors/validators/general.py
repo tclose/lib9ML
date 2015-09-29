@@ -35,7 +35,7 @@ class TimeDerivativesAreDeclaredDynamicsValidator(
         for td in self.time_derivatives_used:
             if td not in self.sv_declared:
                 raise NineMLRuntimeError(
-                    "StateVariable not declared: %s".format(td))
+                    "StateVariable '{}' not declared".format(td))
 
     def action_statevariable(self, state_variable, **kwargs):  # @UnusedVariable @IgnorePep8
         self.sv_declared.append(state_variable.name)
