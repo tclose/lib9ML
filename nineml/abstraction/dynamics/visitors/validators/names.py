@@ -8,7 +8,7 @@ from nineml.utils import assert_no_duplicates
 from ....componentclass.visitors.validators import (
     LocalNameConflictsComponentValidator,
     DimensionNameConflictsComponentValidator)
-from . import PerNamespaceDynamicsValidator
+from . import BaseDynamicsValidator
 from ..base import DynamicsActionVisitor
 from nineml.exceptions import NineMLRuntimeError
 
@@ -43,7 +43,7 @@ class LocalNameConflictsDynamicsValidator(
 
 class DimensionNameConflictsDynamicsValidator(
         DimensionNameConflictsComponentValidator,
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     def action_statevariable(self, state_variable, **kwargs):  # @UnusedVariable @IgnorePep8
         self.check_conflicting_dimension(state_variable.dimension)
@@ -58,7 +58,7 @@ class DimensionNameConflictsDynamicsValidator(
         self.check_conflicting_dimension(port.dimension)
 
 
-class DuplicateRegimeNamesDynamicsValidator(PerNamespaceDynamicsValidator):
+class DuplicateRegimeNamesDynamicsValidator(BaseDynamicsValidator):
 
     def __init__(self, component_class):
         super(DuplicateRegimeNamesDynamicsValidator, self).__init__(

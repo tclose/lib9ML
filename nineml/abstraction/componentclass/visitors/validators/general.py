@@ -5,7 +5,6 @@ docstring needed
 :license: BSD-3, see LICENSE for details.
 """
 from collections import defaultdict
-from . import PerNamespaceComponentValidator
 from nineml.exceptions import NineMLRuntimeError, NineMLDimensionError
 from nineml.abstraction.expressions.utils import is_valid_lhs_target
 from nineml.abstraction.expressions import reserved_identifiers
@@ -15,16 +14,16 @@ import sympy
 from sympy import sympify
 from nineml.base import SendPortBase
 from nineml.abstraction.expressions import Expression
-from sympy.functions.elementary.piecewise import ExprCondPair
 from sympy.logic.boolalg import BooleanTrue, BooleanFalse
+from .base import BaseValidator
 
 
-class AliasesAreNotRecursiveComponentValidator(PerNamespaceComponentValidator):
+class AliasesAreNotRecursiveComponentValidator(BaseValidator):
 
     """Check that aliases are not self-referential"""
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
+        BaseValidator.__init__(
             self, require_explicit_overrides=False)
         self.visit(component_class)
 
@@ -56,14 +55,14 @@ class AliasesAreNotRecursiveComponentValidator(PerNamespaceComponentValidator):
                 raise NineMLRuntimeError(errmsg)
 
 
-class NoUnresolvedSymbolsComponentValidator(PerNamespaceComponentValidator):
+class NoUnresolvedSymbolsComponentValidator(BaseValidator):
     """
     Check that aliases and timederivatives are defined in terms of other
     parameters, aliases, statevariables and ports
     """
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
+        BaseValidator.__init__(
             self, require_explicit_overrides=False)
 
         self.available_symbols = defaultdict(list)
@@ -123,11 +122,10 @@ class NoUnresolvedSymbolsComponentValidator(PerNamespaceComponentValidator):
         self.add_symbol(namespace, constant.name)
 
 
-class NoDuplicatedObjectsComponentValidator(PerNamespaceComponentValidator):
+class NoDuplicatedObjectsComponentValidator(BaseValidator):
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
-            self, require_explicit_overrides=True)
+        BaseValidator.__init__(self, require_explicit_overrides=True)
         self.all_objects = list()
         self.visit(component_class)
         assert_no_duplicates(self.all_objects)
@@ -145,8 +143,7 @@ class NoDuplicatedObjectsComponentValidator(PerNamespaceComponentValidator):
         self.all_objects.append(constant)
 
 
-class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
-        PerNamespaceComponentValidator):
+class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(BaseValidator):
 
     """
     This class checks that there is not a mathematical symbols, (e.g. pi, e)
@@ -154,7 +151,7 @@ class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
     """
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
+        BaseValidator.__init__(
             self, require_explicit_overrides=False)
 
         self.visit(component_class)
@@ -176,11 +173,10 @@ class CheckNoLHSAssignmentsToMathsNamespaceComponentValidator(
         self.check_lhssymbol_is_valid(constant.name)
 
 
-class DimensionalityComponentValidator(PerNamespaceComponentValidator):
+class DimensionalityComponentValidator(BaseValidator):
 
     def __init__(self, component_class):
-        PerNamespaceComponentValidator.__init__(
-            self, require_explicit_overrides=False)
+        BaseValidator.__init__(self, require_explicit_overrides=False)
         self.component_class = component_class
         self._dimensions = {}
         # Insert declared dimensions into dimensionality database

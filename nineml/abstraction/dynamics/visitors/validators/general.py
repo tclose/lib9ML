@@ -13,19 +13,19 @@ from ....componentclass.visitors.validators import (
     NoDuplicatedObjectsComponentValidator,
     CheckNoLHSAssignmentsToMathsNamespaceComponentValidator,
     DimensionalityComponentValidator)
-from . import PerNamespaceDynamicsValidator
+from . import BaseDynamicsValidator
 from nineml import units as un
 
 
 class TimeDerivativesAreDeclaredDynamicsValidator(
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     """ Check all variables used in TimeDerivative blocks are defined
         as  StateVariables.
     """
 
     def __init__(self, component_class):
-        PerNamespaceDynamicsValidator.__init__(
+        BaseDynamicsValidator.__init__(
             self, require_explicit_overrides=False)
         self.sv_declared = defaultdict(list)
         self.time_derivatives_used = defaultdict(list)
@@ -48,13 +48,13 @@ class TimeDerivativesAreDeclaredDynamicsValidator(
 
 
 class StateAssignmentsAreOnStateVariablesDynamicsValidator(
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     """ Check that we only attempt to make StateAssignments to state-variables.
     """
 
     def __init__(self, component_class):
-        PerNamespaceDynamicsValidator.__init__(
+        BaseDynamicsValidator.__init__(
             self, require_explicit_overrides=False)
         self.sv_declared = defaultdict(list)
         self.state_assignments_lhses = defaultdict(list)
@@ -77,7 +77,7 @@ class StateAssignmentsAreOnStateVariablesDynamicsValidator(
 
 class AliasesAreNotRecursiveDynamicsValidator(
         AliasesAreNotRecursiveComponentValidator,
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     """Check that aliases are not self-referential"""
 
@@ -86,7 +86,7 @@ class AliasesAreNotRecursiveDynamicsValidator(
 
 class NoUnresolvedSymbolsDynamicsValidator(
         NoUnresolvedSymbolsComponentValidator,
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
     """
     Check that aliases and timederivatives are defined in terms of other
     parameters, aliases, statevariables and ports
@@ -108,10 +108,10 @@ class NoUnresolvedSymbolsDynamicsValidator(
         self.state_assignments[namespace].append(state_assignment)
 
 
-class RegimeGraphDynamicsValidator(PerNamespaceDynamicsValidator):
+class RegimeGraphDynamicsValidator(BaseDynamicsValidator):
 
     def __init__(self, component_class):
-        PerNamespaceDynamicsValidator.__init__(
+        BaseDynamicsValidator.__init__(
             self, require_explicit_overrides=False)
 
         self.connected_regimes_from_regime = defaultdict(set)
@@ -149,7 +149,7 @@ class RegimeGraphDynamicsValidator(PerNamespaceDynamicsValidator):
 
 class NoDuplicatedObjectsDynamicsValidator(
         NoDuplicatedObjectsComponentValidator,
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     def action_regime(self, regime, **kwargs):  # @UnusedVariable
         self.all_objects.append(regime)
@@ -192,10 +192,10 @@ class NoDuplicatedObjectsDynamicsValidator(
 
 
 class RegimeOnlyHasOneHandlerPerEventDynamicsValidator(
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     def __init__(self, component_class):
-        PerNamespaceDynamicsValidator.__init__(
+        BaseDynamicsValidator.__init__(
             self, require_explicit_overrides=False)
         self.visit(component_class)
 
@@ -207,7 +207,7 @@ class RegimeOnlyHasOneHandlerPerEventDynamicsValidator(
 
 class CheckNoLHSAssignmentsToMathsNamespaceDynamicsValidator(
         CheckNoLHSAssignmentsToMathsNamespaceComponentValidator,
-        PerNamespaceDynamicsValidator):
+        BaseDynamicsValidator):
 
     """
     This class checks that there is not a mathematical symbols, (e.g. pi, e)
@@ -225,7 +225,7 @@ class CheckNoLHSAssignmentsToMathsNamespaceDynamicsValidator(
 
 
 class DimensionalityDynamicsValidator(DimensionalityComponentValidator,
-                                      PerNamespaceDynamicsValidator):
+                                      BaseDynamicsValidator):
 
     def __init__(self, component_class):
         if not component_class.subnodes:  # Assumes that subnodes are alread checked @IgnorePep8
