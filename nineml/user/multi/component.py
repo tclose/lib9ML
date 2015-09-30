@@ -9,7 +9,8 @@ from nineml.xmlns import NINEML, E
 from nineml.utils import expect_single
 from nineml.user import DynamicsProperties
 from nineml.annotations import annotate_xml, read_annotations
-from nineml.exceptions import NineMLRuntimeError, NineMLMissingElementError
+from nineml.exceptions import (
+    NineMLRuntimeError, NineMLMissingElementError, NineMLNamespaceError)
 from ..port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
 from nineml.abstraction import BaseALObject
@@ -557,7 +558,11 @@ class MultiDynamics(Dynamics):
                        for name in Dynamics.class_to_members.itervalues()))
 
     def element(self, name):
-        return Dynamics.element(self, name)
+        try:
+            _, comp_name = split_namespace(name)
+            return self.sub_component(comp_name).element(name)
+        except NineMLNamespaceError:
+            return super(MultiDynamics, self).element(name)
 
     @property
     def _sub_component_keys(self):
