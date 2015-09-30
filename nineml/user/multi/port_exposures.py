@@ -220,7 +220,7 @@ class _LocalAnalogPortConnection(AnalogPortConnection, Alias):
 
     @property
     def rhs(self):
-        return self.sender.append_namespace(self.send_port_name)
+        return sympy.Symbol(self.sender.append_namespace(self.send_port_name))
 
     def lhs_name_transform_inplace(self, name_map):
         raise NineMLImmutableError(

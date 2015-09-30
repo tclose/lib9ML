@@ -210,9 +210,8 @@ class DimensionalityDynamicsValidator(DimensionalityComponentValidator,
                                       BaseDynamicsValidator):
 
     def __init__(self, component_class):
-        if not component_class.subnodes:  # Assumes that subnodes are alread checked @IgnorePep8
-            super(DimensionalityDynamicsValidator,
-                  self).__init__(component_class)
+        super(DimensionalityDynamicsValidator,
+              self).__init__(component_class)
 
     def action_timederivative(self, timederivative, **kwargs):  # @UnusedVariable @IgnorePep8
         dimension = self._get_dimensions(timederivative)
