@@ -84,9 +84,13 @@ class NoUnresolvedSymbolsComponentValidator(BaseValidator):
             for rhs_atom in timederivative.rhs_symbol_names:
                 if (rhs_atom not in self.available_symbols and
                         rhs_atom not in reserved_identifiers):
-                    raise NineMLRuntimeError(
-                        "Unresolved Symbol in Time Derivative: {} [{}]"
-                        .format(rhs_atom, timederivative))
+                    try:
+                        raise NineMLRuntimeError(
+                            "Unresolved Symbol in Time Derivative: {} [{}]"
+                            .format(rhs_atom, timederivative))
+                    except:
+                        td = list(timederivative.rhs_symbol_names)
+                        print td
 
         # Check StateAssignments
         for state_assignment in self.state_assignments:
