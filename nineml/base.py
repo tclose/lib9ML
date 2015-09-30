@@ -27,6 +27,8 @@ class BaseNineMLObject(object):
         if not (isinstance(other, self.__class__) or
                 isinstance(self, other.__class__)):
             return False
+        if self.defining_attributes != other.defining_attributes:
+            return False
         for name in self.defining_attributes:
             self_elem = getattr(self, name)
             other_elem = getattr(other, name)

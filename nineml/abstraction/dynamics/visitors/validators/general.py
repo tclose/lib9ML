@@ -105,18 +105,14 @@ class RegimeGraphDynamicsValidator(BaseDynamicsValidator):
     def __init__(self, component_class):
         BaseDynamicsValidator.__init__(
             self, require_explicit_overrides=False)
-
         self.connected_regimes_from_regime = defaultdict(set)
         self.regimes = set
-
         self.visit(component_class)
-
-        def add_connected_regimes_recursive(regime, connected):
+        def add_connected_regimes_recursive(regime, connected):  # @IgnorePep8
             connected.add(regime)
             for r in self.connected_regimes_from_regime[regime]:
                 if r not in connected:
                     add_connected_regimes_recursive(r, connected)
-
         connected = set()
         add_connected_regimes_recursive(self.regimes[0], connected)
         if len(connected) != len(self.regimes):
