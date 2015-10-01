@@ -114,6 +114,10 @@ class _NamespaceNamed(object):
     def name(self):
         return self.sub_component.append_namespace(self._element.name)
 
+    @property
+    def _name(self):
+        return self.name
+
 
 class _NamespaceExpression(object):
 
