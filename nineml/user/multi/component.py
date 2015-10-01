@@ -774,7 +774,7 @@ class _MultiRegime(Regime):
                     (pc.receiver_name, pc.receive_port_name)
                     for pc in self._parent._event_port_connections[
                         (output_event.sub_component.name,
-                         output_event.element.port_name)].itervalues()
+                         output_event.relative_port_name)].itervalues()
                     if pc.delay == 0.0)
                 # Get all the OnEvent transitions that are connected to this
                 for on_event in self._all_sub_on_events:
