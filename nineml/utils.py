@@ -289,13 +289,14 @@ def assert_no_duplicates(lst, error_func=None):
         for item in lst:
             if item in seen_items:
                 if item not in duplicates:
-                    duplicates.append(next(i for i in lst if i == item))
+                    duplicates.append(next(i for i in lst
+                                           if hash(i) == hash(item)))
                 duplicates.append(item)
             else:
                 seen_items.append(item)
         _dispatch_error_func(
             error_func,
-            "Unxpected duplications:\n{}\n\n Found in list:\n {}"
+            "Unxpected duplications:\n{}\nFound in list:\n {}"
             .format(', '.join(str(d) for d in duplicates), str(lst)))
 
 
