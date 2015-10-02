@@ -1,6 +1,7 @@
 from itertools import chain
 from copy import copy
 from .. import BaseULObject
+import sympy
 import operator
 from itertools import product, groupby, izip
 from nineml.reference import resolve_reference, write_reference
@@ -9,7 +10,7 @@ from nineml.xmlns import NINEML, E
 from nineml.utils import expect_single
 from nineml.user import DynamicsProperties
 from nineml.annotations import annotate_xml, read_annotations
-from nineml.abstraction.dynamics.visitors import DynamicsCloner
+from nineml.abstraction.dynamics.visitors.cloner import DynamicsCloner
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLMissingElementError)
 from ..port_connections import (
@@ -388,7 +389,7 @@ class MultiDynamics(Dynamics):
                         exposure.name] = exposure
                 elif isinstance(exposure, EventSendPortExposure):
                     self._event_send_ports[exposure.name] = exposure
-                elif isinstance(exposure, EventSendPortExposure):
+                elif isinstance(exposure, EventReceivePortExposure):
                     self._event_receive_ports[
                         exposure.name] = exposure
                 else:
@@ -716,15 +717,23 @@ class _MultiRegime(Regime):
         #     port exposure and the on event that listens to it if there is)
         #     these lists are then chained to form a list of 2-tuples (ie. not
         #     a list of lists) containing port exposure and on event pairs
-        exposed_on_events = chain(*[
-            izip((pe for pe in self._parent._event_receive_ports
+        exposed_on_events_tples = list(chain(*[
+            izip((pe for pe in self._parent.event_receive_ports
                   if oe.port is pe.port), (oe,))
-            for oe in self._all_sub_on_events])
-        # Group on events by their port exposure and return as an _MultiOnEvent
-        key = lambda tple: tple[0]
+            for oe in self._all_sub_on_events]))
+        # If any of the on events are exposed
+        if exposed_on_events_tples:
+            # Strip port exposure to give just the on events
+            exposed_on_events = zip(*exposed_on_events_tples)[1]
+        else:
+            exposed_on_events = []
+        # Group on events by their port exposure and return as an
+        # _MultiOnEvent
+        key = lambda oe: oe.src_port_name
         return (
             _MultiOnEvent(grp, self)
-            for _, grp in groupby(sorted(exposed_on_events, key=key), key=key))
+            for _, grp in groupby(sorted(exposed_on_events, key=key),
+                                  key=key))
 
     @property
     def on_conditions(self):
@@ -734,7 +743,7 @@ class _MultiRegime(Regime):
         """
         # Group on conditions by their trigger condition and return as an
         # _MultiOnCondition
-        all_on_conds = chain(*[r.on_conditions for r in self.sub_regimes])
+        all_on_conds = list(self._all_sub_on_conds)
         # Get all event connection ports that receive connections with non-zero
         # delay
         nonzero_delay_receive_ports = [
@@ -758,10 +767,14 @@ class _MultiRegime(Regime):
         return self.sub_regime(comp_name).alias(name)
 
     def on_event(self, port_name):
-        raise NotImplementedError
+        return _MultiOnCondition(
+            (oc for oc in self._all_sub_on_events
+             if oc.src_port_name == port_name), self)
 
     def on_condition(self, condition):
-        raise NotImplementedError
+        return _MultiOnCondition(
+            (oc for oc in self._all_sub_on_conds
+             if oc.trigger.rhs == sympy.sympify(condition)), self)
 
     @property
     def time_derivative_variables(self):
@@ -829,6 +842,10 @@ class _MultiRegime(Regime):
     @property
     def _all_sub_on_events(self):
         return chain(*[r.on_events for r in self.sub_regimes])
+
+    @property
+    def _all_sub_on_conds(self):
+        return chain(*[r.on_conditions for r in self.sub_regimes])
 
 
 class _MultiTransition(object):

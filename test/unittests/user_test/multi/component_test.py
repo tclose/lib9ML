@@ -101,7 +101,9 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
                 Regime(
                     'dSV1/dt = -SV1/(cp2*t)',
                     transitions=[On('SV1>cp1', do=[OutputEvent('emit')]),
-                                 On('spikein', do=[OutputEvent('c_emit')])],
+                                 On('spikein',
+                                    do=[OutputEvent('c_emit'),
+                                        StateAssignment('SV1', '10')])],
                     name='r1',
                 ),
                 Regime(name='r2', transitions=On('SV1>1', to='r1'))
@@ -133,22 +135,36 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
             port_connections=[('a', 'C1', 'b', 'dIn1'),
                               ('a', 'C2', 'b', 'dIn2')],
             port_exposures=[('ARP1', 'a', 'cIn1'),
-                            ('ARP2', 'a', 'cIn2')])
+                            ('ARP2', 'a', 'cIn2'),
+                            ('ERP1', 'a', 'spikein')])
 
         # Flatten a flat component
         # Everything should be as before:
-        e_flat = e.flatten(c)
+        e_flat = e.flatten()
 
-        self.assertEqual(e_flat.name, 'C')
-        self.assertEqual(set(e_flat.alias_names), set(['C1', 'C2', 'C3']))
+        self.assertEqual(e_flat.name, 'E')
+        self.assertEqual(set(e_flat.alias_names),
+                         set(['C1__a', 'C2__a', 'C3__a', 'D1__b', 'D2__b',
+                              'D3__b', 'cIn1__a', 'cIn2__a', 'dIn1__b',
+                              'dIn2__b']))
 
         # - Regimes and Transitions:
-        self.assertEqual(set(e_flat.regime_names), set(['r1', 'r2']))
-        self.assertEqual(len(list(e_flat.regime('r1').on_events)), 1)
-        self.assertEqual(len(list(e_flat.regime('r1').on_conditions)), 1)
-        self.assertEqual(len(list(e_flat.regime('r2').on_events)), 0)
-        self.assertEqual(len(list(e_flat.regime('r2').on_conditions)), 1)
-        self.assertEqual(len(list(e_flat.regime('r2').on_conditions)), 1)
+        self.assertEqual(set(e_flat.regime_names),
+                         set(['r1___r1___regime', 'r1___r2___regime',
+                              'r2___r1___regime', 'r2___r2___regime']))
+        r11 = e.regime('r1___r1___regime')
+        self.assertEqual(r11.num_on_conditions, 2)
+        self.assertEqual(r11.num_on_events, 1)
+        oc1 = r11.on_condition('SV1__b > dp1__b')
+        oe = r11.on_event('ERP1')
+        self.assertEqual(oc1.num_output_events, 1)
+        self.assertEqual(oe.num_state_assignments, 1)
+        self.assertEqual(r11.num_on_events, 2)
+        self.assertEqual(
+            e_flat.regime('r1___r1___regime').num_on_conditions, 1)
+        self.assertEqual(e_flat.regime('r1___r2___regime').num_on_events, 1)
+        self.assertEqual(
+            e_flat.regime('r1___r2___regime').num_on_conditions, 2)
 
         #  - Ports & Parameters:
         self.assertEqual(
