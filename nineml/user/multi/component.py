@@ -321,15 +321,15 @@ class MultiDynamics(Dynamics):
         '_analog_send_ports', '_analog_receive_ports',
         '_analog_reduce_ports', '_event_send_ports',
         '_event_receive_ports')
-    class_to_members = {
-        'SubDynamics': 'sub_components',
-        'AnalogPortConnection': 'analog_port_connections',
-        'EventPortConnection': 'event_port_connections',
-        'AnalogSendPortExposure': 'analog_send_ports',
-        'AnalogReceivePortExposure': 'analog_receive_ports',
-        'AnalogReducePortExposure': 'analog_reduce_ports',
-        'EventSendPortExposure': 'event_send_ports',
-        'EventReceivePortExposure': 'event_receive_ports'}
+    class_to_member = {
+        'SubDynamics': 'sub_component',
+        'AnalogPortConnection': 'analog_port_connection',
+        'EventPortConnection': 'event_port_connection',
+        'AnalogSendPortExposure': 'analog_send_port',
+        'AnalogReceivePortExposure': 'analog_receive_port',
+        'AnalogReducePortExposure': 'analog_reduce_port',
+        'EventSendPortExposure': 'event_send_port',
+        'EventReceivePortExposure': 'event_receive_port'}
 
     def __init__(self, name, sub_components, port_connections,
                  port_exposures=None, url=None, validate_dimensions=True):
@@ -575,7 +575,7 @@ class MultiDynamics(Dynamics):
     @property
     def elements(self):
         return chain(*(getattr(self, name)
-                       for name in Dynamics.class_to_members.itervalues()))
+                       for name in Dynamics.class_to_member.itervalues()))
 
     def element(self, name):
         try:
@@ -656,7 +656,7 @@ class _MultiRegime(Regime):
     @property
     def all_member_dicts(self):
         return chain(*[
-            (getattr(r, n) for n in r.class_to_members.itervalues())
+            (getattr(r, n) for n in r.class_to_member.itervalues())
             for r in self.sub_regimes])
 
     # Member Properties:
