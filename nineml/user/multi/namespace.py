@@ -89,6 +89,9 @@ def make_regime_name(sub_regimes_dict):
 
 def split_multi_regime_name(name):
     parts = triple_underscore_re.split(name)[:-1]
+    if not parts:
+        raise NineMLNamespaceError(
+            "'{}' is not a multi-regime name")
     return [more_than_triple_underscore_re.sub('_\1', p) for p in parts]
 
 

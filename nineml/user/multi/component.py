@@ -2,7 +2,6 @@ from itertools import chain
 from copy import copy
 from .. import BaseULObject
 import operator
-from collections import defaultdict
 from itertools import product, groupby, izip
 from nineml.reference import resolve_reference, write_reference
 from nineml import DocumentLevelObject
@@ -20,7 +19,7 @@ from nineml.utils import ensure_valid_identifier, normalise_parameter_as_list
 from nineml import units as un
 from nineml.annotations import VALIDATE_DIMENSIONS
 from nineml.abstraction import (
-    Dynamics, Regime, AnalogReceivePort, AnalogReducePort, EventReceivePort,
+    Dynamics, Regime, AnalogReceivePort, EventReceivePort,
     StateVariable, OnEvent, OnCondition, OutputEvent, StateAssignment,
     Trigger)
 from .port_exposures import (
@@ -332,8 +331,8 @@ class MultiDynamics(Dynamics):
                 for name, dyn in sub_components.iteritems())
         else:
             self._sub_components = dict((d.name, d) for d in sub_components)
-        self._analog_port_connections = defaultdict(dict)
-        self._event_port_connections = defaultdict(dict)
+        self._analog_port_connections = {}
+        self._event_port_connections = {}
         # Insert an empty list for each event and reduce port in the combined
         # model
         # Parse port connections (from tuples if required), bind them to the
@@ -349,11 +348,15 @@ class MultiDynamics(Dynamics):
             rcv_key = (port_connection.receiver_name,
                        port_connection.receive_port_name)
             if isinstance(port_connection.receive_port, EventReceivePort):
+                if snd_key not in self._event_port_connections:
+                    self._event_port_connections[snd_key] = {}
                 self._event_port_connections[
                     snd_key][rcv_key] = port_connection
             else:
-                if (isinstance(port_connection.receive_port, AnalogReceivePort)
-                        and rcv_key in self._analog_port_connections):
+                if rcv_key not in self._analog_port_connections:
+                    self._analog_port_connections[rcv_key] = {}
+                elif isinstance(port_connection.receive_port,
+                                 AnalogReceivePort):
                     raise NineMLRuntimeError(
                         "Multiple connections to receive port '{}' in '{} "
                         "sub-component of '{}'"
@@ -546,7 +549,8 @@ class MultiDynamics(Dynamics):
                     self)
             except KeyError:
                 # An alias of a sub component
-                alias = self.sub_component(comp_name).alias(local)
+                alias = self.sub_component(comp_name).component_class.alias(
+                    local)
         except NineMLNamespaceError:
             try:
                 alias = self.analog_receive_port_exposure(name).alias
@@ -802,12 +806,15 @@ class _MultiRegime(Regime):
                 # Get all receive ports that are activated by this output event
                 # i.e. all zero-delay event port connections that are linked to
                 # this output_event
-                active_ports = set(
-                    (pc.receiver_name, pc.receive_port_name)
-                    for pc in self._parent._event_port_connections[
-                        (output_event.sub_component.name,
-                         output_event.relative_port_name)].itervalues()
-                    if pc.delay == 0.0)
+                try:
+                    active_ports = set(
+                        (pc.receiver_name, pc.receive_port_name)
+                        for pc in self._parent._event_port_connections[
+                            (output_event.sub_component.name,
+                             output_event.relative_port_name)].itervalues()
+                        if pc.delay == 0.0)
+                except KeyError:
+                    active_ports = []
                 # Get all the OnEvent transitions that are connected to this
                 for on_event in self._all_sub_on_events:
                     if (on_event.sub_component.name,

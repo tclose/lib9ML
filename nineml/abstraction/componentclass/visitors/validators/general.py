@@ -209,13 +209,9 @@ class DimensionalityComponentValidator(BaseValidator):
                         name, as_container=self._core_type)
                 except KeyError:
                     pass
-                # FIXME: Debugging code to remove
-#                 if name == 'ARP1':
-#                     scope._member_accessor(
-#                         'Alias', as_container=self._core_type)(name)
-#                     scope.element(name, as_container=self._core_type)
-                # ---
             if element is None:
+                element = scope.element(
+                    name, as_container=self._core_type)
                 raise NineMLRuntimeError(
                     "Did not find '{}' in '{}' dynamics class (scopes: {})"
                     .format(name, self.component_class.name,
@@ -227,14 +223,11 @@ class DimensionalityComponentValidator(BaseValidator):
         try:
             return self._dimensions[element]
         except (KeyError, AttributeError):  # for derived dimensions
-#             exec('from nineml.user.multi.port_exposures import ReceivePortExposureAlias')
-#             if isinstance(element, ReceivePortExposureAlias):
-#                 pass
             dims = self._flatten_dims(expr, element)
-        try:
-            self._dimensions[element] = dims
-        except AttributeError:
-            pass
+#         try:
+        self._dimensions[element] = dims
+#         except AttributeError:
+#             pass
         return dims
 
     def _flatten_dims(self, expr, element):
