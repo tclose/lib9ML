@@ -26,7 +26,7 @@ from nineml.abstraction import (
 from .port_exposures import (
     EventReceivePortExposure, EventSendPortExposure, AnalogReducePortExposure,
     AnalogReceivePortExposure, AnalogSendPortExposure, _BasePortExposure,
-    _LocalReducePortConnections, _LocalAnalogPortConnection)
+    _LocalAnalogPortConnections)
 from .namespace import (
     _NamespaceAlias, _NamespaceRegime, _NamespaceStateVariable,
     _NamespaceConstant, _NamespaceParameter, _NamespaceProperty,
@@ -296,30 +296,14 @@ class SubDynamics(object):
     def regime_names(self):
         return (p.name for p in self.regimes)
 
-    def element(self, name):
-        try:
-            return self.parameter(name)
-        except KeyError:
-            try:
-                return self.state_variable(name)
-            except KeyError:
-                try:
-                    return self.alias(name)
-                except KeyError:
-                    try:
-                        return self.regime(name)
-                    except KeyError:
-                        return self.constant(name)
-
 
 class MultiDynamics(Dynamics):
 
     element_name = 'MultiDynamics'
     defining_attributes = (
         '_name', '_sub_components', '_analog_port_connections',
-        '_event_port_connections', '_reduce_port_connections',
-        '_analog_send_ports', '_analog_receive_ports',
-        '_analog_reduce_ports', '_event_send_ports',
+        '_event_port_connections', '_analog_send_ports',
+        '_analog_receive_ports', '_analog_reduce_ports', '_event_send_ports',
         '_event_receive_ports')
     class_to_member = {
         'SubDynamics': 'sub_component',
@@ -330,6 +314,7 @@ class MultiDynamics(Dynamics):
         'AnalogReducePortExposure': 'analog_reduce_port',
         'EventSendPortExposure': 'event_send_port',
         'EventReceivePortExposure': 'event_receive_port'}
+    core_type = Dynamics
 
     def __init__(self, name, sub_components, port_connections,
                  port_exposures=None, url=None, validate_dimensions=True):
@@ -347,9 +332,8 @@ class MultiDynamics(Dynamics):
                 for name, dyn in sub_components.iteritems())
         else:
             self._sub_components = dict((d.name, d) for d in sub_components)
-        self._analog_port_connections = {}
+        self._analog_port_connections = defaultdict(dict)
         self._event_port_connections = defaultdict(dict)
-        self._reduce_port_connections = defaultdict(dict)
         # Insert an empty list for each event and reduce port in the combined
         # model
         # Parse port connections (from tuples if required), bind them to the
@@ -364,27 +348,19 @@ class MultiDynamics(Dynamics):
                        port_connection.send_port_name)
             rcv_key = (port_connection.receiver_name,
                        port_connection.receive_port_name)
-            if isinstance(port_connection.receive_port, AnalogReceivePort):
-                if rcv_key in self._analog_port_connections:
+            if isinstance(port_connection.receive_port, EventReceivePort):
+                self._event_port_connections[
+                    snd_key][rcv_key] = port_connection
+            else:
+                if (isinstance(port_connection.receive_port, AnalogReceivePort)
+                        and rcv_key in self._analog_port_connections):
                     raise NineMLRuntimeError(
                         "Multiple connections to receive port '{}' in '{} "
                         "sub-component of '{}'"
                         .format(port_connection.receive_port_name,
                                 port_connection.receiver_name, name))
-                port_connection = _LocalAnalogPortConnection(
-                    port_connection)
-                port_connection.bind(self)
-                self._analog_port_connections[rcv_key] = port_connection
-            elif isinstance(port_connection.receive_port, EventReceivePort):
-                self._event_port_connections[
-                    snd_key][rcv_key] = port_connection
-            elif isinstance(port_connection.receive_port, AnalogReducePort):
-                self._reduce_port_connections[
+                self._analog_port_connections[
                     rcv_key][snd_key] = port_connection
-            else:
-                raise NineMLRuntimeError(
-                    "Unrecognised port connection type '{}'"
-                    .format(port_connection))
         # =====================================================================
         # Save port exposurs into separate member dictionaries
         # =====================================================================
@@ -420,6 +396,9 @@ class MultiDynamics(Dynamics):
     def __getitem__(self, name):
         return self.sub_component(name)
 
+    def __repr__(self):
+        return "<multi.MultiDynamics {}>".format(self.name)
+
     @property
     def sub_components(self):
         return self._sub_components.itervalues()
@@ -434,7 +413,8 @@ class MultiDynamics(Dynamics):
 
     @property
     def analog_port_connections(self):
-        return self._analog_port_connections.itervalues()
+        return chain(*(d.itervalues()
+                       for d in self._analog_port_connections.itervalues()))
 
     @property
     def event_port_connections(self):
@@ -450,17 +430,8 @@ class MultiDynamics(Dynamics):
         return (pc for pc in self.event_port_connections if pc.delay != 0.0)
 
     @property
-    def reduce_port_connections(self):
-        return chain(*[d.itervalues()
-                       for d in self._reduce_port_connections.itervalues()])
-
-    @property
     def port_connections(self):
-        return chain(self.analog_port_connections, self.event_port_connections,
-                     self.reduce_port_connections)
-
-    def sub_component(self, name):
-        return self._sub_components[name]
+        return chain(self.analog_port_connections, self.event_port_connections)
 
     # =========================================================================
     # Dynamics members properties and accessors
@@ -478,13 +449,12 @@ class MultiDynamics(Dynamics):
         all aliases defined in the sub components
         """
         return chain(
-            self.analog_port_connections,
             (p.alias for p in self.analog_send_ports),
             (p.alias for p in self.analog_receive_ports),
             (p.alias for p in self.analog_reduce_ports),
-            (_LocalReducePortConnections(
-                prt, rcv, self._reduce_port_connections[(prt, rcv)])
-             for prt, rcv in self._reduce_port_connections.iterkeys()),
+            (_LocalAnalogPortConnections(
+                rcv[1], rcv[0], snd_dct.values(), self)
+             for rcv, snd_dct in self._analog_port_connections.iteritems()),
             *[sc.aliases for sc in self.sub_components])
 
     @property
@@ -524,6 +494,39 @@ class MultiDynamics(Dynamics):
     def state_variable_names(self):
         return (sv.name for sv in self.state_variables)
 
+    @property
+    def analog_port_connection_names(self):
+        return chain(*(d.iterkeys()
+                       for d in self._analog_port_connections.itervalues()))
+
+    @property
+    def event_port_connection_names(self):
+        return chain(*(d.iterkeys()
+                       for d in self._event_port_connections.itervalues()))
+
+    def sub_component(self, name):
+        return self._sub_components[name]
+
+    def analog_port_connection(self, name):
+        try:
+            sender, send_port, receiver, receive_port = name
+        except ValueError:
+            raise NineMLMissingElementError(
+                "Name provided to analog_port_connection '{}' was not a "
+                "4-tuple of (sender, send_port, receiver, receive_port)")
+        return self._analog_port_connections[
+            (receiver, receive_port)][(sender, send_port)]
+
+    def event_port_connection(self, name):
+        try:
+            sender, send_port, receiver, receive_port = name
+        except ValueError:
+            raise NineMLMissingElementError(
+                "Name provided to analog_port_connection '{}' was not a "
+                "4-tuple of (sender, send_port, receiver, receive_port)")
+        return self._event_port_connections[
+            (sender, send_port)][(receiver, receive_port)]
+
     def parameter(self, name):
         _, comp_name = split_namespace(name)
         return self.sub_component(comp_name).parameter(name)
@@ -534,13 +537,24 @@ class MultiDynamics(Dynamics):
 
     def alias(self, name):
         try:
-            alias = self._analog_port_connections[name]
-        except KeyError:
+            local, comp_name = split_namespace(name)
             try:
-                alias = self._reduce_port_connections[name]
+                # An alias that is actually a local analog port connection
+                alias = _LocalAnalogPortConnections(
+                    name, comp_name,
+                    self._analog_port_connections[(local, comp_name)].values(),
+                    self)
             except KeyError:
-                _, comp_name = split_namespace(name)
-                alias = self.sub_component(comp_name).alias(name)
+                # An alias of a sub component
+                alias = self.sub_component(comp_name).alias(local)
+        except NineMLNamespaceError:
+            try:
+                alias = self.analog_receive_port_exposure(name).alias
+            except KeyError:
+                raise NineMLMissingElementError(
+                    "Could not find alias corresponding to '{}' in "
+                    "sub-components or port connections/exposures"
+                    .format(name))
         return alias
 
     def constant(self, name):
@@ -555,6 +569,18 @@ class MultiDynamics(Dynamics):
         return self._create_multi_regime(
             self.sub_component(sc_n).regime(append_namespace(r_n, sc_n))
             for sc_n, r_n in izip(self._sub_component_keys, sub_regime_names))
+
+    def analog_receive_port_exposure(self, exposed_port_name):
+        port_name, comp_name = split_namespace(exposed_port_name)
+        try:
+            exposure = next(pe for pe in chain(self.analog_receive_ports,
+                                               self.analog_reduce_ports)
+                            if (pe.port_name == port_name and
+                                pe.sub_component.name == comp_name))
+        except StopIteration:
+            raise NineMLMissingElementError(
+                "No port exposure that exposes '{}'".format(exposed_port_name))
+        return exposure
 
     @property
     def num_parameters(self):
@@ -573,16 +599,16 @@ class MultiDynamics(Dynamics):
         return len(list(self.state_variables))
 
     @property
-    def elements(self):
-        return chain(*(getattr(self, name)
-                       for name in Dynamics.class_to_member.itervalues()))
+    def num_analog_port_connections(self):
+        return reduce(
+            operator.add,
+            (len(d) for d in self._analog_port_connections.itervalues()))
 
-    def element(self, name):
-        try:
-            _, comp_name = split_namespace(name)
-            return self.sub_component(comp_name).element(name)
-        except NineMLNamespaceError:
-            return super(MultiDynamics, self).element(name)
+    @property
+    def num_event_port_connections(self):
+        return reduce(
+            operator.add,
+            (len(d) for d in self._event_port_connections.itervalues()))
 
     @property
     def _sub_component_keys(self):

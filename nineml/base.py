@@ -225,11 +225,13 @@ class MemberContainerObject(object):
                       *(self._num_members(et, as_container=as_container)
                         for et in as_container.class_to_member))
 
-    def element_names(self, as_container=None):
-        if as_container is None:
-            as_container = self
-        return chain(*(self._member_names_iter(et, as_container=as_container)
-                       for et in as_container.class_to_member))
+# Some of these do not meet the stereotypical *_names format, e.g.
+# time_derivative_variables, could change these to *_keys instead
+#     def element_names(self, as_container=None):
+#         if as_container is None:
+#             as_container = self
+#         return chain(*(self._member_names_iter(et, as_container=as_container)
+#                        for et in as_container.class_to_member))
 
     def __getitem__(self, name):
         raise NotImplementedError
@@ -266,7 +268,7 @@ class MemberContainerObject(object):
         if as_container is None:
             as_container = self
         if key is None:
-            key = member_accessor_name_from_type(as_container, element)
+            key = accessor_name_from_type(as_container, element)
         dct = self._indices[key]
         try:
             index = dct[element]
@@ -290,8 +292,8 @@ class MemberContainerObject(object):
     def _member_accessor(self, element_type, as_container=None):
         if as_container is None:
             as_container = self
-        return getattr(self, member_accessor_name_from_type(as_container,
-                                                            element_type))
+        return getattr(self, accessor_name_from_type(as_container,
+                                                     element_type))
 
     def _members_iter(self, element_type, as_container=None):
         """
@@ -301,31 +303,31 @@ class MemberContainerObject(object):
         if as_container is None:
             as_container = self
         return getattr(
-            self, pluralise(member_accessor_name_from_type(as_container,
-                                                           element_type)))
+            self, pluralise(accessor_name_from_type(as_container,
+                                                    element_type)))
 
-    def _member_names_iter(self, element_type, as_container=None):
-        if as_container is None:
-            as_container = self
-        return getattr(
-            self, (member_accessor_name_from_type(as_container, element_type)
-                   + '_names'))
+#     def _member_names_iter(self, element_type, as_container=None):
+#         if as_container is None:
+#             as_container = self
+#         return getattr(
+#             self, (accessor_name_from_type(as_container, element_type)
+#                    + '_names'))
 
     def _num_members(self, element_type, as_container=None):
         if as_container is None:
             as_container = self
         return getattr(
             self, ('num_' +
-                   pluralise(member_accessor_name_from_type(as_container,
-                                                            element_type))))
+                   pluralise(accessor_name_from_type(as_container,
+                                                     element_type))))
 
     def _member_dict(self, element_type):
         return getattr(
-            self, '_' + pluralise(member_accessor_name_from_type(
+            self, '_' + pluralise(accessor_name_from_type(
                 self, element_type)))
 
 
-def member_accessor_name_from_type(container_type, element_type):
+def accessor_name_from_type(container_type, element_type):
     """
     Looks up the name of the accessor method from the element_name of the
     element argument for a given container type

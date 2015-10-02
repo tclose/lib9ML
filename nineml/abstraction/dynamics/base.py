@@ -11,7 +11,7 @@ from nineml.utils import normalise_parameter_as_list, filter_discrete_types
 from itertools import chain
 from nineml.abstraction.componentclass import (
     ComponentClass, Parameter)
-from .regimes import StateVariable, Regime
+from .regimes import StateVariable
 from ..ports import (AnalogReceivePort, AnalogSendPort,
                      AnalogReducePort, EventReceivePort,
                      EventSendPort)
