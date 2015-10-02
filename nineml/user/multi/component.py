@@ -717,23 +717,16 @@ class _MultiRegime(Regime):
         #     port exposure and the on event that listens to it if there is)
         #     these lists are then chained to form a list of 2-tuples (ie. not
         #     a list of lists) containing port exposure and on event pairs
-        exposed_on_events_tples = list(chain(*[
-            izip((pe for pe in self._parent.event_receive_ports
+        exposed_on_events = chain(*[
+            izip((pe for pe in self._parent._event_receive_ports
                   if oe.port is pe.port), (oe,))
-            for oe in self._all_sub_on_events]))
-        # If any of the on events are exposed
-        if exposed_on_events_tples:
-            # Strip port exposure to give just the on events
-            exposed_on_events = zip(*exposed_on_events_tples)[1]
-        else:
-            exposed_on_events = []
-        # Group on events by their port exposure and return as an
-        # _MultiOnEvent
-        key = lambda oe: oe.src_port_name
+            for oe in self._all_sub_on_events])
+        # Group on events by their port exposure and return as an _MultiOnEvent
+        key = lambda tple: tple[0]
         return (
-            _MultiOnEvent(grp, self)
-            for _, grp in groupby(sorted(exposed_on_events, key=key),
-                                  key=key))
+            _MultiOnEvent(pe, zip(*grp)[1], self)
+            for pe, grp in groupby(sorted(exposed_on_events, key=key),
+                                   key=key))
 
     @property
     def on_conditions(self):
@@ -767,9 +760,11 @@ class _MultiRegime(Regime):
         return self.sub_regime(comp_name).alias(name)
 
     def on_event(self, port_name):
+        port_exposure = self.event_receive_port(port_name)
         return _MultiOnCondition(
-            (oc for oc in self._all_sub_on_events
-             if oc.src_port_name == port_name), self)
+            (oe for oe in self._all_sub_on_events
+             if (oe.src_port_name == port_exposure.port_name and
+                 oe.sub_component == port_exposure.sub_component)), self)
 
     def on_condition(self, condition):
         return _MultiOnCondition(
@@ -957,9 +952,9 @@ class _MultiOnEvent(_MultiTransition, OnEvent):
 
     defining_attributes = ('_sub_transitions', '_src_port_name')
 
-    def __init__(self, sub_transitions, parent):
+    def __init__(self, port_exposure, sub_transitions, parent):
         sub_transitions = normalise_parameter_as_list(sub_transitions)
-        self._src_port_name = sub_transitions[0].src_port_name
+        self._port_exposure = port_exposure
         assert all(st.src_port_name == self._src_port_name
                    for st in sub_transitions[1:])
         _MultiTransition.__init__(self, sub_transitions, parent)
@@ -975,7 +970,7 @@ class _MultiOnEvent(_MultiTransition, OnEvent):
 
     @property
     def src_port_name(self):
-        return self._src_port_name
+        return self._port_exposure.name
 
 
 class _MultiOnCondition(_MultiTransition, OnCondition):
