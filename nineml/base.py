@@ -71,11 +71,8 @@ class BaseNineMLObject(object):
                                                             type(other))
         else:
             for attr_name in self.__class__.defining_attributes:
-                try:
-                    self_attr = getattr(self, attr_name)
-                    other_attr = getattr(other, attr_name)
-                except:
-                    raise
+                self_attr = getattr(self, attr_name)
+                other_attr = getattr(other, attr_name)
                 if self_attr != other_attr:
                     result += "\n{}Attribute '{}': ".format(indent, attr_name)
                     result += self._unwrap_mismatch(self_attr, other_attr,
