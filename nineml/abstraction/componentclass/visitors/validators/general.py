@@ -6,13 +6,12 @@ docstring needed
 """
 from nineml.exceptions import NineMLRuntimeError, NineMLDimensionError
 from nineml.abstraction.expressions.utils import is_valid_lhs_target
-from nineml.abstraction.expressions import reserved_identifiers
+from nineml.abstraction.expressions import reserved_identifiers, Expression
 from nineml.utils import assert_no_duplicates
 import operator
 import sympy
 from sympy import sympify
 from nineml.base import SendPortBase
-from nineml.abstraction.expressions import Expression
 from sympy.logic.boolalg import BooleanTrue, BooleanFalse
 from .base import BaseValidator
 
@@ -175,9 +174,18 @@ class DimensionalityComponentValidator(BaseValidator):
     def __init__(self, component_class):
         BaseValidator.__init__(self, require_explicit_overrides=False)
         self.component_class = component_class
+        try:
+            self._core_type = component_class.core_type
+        except AttributeError:
+            self._core_type = type(component_class)
         self._dimensions = {}
         # Insert declared dimensions into dimensionality database
-        for e in component_class.elements:
+        try:
+            # See comments in ComponentActionVisitor vist_componentclass
+            container_type = component_class.core_type
+        except AttributeError:
+            container_type = component_class
+        for e in component_class.elements(as_container=container_type):
             if not isinstance(e, SendPortBase):
                 try:
                     self._dimensions[e] = sympify(e.dimension)
@@ -197,9 +205,16 @@ class DimensionalityComponentValidator(BaseValidator):
             element = None
             for scope in reversed(self._scopes):
                 try:
-                    element = scope.element(name)
+                    element = scope.element(
+                        name, as_container=self._core_type)
                 except KeyError:
                     pass
+                # FIXME: Debugging code to remove
+#                 if name == 'ARP1':
+#                     scope._member_accessor(
+#                         'Alias', as_container=self._core_type)(name)
+#                     scope.element(name, as_container=self._core_type)
+                # ---
             if element is None:
                 raise NineMLRuntimeError(
                     "Did not find '{}' in '{}' dynamics class (scopes: {})"
@@ -212,6 +227,9 @@ class DimensionalityComponentValidator(BaseValidator):
         try:
             return self._dimensions[element]
         except (KeyError, AttributeError):  # for derived dimensions
+#             exec('from nineml.user.multi.port_exposures import ReceivePortExposureAlias')
+#             if isinstance(element, ReceivePortExposureAlias):
+#                 pass
             dims = self._flatten_dims(expr, element)
         try:
             self._dimensions[element] = dims
