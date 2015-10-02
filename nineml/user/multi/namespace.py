@@ -246,6 +246,10 @@ class _NamespaceOnEvent(_NamespaceTransition, OnEvent):
     def src_port_name(self):
         return self._object.src_port_name
 
+    @property
+    def port(self):
+        return self._object.port
+
 
 class _NamespaceOnCondition(_NamespaceTransition, OnCondition):
 

@@ -11,10 +11,8 @@ from nineml.abstraction.componentclass import BaseALObject
 from ..expressions import Expression, ExpressionWithSimpleLHS
 from ...exceptions import (NineMLRuntimeError,
                            NineMLInvalidElementTypeException)
-from .visitors.cloner import DynamicsCloner
 from nineml.base import MemberContainerObject
 from nineml.utils import normalise_parameter_as_list
-from .visitors.queriers import DynamicsElementFinder
 
 
 class StateAssignment(BaseALObject, ExpressionWithSimpleLHS):
@@ -314,11 +312,19 @@ class OnEvent(Transition):
                             output_events=output_events,
                             target_regime=target_regime)
         self._src_port_name = src_port_name.strip()
+        self._port = None
         ensure_valid_identifier(self._src_port_name)
 
     @property
     def src_port_name(self):
         return self._src_port_name
+
+    @property
+    def port(self):
+        if self._port is None:
+            raise NineMLRuntimeError(
+                "OnEvent is not bound to a component class")
+        return self._port
 
     def __repr__(self):
         return """OnEvent( %s )""" % self.src_port_name
@@ -330,6 +336,9 @@ class OnEvent(Transition):
         other named structures
         """
         return self.src_port_name
+
+    def bind(self, component_class):
+        self._port = component_class.event_receive_port(self.src_port_name)
 
 
 class OnCondition(Transition):
@@ -353,18 +362,14 @@ class OnCondition(Transition):
             parameters.
         """
         if isinstance(trigger, Trigger):
-            self._trigger = DynamicsCloner().visit(trigger)
-        elif isinstance(trigger, basestring):
-            self._trigger = Trigger(rhs=trigger)
-        else:
-            assert False
-
+            trigger = trigger.rhs
+        self._trigger = Trigger(rhs=trigger)
         Transition.__init__(self, state_assignments=state_assignments,
                             output_events=output_events,
                             target_regime=target_regime)
 
     def __repr__(self):
-        return 'OnCondition( %s )' % self.trigger.rhs
+        return 'OnCondition({})'.format(self.trigger.rhs)
 
     @property
     def trigger(self):
@@ -407,3 +412,5 @@ class Trigger(BaseALObject, Expression):
         negated = copy(self)
         negated.negate()
         return negated
+
+from .visitors.queriers import DynamicsElementFinder
