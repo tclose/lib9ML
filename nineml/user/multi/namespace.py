@@ -271,6 +271,10 @@ class _NamespaceOutputEvent(_NamespaceObject, OutputEvent):
                                 self.sub_component.name)
 
     @property
+    def port(self):
+        return self._object.port
+
+    @property
     def relative_port_name(self):
         return self._object.port_name
 

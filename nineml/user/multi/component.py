@@ -999,7 +999,15 @@ class _ExposedOutputEvent(OutputEvent):
 
     @property
     def _name(self):
+        return self.port_name
+
+    @property
+    def port_name(self):
         return self._port_exposure.name
+
+    @property
+    def port(self):
+        return self._port_exposure
 
 
 class _DelayedOnEvent(_NamespaceOnCondition):
