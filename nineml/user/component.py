@@ -118,7 +118,7 @@ class Component(BaseULObject, DocumentLevelObject):
         """
         BaseULObject.__init__(self)
         DocumentLevelObject.__init__(self, url)
-        self.name = name
+        self._name = name
         if isinstance(definition, basestring):
             definition = Definition(
                 name=path.basename(definition).replace(".xml", ""),
@@ -139,6 +139,10 @@ class Component(BaseULObject, DocumentLevelObject):
         else:
             self._properties = dict((p.name, p) for p in properties)
         self.check_properties()
+
+    @property
+    def name(self):
+        return self._name
 
     @abstractmethod
     def get_element_name(self):
@@ -349,11 +353,11 @@ class Property(BaseULObject):
 
     @property
     def value(self):
-        return self._quantity.value
+        return self.quantity.value
 
     @property
     def units(self):
-        return self._quantity.units
+        return self.quantity.units
 
     def __hash__(self):
         return hash(self.name) ^ hash(self.quantity)
