@@ -171,8 +171,8 @@ class Dynamics(ComponentClass):
                 self._event_send_ports[pname] = EventSendPort(name=pname)
 
         self.annotations[NINEML][VALIDATE_DIMENSIONS] = validate_dimensions
-        for on_event in self.all_on_events():
-            on_event.bind(self)
+        for transition in self.all_transitions():
+            transition.bind(self)
         # Is the finished component_class valid?:
         self.validate()
 

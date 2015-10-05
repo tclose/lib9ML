@@ -89,12 +89,24 @@ class OutputEvent(BaseALObject):
         """
         super(OutputEvent, self).__init__()
         self._port_name = port_name.strip()
+        self._port = None
         ensure_valid_identifier(self._port_name)
 
     @property
     def port_name(self):
         '''Returns the name of the port'''
-        return self._port_name
+        if self._port is not None:
+            name = self._port.name
+        else:
+            name = self._port_name
+        return name
+
+    @property
+    def port(self):
+        if self._port is None:
+            raise NineMLRuntimeError(
+                "Cannot access port as output event has not been bound")
+        return self._port
 
     def __str__(self):
         return 'OutputEvent( port: %s )' % self.port_name
@@ -109,6 +121,10 @@ class OutputEvent(BaseALObject):
         other named structures
         """
         return self.port_name
+
+    def bind(self, component_class):
+        self._port = component_class.event_send_port(self.port_name)
+        self._port_name = None
 
 
 class Transition(BaseALObject, MemberContainerObject):
@@ -288,6 +304,10 @@ class Transition(BaseALObject, MemberContainerObject):
                 "Could not remove element of type '{}' to {} class"
                 .format(element.__class__.__name__, self.__class__.__name__))
 
+    def bind(self, component_class):
+        for output_event in self.output_events:
+            output_event.bind(component_class)
+
 
 class OnEvent(Transition):
 
@@ -338,7 +358,9 @@ class OnEvent(Transition):
         return self.src_port_name
 
     def bind(self, component_class):
+        super(OnEvent, self).bind(component_class)
         self._port = component_class.event_receive_port(self.src_port_name)
+        self._port_name = None
 
 
 class OnCondition(Transition):
