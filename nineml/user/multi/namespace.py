@@ -244,7 +244,7 @@ class _NamespaceOnEvent(_NamespaceTransition, OnEvent):
 
     @property
     def src_port_name(self):
-        return self._object.src_port_name
+        return self.sub_component.append_namespace(self._object.src_port_name)
 
     @property
     def port(self):

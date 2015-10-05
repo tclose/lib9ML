@@ -57,6 +57,10 @@ class _BasePortExposure(BaseULObject):
             return self._port_name
 
     @property
+    def local_port_name(self):
+        return append_namespace(self.port_name, self.sub_component_name)
+
+    @property
     def attributes_with_units(self):
         return chain(*[c.attributes_with_units for c in self.sub_component])
 
