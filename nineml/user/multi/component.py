@@ -716,9 +716,10 @@ class _MultiRegime(Regime):
         """
         list_of_args = []
         for port_exposure in self._parent.event_receive_ports:
-            exposed_on_events = (oe for oe in self._all_sub_on_events
-                                 if oe.port is port_exposure.port)
-            list_of_args.append((port_exposure, exposed_on_events))
+            exposed_on_events = [oe for oe in self._all_sub_on_events
+                                 if oe.port is port_exposure.port]
+            if exposed_on_events:
+                list_of_args.append((port_exposure, exposed_on_events))
         return (_MultiOnEvent(pe, oes, self) for pe, oes in list_of_args)
 
     @property
@@ -754,10 +755,12 @@ class _MultiRegime(Regime):
 
     def on_event(self, port_name):
         port_exposure = self._parent.event_receive_port(port_name)
-        return _MultiOnEvent(
-            port_exposure,
-            (oe for oe in self._all_sub_on_events
-             if oe.src_port_name == port_exposure.local_port_name), self)
+        sub_on_events = [oe for oe in self._all_sub_on_events
+                         if oe.src_port_name == port_exposure.local_port_name]
+        if not sub_on_events:
+            raise KeyError(
+                "No OnEvent for receive port '{}'".format(port_name))
+        return _MultiOnEvent(port_exposure, sub_on_events, self)
 
     def on_condition(self, condition):
         sub_conds = [oc for oc in self._all_sub_on_conds
@@ -902,7 +905,7 @@ class _MultiTransition(object):
                              't + {}'.format(pc.delay))
              for pc in
                  self._parent._parent.nonzero_delay_event_port_connections
-             if pc.port in self._all_output_event_ports),
+             if pc.port in self._sub_output_event_ports),
             *[t.state_assignments for t in self.sub_transitions])
 
     @property
@@ -911,7 +914,7 @@ class _MultiTransition(object):
         return (
             _ExposedOutputEvent(pe)
             for pe in self._parent._parent.event_send_ports
-            if pe.port in self._all_output_event_ports)
+            if pe.port in self._sub_output_event_ports)
 
     def state_assignment(self, variable):
         try:
@@ -924,7 +927,7 @@ class _MultiTransition(object):
 
     def output_event(self, name):
         exposure = self._parent._parent.event_send_port(name)
-        if exposure.port not in self._all_output_event_ports:
+        if exposure.port not in self._sub_output_event_ports:
             raise NineMLMissingElementError(
                 "Output event for '{}' port is not present in transition"
                 .format(name))
@@ -943,7 +946,11 @@ class _MultiTransition(object):
         return (sa.variable for sa in self.state_assignments)
 
     @property
-    def _all_output_event_ports(self):
+    def output_event_port_names(self):
+        return (oe.port_name for oe in self.output_events)
+
+    @property
+    def _sub_output_event_ports(self):
         return set(oe.port for oe in chain(*[t.output_events
                                              for t in self.sub_transitions]))
 
@@ -971,6 +978,10 @@ class _MultiOnEvent(_MultiTransition, OnEvent):
     @property
     def src_port_name(self):
         return self._port_exposure.name
+
+    @property
+    def port(self):
+        return self._port_exposure
 
 
 class _MultiOnCondition(_MultiTransition, OnCondition):

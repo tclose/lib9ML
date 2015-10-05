@@ -150,6 +150,9 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         self.assertEqual(set(e.regime_names),
                          set(['r1___r1___regime', 'r1___r2___regime',
                               'r2___r1___regime', 'r2___r2___regime']))
+        # =====================================================================
+        # Regime a=1, b=2
+        # =====================================================================
         r11 = e.regime('r1___r1___regime')
         self.assertEqual(r11.num_on_conditions, 2)
         self.assertEqual(r11.num_on_events, 1)
@@ -158,20 +161,40 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         out1 = oe1.output_event('ESP1')
         self.assertEqual(out1.port, e.event_send_port('ESP1'))
         self.assertEqual(oe1.num_state_assignments, 1)
-        self.assertEqual(list(oe1.state_assignments)[0].rhs,
-                         10)
+        self.assertEqual(list(oe1.state_assignments)[0].rhs, 10)
         self.assertEqual(r11.num_on_conditions, 2)
         oc1 = r11.on_condition('SV1__a > cp1__a')
         self.assertEqual(oc1.num_output_events, 1)
-        out2 = oc1.output_event('ESP1')
-        self.assertEqual(out2.port, e.event_send_port('ESP1'))
+        out1 = oc1.output_event('ESP1')
+        self.assertEqual(out1.port, e.event_send_port('ESP1'))
         self.assertEqual(oc1.num_state_assignments, 0)
         oc2 = r11.on_condition('SV1__b > dp1__b')
         self.assertEqual(oc2.num_output_events, 0)
         self.assertEqual(oc2.num_state_assignments, 0)
+        # =====================================================================
+        # Regime a=1, b=2
+        # =====================================================================
         r12 = e.regime('r1___r2___regime')
-        self.assertEqual(r12.num_on_events, 1)
         self.assertEqual(r12.num_on_conditions, 2)
+        oc1 = r12.on_condition('SV1__a > cp1__a')
+        oc2 = r12.on_condition('SV1__b > 1')
+        self.assertEqual(set(oc1.output_event_port_names), set(('ESP1',)))
+        self.assertEqual(oc2.num_output_events, 0)
+        self.assertEqual(oc2.target_regime, r11)
+        self.assertEqual(r12.num_on_events, 1)
+        self.assertEqual(r12.on_event('ERP1').port.port,
+                         c.event_receive_port('spikein'))
+        # =====================================================================
+        # Regime a=2, b=1
+        # =====================================================================
+        r21 = e.regime('r2___r1___regime')
+        self.assertEqual(r21.num_on_conditions, 2)
+        oc1 = r21.on_condition('SV1__a > 1')
+        oc2 = r21.on_condition('SV1__b > dp1__b')
+        self.assertEqual(oc1.num_output_events, 0)
+        self.assertEqual(oc2.num_output_events, 0)
+        self.assertEqual(oc1.target_regime, r11)
+        self.assertEqual(r21.num_on_events, 0)
         #  - Ports & Parameters:
         self.assertEqual(set(e.analog_receive_port_names),
                          set(['ARP1', 'ARP2']))
