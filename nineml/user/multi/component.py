@@ -710,23 +710,12 @@ class _MultiRegime(Regime):
         All OnEvents in sub_regimes that are exposed via an event receive
         port exposure
         """
-        # Zip together all on events with their EventReceivePortExposures,
-        # if present
-        # NB: izip will return an empty list if there is no exposure for the
-        #     on event port or a list of length 1 (containing a tuple of the
-        #     port exposure and the on event that listens to it if there is)
-        #     these lists are then chained to form a list of 2-tuples (ie. not
-        #     a list of lists) containing port exposure and on event pairs
-        exposed_on_events = chain(*[
-            izip((pe for pe in self._parent._event_receive_ports
-                  if oe.port is pe.port), (oe,))
-            for oe in self._all_sub_on_events])
-        # Group on events by their port exposure and return as an _MultiOnEvent
-        key = lambda tple: tple[0]
-        return (
-            _MultiOnEvent(pe, zip(*grp)[1], self)
-            for pe, grp in groupby(sorted(exposed_on_events, key=key),
-                                   key=key))
+        list_of_args = []
+        for port_exposure in self._parent.event_receive_ports:
+            exposed_on_events = (oe for oe in self._all_sub_on_events
+                                 if oe.port is port_exposure.port)
+            list_of_args.append((port_exposure, exposed_on_events))
+        return (_MultiOnEvent(pe, oes, self) for pe, oes in list_of_args)
 
     @property
     def on_conditions(self):
@@ -760,11 +749,11 @@ class _MultiRegime(Regime):
         return self.sub_regime(comp_name).alias(name)
 
     def on_event(self, port_name):
-        port_exposure = self.event_receive_port(port_name)
-        return _MultiOnCondition(
+        port_exposure = self._parent.event_receive_port(port_name)
+        return _MultiOnEvent(
+            port_exposure,
             (oe for oe in self._all_sub_on_events
-             if (oe.src_port_name == port_exposure.port_name and
-                 oe.sub_component == port_exposure.sub_component)), self)
+             if oe.src_port_name == port_exposure.local_port_name), self)
 
     def on_condition(self, condition):
         return _MultiOnCondition(
@@ -943,6 +932,10 @@ class _MultiTransition(object):
         return len(list(self.output_events))
 
     @property
+    def state_assignment_variables(self):
+        return (sa.variable for sa in self.state_assignments)
+
+    @property
     def _all_output_event_ports(self):
         return set(oe.port for oe in chain(*[t.output_events
                                              for t in self.sub_transitions]))
@@ -955,15 +948,15 @@ class _MultiOnEvent(_MultiTransition, OnEvent):
     def __init__(self, port_exposure, sub_transitions, parent):
         sub_transitions = normalise_parameter_as_list(sub_transitions)
         self._port_exposure = port_exposure
-        assert all(st.src_port_name == self._src_port_name
-                   for st in sub_transitions[1:])
+        assert all(st.src_port_name == self._port_exposure.local_port_name
+                   for st in sub_transitions)
         _MultiTransition.__init__(self, sub_transitions, parent)
 
     def __hash__(self):
         # Since a new MultiRegime will be created each time it is accessed from
         # a MultiDynamics object, in order to use MultiRegimes in sets or dicts
         # with equivalence between the same MultiRegime
-        return hash(self._src_port_name) ^ hash(self._parent)
+        return hash(self.src_port_name) ^ hash(self._parent)
 
     def __repr__(self):
         return '_MultiOnEvent({})'.format(self.src_port_name)

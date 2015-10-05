@@ -136,7 +136,8 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
                               ('a', 'C2', 'b', 'dIn2')],
             port_exposures=[('ARP1', 'a', 'cIn1'),
                             ('ARP2', 'a', 'cIn2'),
-                            ('ERP1', 'a', 'spikein')])
+                            ('ERP1', 'a', 'spikein'),
+                            ('ESP1', 'a', 'c_emit')])
 
         # Flatten a flat component
         # Everything should be as before:
