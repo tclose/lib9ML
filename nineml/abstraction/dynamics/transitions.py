@@ -277,6 +277,10 @@ class Transition(BaseALObject, MemberContainerObject):
         return self._state_assignments.iterkeys()
 
     @property
+    def output_event_port_names(self):
+        return self._output_events.iterkeys()
+
+    @property
     def output_events(self):
         """|Events| that happen when this transitions occurs"""
         return self._output_events.itervalues()
