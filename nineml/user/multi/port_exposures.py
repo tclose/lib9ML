@@ -14,7 +14,7 @@ from .namespace import append_namespace
 
 class _BasePortExposure(BaseULObject):
 
-    defining_attributes = ('_name', '_component', '_port')
+    defining_attributes = ('_name', '_sub_component', '_port')
 
     def __init__(self, name, component, port):
         super(_BasePortExposure, self).__init__()

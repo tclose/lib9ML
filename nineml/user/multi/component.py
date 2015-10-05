@@ -503,6 +503,10 @@ class MultiDynamics(Dynamics):
         return (sv.name for sv in self.state_variables)
 
     @property
+    def regime_names(self):
+        return (r.name for r in self.regimes)
+
+    @property
     def analog_port_connection_names(self):
         return chain(*(d.iterkeys()
                        for d in self._analog_port_connections.itervalues()))
@@ -734,7 +738,7 @@ class _MultiRegime(Regime):
         key = lambda oc: oc.trigger  # Group key for on conditions
         # Chain delayed on events and grouped on conditions
         return chain(
-            (_MultiOnCondition(_DelayedOnEvent(oe), self)
+            (_MultiOnCondition((_DelayedOnEvent(oe),), self)
              for oe in self._all_sub_on_events
              if oe.src_port_name in nonzero_delay_receive_ports),
             (_MultiOnCondition(grp, self)
@@ -756,9 +760,12 @@ class _MultiRegime(Regime):
              if oe.src_port_name == port_exposure.local_port_name), self)
 
     def on_condition(self, condition):
-        return _MultiOnCondition(
-            (oc for oc in self._all_sub_on_conds
-             if oc.trigger.rhs == sympy.sympify(condition)), self)
+        sub_conds = [oc for oc in self._all_sub_on_conds
+                     if oc.trigger.rhs == sympy.sympify(condition)]
+        if not sub_conds:
+            raise KeyError(
+                "No OnCondition with trigger condition '{}'".format(condition))
+        return _MultiOnCondition(sub_conds, self)
 
     @property
     def time_derivative_variables(self):
@@ -916,7 +923,7 @@ class _MultiTransition(object):
                 .format(variable))
 
     def output_event(self, name):
-        exposure = self.parent.parent.event_send_port(name)
+        exposure = self._parent._parent.event_send_port(name)
         if exposure.port not in self._all_output_event_ports:
             raise NineMLMissingElementError(
                 "Output event for '{}' port is not present in transition"
