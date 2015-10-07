@@ -9,9 +9,10 @@ from nineml.xmlns import E
 from nineml.annotations import read_annotations
 from ...componentclass.visitors.xml import (
     ComponentClassXMLLoader, ComponentClassXMLWriter)
+from .base import ConnectionRuleVisitor
 
 
-class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
+class ConnectionRuleXMLLoader(ComponentClassXMLLoader, ConnectionRuleVisitor):
 
     """This class is used by XMLReader interny.
 
@@ -35,7 +36,7 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
         (("ConnectionRule", load_connectionruleclass),))
 
 
-class ConnectionRuleXMLWriter(ComponentClassXMLWriter):
+class ConnectionRuleXMLWriter(ComponentClassXMLWriter, ConnectionRuleVisitor):
 
     @annotate_xml
     def visit_componentclass(self, component_class, **kwargs):  # @UnusedVariable @IgnorePep8
