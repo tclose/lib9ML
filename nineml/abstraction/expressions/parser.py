@@ -172,8 +172,7 @@ class Parser(object):
     @classmethod
     def _func_to_op(self, expr):
         """Maps functions to SymPy operators (i.e. 'pow')"""
-        if isinstance(expr, (sympy.function.Application,
-                             sympy.relational.Relational)):
+        if expr.args:
             args = [self._func_to_op(a) for a in expr.args]
             try:
                 expr = self._func_to_op_map[type(expr)](*args)
