@@ -3,7 +3,7 @@ from operator import and_
 from . import BaseNineMLObject
 from nineml.xmlns import NINEML, E
 from nineml.annotations import annotate_xml, read_annotations
-from nineml.exceptions import NineMLRuntimeError
+from nineml.exceptions import NineMLRuntimeError, handle_xml_exceptions
 from nineml.document import Document
 
 
@@ -54,6 +54,7 @@ class BaseReference(BaseNineMLObject):
         return element
 
     @classmethod
+    @handle_xml_exceptions
     @read_annotations
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag != NINEML + cls.element_name:

@@ -6,6 +6,21 @@ Exceptions specific to the 9ML library
 """
 
 
+def handle_xml_exceptions(from_xml):
+    def from_xml_with_exception_handling(cls, element, document, **kwargs):  # @UnusedVariable @IgnorePep8
+        try:
+            return from_xml(cls, element, document, **kwargs)
+        except KeyError, e:
+            raise NineMLXMLAttributeError(
+                "{} XML element{} is missing a {} attribute (found '{}')"
+                .format(
+                    cls.element_name,
+                    (" '" + element.attrib['name'] + "'"
+                     if 'name' in element.attrib else ''),
+                    e, "', '".join(element.attrib.iterkeys())))
+    return from_xml_with_exception_handling
+
+
 class NineMLRuntimeError(Exception):
     pass
 
@@ -35,6 +50,10 @@ class NineMLInvalidElementTypeException(TypeError):
 
 
 class NineMLImmutableError(NineMLRuntimeError):
+    pass
+
+
+class NineMLXMLAttributeError(KeyError):
     pass
 
 
