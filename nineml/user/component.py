@@ -517,12 +517,12 @@ class Quantity(BaseULObject):
                 "{} element '{}' is missing 'units' attribute (found '{}')"
                 .format(element.tag, element.get('name', ''),
                         "', '".join(element.attrib.iterkeys())))
-#         try:
-        units = document[units_str]
-#         except KeyError:
-#             raise NineMLMissingElementError(
-#                 "Did not find definition of '{}' units in the current "
-#                 "document.".format(units_str))
+        try:
+            units = document[units_str]
+        except KeyError:
+            raise NineMLMissingElementError(
+                "Did not find definition of '{}' units in the current "
+                "document.".format(units_str))
         return cls(value=value, units=units)
 
 
