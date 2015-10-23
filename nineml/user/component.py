@@ -1,16 +1,14 @@
 # encoding: utf-8
 from itertools import chain
 from abc import ABCMeta, abstractmethod
-import collections
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError,
-    handle_xml_exceptions)
+    handle_xml_exceptions, NineMLDimensionError)
 from nineml.xmlns import NINEML, E
 from nineml.reference import (
     Prototype, Definition, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate_xml
-from nineml.utils import expect_single, check_units
-from nineml import units as un
+from nineml.utils import expect_single
 from ..abstraction import ComponentClass
 from nineml.units import Quantity
 from . import BaseULObject
@@ -30,24 +28,9 @@ class Component(BaseULObject, DocumentLevelObject):
     :class:`~nineml.abstraction.ComponentClass`  together with a set
     of properties (parameter values), or by cloning then modifying an
     existing component_class (the prototype).
-
-    *Arguments*:
-        `name`:
-             a name for the component_class.
-        `definition`:
-             the URL of an abstraction layer component_class class definition,
-             a :class:`Definition` or a :class:`Prototype` instance.
-        `properties`:
-             a dictionary containing (value,units) pairs or a
-             :class:`PropertySet` for the component_class's properties.
-        `initial_values`:
-            a dictionary containing (value,units) pairs or a
-            :class:`PropertySet` for the component_class's state variables.
-
     """
     __metaclass__ = ABCMeta  # Abstract base class
-    defining_attributes = ('name', 'component_class', '_properties',
-                           '_initial_values')
+    defining_attributes = ('name', 'component_class', '_properties')
     children = ("Property", "Definition", 'Prototype')
 
     # initial_values is temporary, the idea longer-term is to use a separate
@@ -88,8 +71,7 @@ class Component(BaseULObject, DocumentLevelObject):
         pass
 
     def __getinitargs__(self):
-        return (self.name, self.definition, self.property_set,
-                self.initial_value_set, self._url)
+        return (self.name, self.definition, self._properties, self._url)
 
     def __iter__(self):
         return self.properties
@@ -126,8 +108,7 @@ class Component(BaseULObject, DocumentLevelObject):
                 self._properties[p.name] if p.name in self._properties else p
                 for p in self.definition.component.properties)
         else:
-            return self._properties.itervalues())
-
+            return self._properties.itervalues()
 
     @property
     def property_names(self):
@@ -200,7 +181,7 @@ class Component(BaseULObject, DocumentLevelObject):
             prop_dimension = prop_units.dimension
             param_dimension = param.dimension
             if prop_dimension != param_dimension:
-                raise NineMLRuntimeError(
+                raise NineMLDimensionError(
                     "Dimensions for '{}' property, {}, in '{}' don't match "
                     "that of its definition in '{}', {}."
                     .format(param.name, prop_dimension, self.name,
@@ -240,7 +221,6 @@ class Component(BaseULObject, DocumentLevelObject):
                       for e in element.findall(NINEML + 'Property')]
         return cls(name, definition, properties=properties, url=document.url)
 
-
     @property
     def used_units(self):
         return set(p.units for p in self.properties.itervalues())
@@ -256,7 +236,6 @@ class Component(BaseULObject, DocumentLevelObject):
                 raise NineMLMissingElementError(
                     "No property named '{}' in component class".format(name))
 
-
     def write(self, fname):
         """
         Writes the top-level NineML object to file in XML.
@@ -268,10 +247,10 @@ class Component(BaseULObject, DocumentLevelObject):
             to_write.append(self.component_class)
         Document(*to_write).write(fname)
 
-
     def get_random_distributions(self):
         return [p.value.distribution for p in self.properties
                 if p.value.element_name == 'RandomDistributionValue']
+
 
 class Property(BaseULObject):
 
@@ -337,7 +316,7 @@ class Property(BaseULObject):
         return cls(name=name, quantity=quantity)
 
     def set_units(self, units):
-        self.quantity._units = units                
+        self.quantity._units = units
 
 
 class Initial(Property):
@@ -349,10 +328,24 @@ class Initial(Property):
 
 
 class DynamicsProperties(Component):
+    """
+    *Arguments*:
+        `name`:
+             a name for the component_class.
+        `definition`:
+             the URL of an abstraction layer component_class class definition,
+             a :class:`Definition` or a :class:`Prototype` instance.
+        `properties`:
+             a dictionary containing (value,units) pairs or a
+             :class:`PropertySet` for the component_class's properties.
+        `initial_values`:
+            a dictionary containing (value,units) pairs or a
+            :class:`PropertySet` for the component_class's state variables.
+    """
 
     element_name = 'DynamicsProperties'
     defining_attributes = ('name', 'component_class', '_properties',
-                           '_initial_values')    
+                           '_initial_values')
 
     def __init__(self, name, definition, properties={}, initial_values={},
                  url=None):
@@ -367,13 +360,23 @@ class DynamicsProperties(Component):
         self.check_initial_values()
 
     def check_initial_values(self):
-        for var in self.definition.componentclass.state_variables:
+        cc = self.definition.component_class
+        for initial_value in self.initial_values:
             try:
-                initial_value = self.initial_values[var.name]
+                var = cc.state_variable(initial_value.name)
             except KeyError:
                 raise NineMLRuntimeError(
-                    "Initial value not specified for {}".format(var.name))
-            check_units(initial_value.units, var.dimension)
+                    "Initial value not specified for {}"
+                    .format(initial_value.name))
+            if initial_value.units.dimension != var.dimension:
+                raise NineMLDimensionError(
+                    "Initial value dimension '{}' did not match state variable"
+                    " definition ('{}')".format(initial_value.units.dimension,
+                                                var.dimension))
+
+    def __getinitargs__(self):
+        return (self.name, self.definition, self._properties,
+                self._initial_values, self._url)
 
     def get_element_name(self):
         return self.element_name
@@ -415,11 +418,11 @@ class DynamicsProperties(Component):
                           for e in element.findall(NINEML + 'Initial')]
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
-        
+
     @property
     def initial_values(self):
         return self._initial_values.itervalues()
-    
+
     def initial_value(self, name):
         return self._initial_values[name]
 
@@ -452,7 +455,6 @@ class RandomDistributionProperties(Component):
     @property
     def standard_library(self):
         return self.component_class.standard_library
-
 
     def get_element_name(self):
         return self.element_name
