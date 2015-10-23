@@ -141,6 +141,10 @@ class DynamicsElementFinder(ComponentElementFinder, DynamicsActionVisitor):
         if self.element is on_event:
             self._found()
 
+    def action_randomvariable(self, random_variable, **kwargs):  # @UnusedVariable @IgnorePep8
+        if self.element is random_variable:
+            self._found()
+
 
 class DynamicsExpressionExtractor(ComponentExpressionExtractor,
                                   DynamicsActionVisitor):

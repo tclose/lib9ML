@@ -102,7 +102,7 @@ class ComponentRequiredDefinitions(object):
 
     def action_randomvariable(self, random_variable, **kwargs):  # @UnusedVariable @IgnorePep8
         if self._is_required(random_variable):
-            self.constants.add(random_variable)            
+            self.constants.add(random_variable)
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable
         if (self._is_required(alias) and

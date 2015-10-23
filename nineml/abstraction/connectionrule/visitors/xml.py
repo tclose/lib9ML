@@ -28,27 +28,27 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader):
         blocks = self._load_blocks(element, block_names=block_names)
         return ConnectionRule(
             name=element.attrib['name'],
-            propertyrecieveport=blocks["PropertyRecievePort"],
+            property_recieve_ports=blocks["PropertyRecievePort"],
             parameters=blocks["Parameter"],
-            constant=blocks["Constant"],
-            alias=blocks["Alias"],
-            select=blocks["Select"])
+            constants=blocks["Constant"],
+            aliases=blocks["Alias"],
+            selects=blocks["Select"])
 
     @read_annotations
     def load_select(self, element):
         block_names = ('Mask', 'Number', 'Preference', 'Selected',
-                       'NumberSelected', 'RandomVariables', 'Select', 'RepeatUntil')
+                       'NumberSelected', 'RandomVariables', 'Select',
+                       'RepeatUntil')
         blocks = self.load_blocks(element, block_names=block_names)
-        return Select(  
+        return Select(
             mask=blocks["Mask"],
-            number=blocks["Number"],#Does the appropriate object get expanded here
+            number=blocks["Number"],
             preference=blocks["Preference"],
-            selecteds=blocks["Selected"], 
+            selecteds=blocks["Selected"],
             number_selecteds=blocks["NumberSelected"],
-            random_variables=blocks["RandomVariables"], 
-            select=blocks["Select"], 
+            random_variables=blocks["RandomVariables"],
+            select=blocks["Select"],
             repeat_untils=blocks["RepeatUntil"])
-
 
     tag_to_loader = dict(
         tuple(ComponentClassXMLLoader.tag_to_loader.iteritems()) +
