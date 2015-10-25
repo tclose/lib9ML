@@ -9,7 +9,7 @@ from nineml.base import BaseNineMLObject
 from nineml.reference import (
     BaseReference, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate_xml
-from nineml.utils import check_units, expect_single
+from nineml.utils import check_units, from_child_xml
 from ..abstraction import ComponentClass
 from nineml.units import Quantity
 from . import BaseULObject
@@ -276,8 +276,8 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
                 raise Exception("A component_class must contain either a "
                                 "defintion or a prototype")
             definition = Prototype.from_xml(prototype_element, document)
-        properties = [Property.from_xml(e, document, **kwargs)
-                      for e in element.findall(NINEML + 'Property')]
+        properties = from_child_xml(element, Property, document, multiple=True,
+                                    **kwargs)
         return cls(name, definition, properties=properties, url=document.url)
 
     @property
@@ -395,8 +395,8 @@ class Property(BaseULObject):
     def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
         cls.check_tag(element)
         name = element.attrib['name']
-        quantity = Quantity.from_xml(
-            expect_single(element.findall(NINEML + 'Quantity')), document)
+        quantity = from_child_xml(
+            element, Quantity, document, **kwargs)
         return cls(name=name, quantity=quantity)
 
     def set_units(self, units):
@@ -502,10 +502,10 @@ class DynamicsProperties(Component):
                 raise Exception("A component_class must contain either a "
                                 "defintion or a prototype")
             definition = Prototype.from_xml(prototype_element, document)
-        properties = [Property.from_xml(e, document, **kwargs)
-                      for e in element.findall(NINEML + 'Property')]
-        initial_values = [Initial.from_xml(e, document, **kwargs)
-                          for e in element.findall(NINEML + 'Initial')]
+        properties = from_child_xml(element, Property, document, multiple=True,
+                                    **kwargs)
+        initial_values = from_child_xml(element, Initial, document,
+                                        multiple=True, **kwargs)
         return cls(name, definition, properties=properties,
                    initial_values=initial_values, url=document.url)
 
