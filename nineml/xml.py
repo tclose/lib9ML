@@ -59,7 +59,9 @@ def from_child_xml(element, child_classes, document, multiple=False,
                     "{} in '{}' has '{}' attributes when none are expected"
                     .format(identify_element(parent), document.url,
                             "', '".join(parent.attrib.iterkeys())))
-            if not multiple_within and len(parent.getchildren()) > 1:
+            if not multiple_within and len([
+                    c for c in parent.getchildren()
+                    if c.tag != xmlns + 'Annotations']) > 1:
                 raise NineMLXMLBlockError(
                     "{} in '{}' is only expected to contain a single child "
                     "block, found {}"

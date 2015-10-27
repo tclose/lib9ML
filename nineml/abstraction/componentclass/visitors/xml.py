@@ -55,7 +55,7 @@ class ComponentClassXMLLoader(object):
             value = float(element.text)
         else:
             value = get_xml_attr(element, 'value', self.document,
-                                 dtype=float, **kwargs),
+                                 dtype=float, **kwargs)
         return Constant(
             name=get_xml_attr(element, 'name', self.document, **kwargs),
             value=value,
