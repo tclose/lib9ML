@@ -1,5 +1,4 @@
 # encoding: utf-8
-from itertools import chain
 from abc import ABCMeta, abstractmethod
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
@@ -15,7 +14,7 @@ from nineml.units import Quantity
 from . import BaseULObject
 from nineml.document import Document
 from nineml.base import DocumentLevelObject, ContainerObject
-from nineml.values import SingleValue, ArrayValue
+from nineml.values import SingleValue, ArrayValue, RandomValue
 from os import path
 
 
@@ -516,7 +515,7 @@ class Property(BaseULObject):
         if extract_xmlns(element.tag) == NINEMLv1:
             value = from_child_xml(
                 element,
-                (SingleValue, ArrayValue, RandomDistributionProperties),
+                (SingleValue, ArrayValue, RandomValue),
                 document, **kwargs)
             units = document[
                 get_xml_attr(element, 'units', document, **kwargs)]

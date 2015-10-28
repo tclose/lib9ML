@@ -57,6 +57,8 @@ class ConnectionRuleXMLWriter(ComponentClassXMLWriter):
                 'ComponentClass',
                 self.E('ConnectionRule',
                          standardLibrary=component_class.standard_library),
+                *(e.accept_visitor(self)
+                  for e in component_class.sorted_elements()),
                 name=component_class.name)
         else:
             xml = self.E(component_class.element_name,
