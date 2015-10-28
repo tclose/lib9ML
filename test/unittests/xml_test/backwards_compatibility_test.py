@@ -102,7 +102,7 @@ version1 = """<?xml version="1.0" encoding="UTF-8"?>
   <ComponentClass name="D_psr">
     <Parameter name="tau" dimension="time"/>
     <Parameter name="weight" dimension="current"/>
-    <EventReceivePort name="spike"/>    
+    <EventReceivePort name="spike"/>
     <AnalogSendPort name="a" dimension="current"/>
     <Dynamics>
       <StateVariable name="a" dimension="current"/>
@@ -119,12 +119,12 @@ version1 = """<?xml version="1.0" encoding="UTF-8"?>
     </Dynamics>
   </ComponentClass>
   <ComponentClass name="CR">
-    <Parameter name="probability" dimension="dimensionless"/>  
+    <Parameter name="probability" dimension="dimensionless"/>
     <ConnectionRule standard_library="http://nineml.net/connectionrule/Probabilistic"/>
   </ComponentClass>
   <ComponentClass name="RD">
+    <Parameter name="maximum" dimension="dimensionless"/>
     <Parameter name="minimum" dimension="dimensionless"/>
-    <Parameter name="maximum" dimension="dimensionless"/>  
     <RandomDistribution standard_library="http://uncertml.org/2.0/UniformDistribution.xml"/>
   </ComponentClass>
   <Component name="D_cellP">
@@ -204,7 +204,7 @@ version1 = """<?xml version="1.0" encoding="UTF-8"?>
   <Unit symbol="uF" dimension="capacitance" power="-6"/>
   <Unit symbol="mV" dimension="voltage" power="-3"/>
   <Unit symbol="ms" dimension="time" power="-3"/>
-  <Unit symbol="unitless" dimension="dimensionless"/>
+  <Unit symbol="unitless" dimension="dimensionless" power="0"/>
 </NineML>"""
 
 version2 = """<?xml version="1.0" encoding="UTF-8"?>
@@ -249,8 +249,8 @@ version2 = """<?xml version="1.0" encoding="UTF-8"?>
     <Parameter name="probability" dimension="dimensionless"/>
   </ConnectionRule>
   <RandomDistribution name="RD" standard_library="http://uncertml.org/2.0/UniformDistribution.xml">
-    <Parameter name="minimum" dimension="dimensionless"/>
     <Parameter name="maximum" dimension="dimensionless"/>
+    <Parameter name="minimum" dimension="dimensionless"/>
   </RandomDistribution>
   <DynamicsProperties name="D_cellP">
     <Definition name="D_cell"/>
@@ -347,5 +347,5 @@ version2 = """<?xml version="1.0" encoding="UTF-8"?>
   <Unit symbol="uF" dimension="capacitance" power="-6"/>
   <Unit symbol="mV" dimension="voltage" power="-3"/>
   <Unit symbol="ms" dimension="time" power="-3"/>
-  <Unit symbol="unitless" dimension="dimensionless"/>
+  <Unit symbol="unitless" dimension="dimensionless" power="0"/>
 </NineML>"""
