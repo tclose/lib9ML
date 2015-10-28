@@ -117,20 +117,20 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
 
     # initial_values is temporary, the idea longer-term is to use a separate
     # library such as SEDML
-    def __init__(self, name, definition, properties={}, url=None):
+    def __init__(self, name, definition, properties={}, document=None):
         """
         Create a new component_class with the given name, definition and
         properties, or create a prototype to another component_class that will
         be resolved later.
         """
         BaseULObject.__init__(self)
-        DocumentLevelObject.__init__(self, url)
+        DocumentLevelObject.__init__(self, document)
         ContainerObject.__init__(self)
         self._name = name
         if isinstance(definition, basestring):
             definition = Definition(
                 name=path.basename(definition).replace(".xml", ""),
-                document=Document(url=url),
+                document=document,
                 url=definition)
         elif isinstance(definition, ComponentClass):
             definition = Definition(definition)
@@ -274,7 +274,7 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
                                     **kwargs)
         properties = from_child_xml(element, Property, document, multiple=True,
                                     allow_none=True, **kwargs)
-        return cls(name, definition, properties=properties, url=document.url)
+        return cls(name, definition, properties=properties, document=document)
 
     @property
     def used_units(self):
@@ -562,9 +562,10 @@ class DynamicsProperties(Component):
     write_order = ('Property', 'Initial')
 
     def __init__(self, name, definition, properties={}, initial_values={},
-                 url=None, check_initial_values=False):
+                 document=None, check_initial_values=False):
         super(DynamicsProperties, self).__init__(
-            name=name, definition=definition, properties=properties, url=url)
+            name=name, definition=definition, properties=properties,
+            document=document)
         if isinstance(initial_values, dict):
             self._initial_values = dict(
                 (name, Initial(name, qty))
@@ -637,7 +638,7 @@ class DynamicsProperties(Component):
                                         multiple=True, allow_none=True,
                                         **kwargs)
         return cls(name, definition, properties=properties,
-                   initial_values=initial_values, url=document.url)
+                   initial_values=initial_values, document=document)
 
 
 class ConnectionRuleProperties(Component):
