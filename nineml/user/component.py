@@ -1,4 +1,5 @@
 # encoding: utf-8
+from itertools import chain
 from abc import ABCMeta, abstractmethod
 from nineml.exceptions import (
     NineMLUnitMismatchError, NineMLRuntimeError, NineMLMissingElementError)
@@ -258,7 +259,7 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
         element = E(self.element_name,
                     self._definition.to_xml(document, E=E, **kwargs),
                     *(p.to_xml(document, E=E, **kwargs)
-                      for p in self.sorted_elements()),
+                      for p in self.sorted_elements(local=True)),
                       name=self.name)
         return element
 
@@ -409,6 +410,17 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
     @property
     def event_send_port_names(self):
         return self.component_class.event_send_port_names
+
+    def elements(self, local=False):
+        """
+        Overrides the elements method in ContainerObject base class to allow
+        for "local" kwarg to only iterate the members that are declared in
+        this instance (i.e. not the prototype)
+        """
+        if local:
+            return self._properties.itervalues()
+        else:
+            return ContainerObject.elements(self)
 
     @property
     def properties(self):
@@ -597,6 +609,18 @@ class DynamicsProperties(Component):
     def attributes_with_units(self):
         return (super(DynamicsProperties, self).attributes_with_units |
                 set(p for p in self.initial_values if p.units is not None))
+
+    def elements(self, local=False):
+        """
+        Overrides the elements method in ContainerObject base class to allow
+        for "local" kwarg to only iterate the members that are declared in
+        this instance (i.e. not the prototype)
+        """
+        if local:
+            return chain(self._properties.itervalues(),
+                         self._initial_values.itervalues())
+        else:
+            return ContainerObject.elements(self)
 
     @classmethod
     @resolve_reference
