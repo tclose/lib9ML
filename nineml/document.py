@@ -112,6 +112,10 @@ class Document(dict, BaseNineMLObject):
     def elements(self):
         return self.itervalues()
 
+    @property
+    def element_names(self):
+        return (e.name for e in self.elements)
+
     def itervalues(self):
         for v in super(Document, self).itervalues():
             if isinstance(v, self._Unloaded):

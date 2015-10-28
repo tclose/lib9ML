@@ -7,7 +7,7 @@ from nineml.xml import (
 from nineml.annotations import read_annotations, annotate_xml
 from .component import (
     ConnectionRuleProperties, DynamicsProperties)
-from nineml.values import SingleValue, ArrayValue
+from nineml.values import SingleValue, ArrayValue, RandomDistributionValue
 from copy import copy
 from itertools import chain
 from .population import Population
@@ -186,8 +186,6 @@ class Projection(BaseULObject, DocumentLevelObject):
         if xmlns == NINEMLv1:
             pre_within = 'Source'
             post_within = 'Destination'
-            dyn_cls = DynamicsComponent
-            con_cls = ConnectionRuleComponent
             multiple_within = True
             # Get Delay
             delay_elem = expect_single(element.findall(NINEMLv1 + 'Delay'))
@@ -195,7 +193,7 @@ class Projection(BaseULObject, DocumentLevelObject):
                 get_xml_attr(delay_elem, 'units', document, **kwargs)]
             value = from_child_xml(
                 delay_elem,
-                (SingleValue, ArrayValue, RandomDistributionComponent),
+                (SingleValue, ArrayValue, RandomDistributionValue),
                 document, **kwargs)
             delay = Quantity(value, units)
             if 'unprocessed' in kwargs:
@@ -203,8 +201,6 @@ class Projection(BaseULObject, DocumentLevelObject):
         else:
             pre_within = 'Pre'
             post_within = 'Post'
-            dyn_cls = DynamicsProperties
-            con_cls = ConnectionRuleProperties
             multiple_within = False
             delay = from_child_xml(element, Quantity, document, within='Delay',
                                    **kwargs)
@@ -215,14 +211,14 @@ class Projection(BaseULObject, DocumentLevelObject):
         post = from_child_xml(element, (Population, Selection), document,
                               allow_reference='only', within=post_within,
                               multiple_within=multiple_within, **kwargs)
-        response = from_child_xml(element, dyn_cls, document,
+        response = from_child_xml(element, DynamicsProperties, document,
                                   allow_reference=True, within='Response',
                                   multiple_within=multiple_within, **kwargs)
-        plasticity = from_child_xml(element, dyn_cls, document,
+        plasticity = from_child_xml(element, DynamicsProperties, document,
                                     allow_reference=True, within='Plasticity',
                                     multiple_within=multiple_within,
                                     allow_none=True, **kwargs)
-        connectivity = from_child_xml(element, con_cls,
+        connectivity = from_child_xml(element, ConnectionRuleProperties,
                                       document, within='Connectivity',
                                       allow_reference=True, **kwargs)
         if xmlns == NINEMLv1:

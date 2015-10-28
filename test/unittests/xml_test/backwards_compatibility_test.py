@@ -1,6 +1,7 @@
 import unittest
 from nineml import load
 from nineml.xml import etree, get_element_maker
+from itertools import izip
 
 
 class TestBackwardsCompatibility(unittest.TestCase):
@@ -14,7 +15,10 @@ class TestBackwardsCompatibility(unittest.TestCase):
 #         list(self.v2.elements)
 
     def test_backwards_compatibility(self):
-        for name in ('D_cellP',):
+        v1_names = list(self.v1_doc.element_names)
+        v2_names = list(self.v1_doc.element_names)
+        self.assertEqual(v1_names, v2_names)
+        for name in v1_names:
             v1 = self.v1_doc[name]
             v2 = self.v2_doc[name]
             # Test loaded python objects are equivalent between versions
@@ -27,13 +31,13 @@ class TestBackwardsCompatibility(unittest.TestCase):
             v1_xml = self._get_xml_element(self.v1_xml, name)
             v2_xml = self._get_xml_element(self.v2_xml, name)
             # Test the version 1 converted to version 2
-            self.assertEqual(
-                v1_to_v2_xml, v2_xml,
+            self.assert_(
+                xml_equal(v1_to_v2_xml, v2_xml),
                 "v2 produced from v1 doesn't match loaded:\n{}\n\nand\n\n{}"
                 .format(xml_to_str(v1_to_v2_xml), xml_to_str(v2_xml)))
             # Test the version 2 converted to version 1
-            self.assertEqual(
-                v2_to_v1_xml, v1_xml,
+            self.assert_(
+                xml_equal(v2_to_v1_xml, v1_xml),
                 "v2 produced from v1 doesn't match loaded:\n{}\n\nand\n\n{}"
                 .format(xml_to_str(v2_to_v1_xml), xml_to_str(v1_xml)))
 
@@ -42,6 +46,17 @@ class TestBackwardsCompatibility(unittest.TestCase):
             if child.get('name') == name:
                 return child
         assert False
+
+
+def xml_equal(xml1, xml2):
+    if xml1.attrib != xml2.attrib:
+        return False
+    if len(xml1.getchildren()) != len(xml2.getchildren()):
+        return False
+    for c1, c2 in izip(xml1.getchildren(), xml2.getchildren()):
+        if not xml_equal(c1, c2):
+            return False
+    return True
 
 
 def xml_to_str(xml):
@@ -183,8 +198,8 @@ version1 = """<?xml version="1.0" encoding="UTF-8"?>
 version2 = """<?xml version="1.0" encoding="UTF-8"?>
 <NineML xmlns="http://nineml.net/9ML/2.0">
   <Dynamics name="D_cell">
-    <Parameter name="tau" dimension="time"/>
     <Parameter name="cm" dimension="capacitance"/>
+    <Parameter name="tau" dimension="time"/>
     <Parameter name="v_thresh" dimension="voltage"/>
     <AnalogReducePort name="i_ext" dimension="current" operator="+"/>
     <EventSendPort name="spike"/>
@@ -227,13 +242,13 @@ version2 = """<?xml version="1.0" encoding="UTF-8"?>
   </RandomDistribution>
   <DynamicsProperties name="D_cellP">
     <Definition name="D_cell"/>
-    <Property name="tau">
-      <Quantity units="ms">
+    <Property name="cm">
+      <Quantity units="uF">
         <SingleValue>1.0</SingleValue>
       </Quantity>
     </Property>
-    <Property name="cm">
-      <Quantity units="uF">
+    <Property name="tau">
+      <Quantity units="ms">
         <SingleValue>1.0</SingleValue>
       </Quantity>
     </Property>
