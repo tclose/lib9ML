@@ -150,51 +150,51 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         # Get all the projections that project to the given population
         received = [p for p in self.projections if p.post == population]
         # Get all sub-dynamics, port connections and port exposures
-        sub_dynamics = {'cell': population.cell}
+        sub_dynamics = {'cell': population.cell.component_class}
         port_connections = []
         port_exposures = []
         for proj in received:
-            sub_dynamics[p.name + '_psr'] = proj.response
-            sub_dynamics[p.name + '_pls'] = proj.plasticity
+            sub_dynamics[proj.name + '_psr'] = proj.response.component_class
+            sub_dynamics[proj.name + '_pls'] = proj.plasticity.component_class
             # Get all projection port connections that don't project to/from
             # the "pre" population and convert them into local MultiDynamics
             # port connections
             port_connections.extend(
-                pc.cls(sender_name=self._role2dyn(proj.name, pc.sender_role),
-                       receiver_name=self._role2dyn(proj.name,
-                                                    pc.receiver_role),
-                       send_port=pc.send_port, receive_port=pc.receive_port)
+                pc.__class__(
+                    sender_name=self._role2dyn(proj.name, pc.sender_role),
+                    receiver_name=self._role2dyn(proj.name, pc.receiver_role),
+                    send_port=pc.send_port, receive_port=pc.receive_port)
                 for pc in proj.port_connections
                 if 'pre' not in (pc.sender_role, pc.receiver_role))
             # Get all the projection port connections that project to/from the
             # the "pre" population and convert them into port exposures
             port_exposures.extend(
                 AnalogReceivePortExposure(
-                    component=self._role2dyn(pc.receiver_role),
+                    component=self._role2dyn(proj.name, pc.receiver_role),
                     port=pc.receive_port)
                 for pc in proj.analog_port_connections
                 if 'pre' == pc.sender_role)
             port_exposures.extend(
                 EventReceivePortExposure(
-                    component=self._role2dyn(pc.receiver_role),
+                    component=self._role2dyn(proj.name, pc.receiver_role),
                     port=pc.receive_port)
                 for pc in proj.event_port_connections
                 if 'pre' == pc.sender_role)
             port_exposures.extend(
                 AnalogSendPortExposure(
-                    component=self._role2dyn(pc.sender_role),
+                    component=self._role2dyn(proj.name, pc.sender_role),
                     port=pc.send_port)
                 for pc in proj.analog_port_connections
                 if 'pre' == pc.receiver_role)
             port_exposures.extend(
                 EventSendPortExposure(
-                    component=self._role2dyn(pc.sender_role),
+                    component=self._role2dyn(proj.name, pc.sender_role),
                     port=pc.send_port)
                 for pc in proj.event_port_connections
                 if 'pre' == pc.receiver_role)
         dyn = MultiDynamics(
             name=population.name + 'Dynamics',
-            sub_dynamics=sub_dynamics, port_connections=port_connections,
+            sub_components=sub_dynamics, port_connections=port_connections,
             port_exposures=port_exposures)
         return DynamicsArray(population.name, population.size, dyn)
 
