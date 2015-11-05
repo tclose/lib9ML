@@ -599,12 +599,14 @@ class MultiDynamics(Dynamics):
     def constants(self):
         # We need to insert a 0-valued constant for each internal reduce port
         # that doesn't receive any connections
-        unused_reduce_ports = chain(*(
-            (Constant(append_namespace(p.name, sc.name), 0.0,
-                      p.dimension.origin.units)
-             for p in sc.analog_reduce_ports
-             if (sc.name, p.name) not in self._analog_port_connections)
-            for sc in self.sub_components))
+        unused_reduce_ports = []
+        for sub_comp in self.sub_components:
+            for port in sub_comp.analog_reduce_ports:
+                if (sub_comp.name,
+                        port.name) not in self._analog_port_connections:
+                    unused_reduce_ports.append(
+                        Constant(append_namespace(port.name, sub_comp.name),
+                                 0.0, port.dimension.origin.units))
         return chain(unused_reduce_ports,
                      *[sc.constants for sc in self.sub_components])
 
@@ -716,7 +718,7 @@ class MultiDynamics(Dynamics):
         except NineMLNameError:
             try:
                 reduce_port = sub_component.analog_reduce_port(port_name)
-                if (port_name, comp_name) not in self._analog_port_connections:
+                if (comp_name, port_name) not in self._analog_port_connections:
                     return Constant(name, 0.0,
                                     reduce_port.dimension.origin.units)
                 else:

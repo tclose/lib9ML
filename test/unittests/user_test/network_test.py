@@ -384,7 +384,10 @@ class TestNetwork(unittest.TestCase):
                     ('Proj3_psr', 'spike')]))
 
         dyn_array3 = DynamicsArray(
-            "Pop3", pop3.size, cell1_cls)
+            "Pop3", pop3.size, MultiDynamics(
+                'Pop3Dynamics',
+                sub_components={'cell': cell1_cls},
+                port_exposures=[('cell', 'spike')]))
 
         # =====================================================================
         # Test equality between network automatically generated dynamics arrays
