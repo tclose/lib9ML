@@ -30,6 +30,8 @@ class EventPortsDynamicsValidator(BaseDynamicsValidator):
         self.output_events = []
         self.input_events = []
 
+
+        list(next(component_class.regimes).on_events)
         self.visit(component_class)
 
         # Check that each output event has a corresponding event_port with a
@@ -49,20 +51,18 @@ class EventPortsDynamicsValidator(BaseDynamicsValidator):
                     .format(input_event))
 
         # Check that each EventSendPort emits at least one output event
-        for event_ports in self.event_send_ports:
-            for port_name in event_ports.keys():
-                if port_name not in self.output_events:
-                    raise NineMLRuntimeError(
-                        "Unable to find events generated for '{}'"
-                        .format(port_name))
+        for port_name in self.event_send_ports.keys():
+            if port_name not in self.output_events:
+                raise NineMLRuntimeError(
+                    "Unable to find events generated for '{}' in '{}'"
+                    .format(port_name, component_class.name))
 
         # Check that each Event port emits/recieves at least one
-        for event_ports in self.event_receive_ports:
-            for port_name in event_ports.keys():
-                if port_name not in self.input_events:
-                    raise NineMLRuntimeError(
-                        "Unable to find event transitions triggered by '{}'"
-                        .format(port_name))
+        for port_name in self.event_receive_ports.keys():
+            if port_name not in self.input_events:
+                raise NineMLRuntimeError(
+                    "Unable to find event transitions triggered by '{}' in "
+                    "'{}'".format(port_name, component_class.name))
 
     def action_eventsendport(self, port, **kwargs):  # @UnusedVariable @IgnorePep8
         assert port.name not in self.event_send_ports

@@ -866,7 +866,7 @@ class _MultiRegime(Regime):
         for port_exposure in self._parent.event_receive_ports:
             exposed_on_events = [
                 oe for oe in self._all_sub_on_events
-                if oe.src_port_name is port_exposure.local_port_name]
+                if oe.src_port_name == port_exposure.local_port_name]
             if exposed_on_events:
                 list_of_args.append((port_exposure, exposed_on_events))
         return (_MultiOnEvent(pe, oes, self) for pe, oes in list_of_args)
