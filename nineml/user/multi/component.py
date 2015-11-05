@@ -449,8 +449,8 @@ class MultiDynamics(Dynamics):
         'EventReceivePortExposure': 'event_receive_port'}
     core_type = Dynamics
 
-    def __init__(self, name, sub_components, port_connections,
-                 port_exposures=None, document=None, validate_dimensions=True):
+    def __init__(self, name, sub_components, port_connections=[],
+                 port_exposures=[], document=None, validate_dimensions=True):
         ensure_valid_identifier(name)
         self._name = name
         BaseALObject.__init__(self)
@@ -475,27 +475,26 @@ class MultiDynamics(Dynamics):
         # =====================================================================
         # Save port exposurs into separate member dictionaries
         # =====================================================================
-        if port_exposures is not None:
-            for exposure in port_exposures:
-                if isinstance(exposure, tuple):
-                    exposure = _BasePortExposure.from_tuple(exposure, self)
-                exposure.bind(self)
-                if isinstance(exposure, AnalogSendPortExposure):
-                    self._analog_send_ports[exposure.name] = exposure
-                elif isinstance(exposure, AnalogReceivePortExposure):
-                    self._analog_receive_ports[
-                        exposure.name] = exposure
-                elif isinstance(exposure, AnalogReducePortExposure):
-                    self._analog_reduce_ports[
-                        exposure.name] = exposure
-                elif isinstance(exposure, EventSendPortExposure):
-                    self._event_send_ports[exposure.name] = exposure
-                elif isinstance(exposure, EventReceivePortExposure):
-                    self._event_receive_ports[
-                        exposure.name] = exposure
-                else:
-                    raise NineMLRuntimeError(
-                        "Unrecognised port exposure '{}'".format(exposure))
+        for exposure in port_exposures:
+            if isinstance(exposure, tuple):
+                exposure = _BasePortExposure.from_tuple(exposure, self)
+            exposure.bind(self)
+            if isinstance(exposure, AnalogSendPortExposure):
+                self._analog_send_ports[exposure.name] = exposure
+            elif isinstance(exposure, AnalogReceivePortExposure):
+                self._analog_receive_ports[
+                    exposure.name] = exposure
+            elif isinstance(exposure, AnalogReducePortExposure):
+                self._analog_reduce_ports[
+                    exposure.name] = exposure
+            elif isinstance(exposure, EventSendPortExposure):
+                self._event_send_ports[exposure.name] = exposure
+            elif isinstance(exposure, EventReceivePortExposure):
+                self._event_receive_ports[
+                    exposure.name] = exposure
+            else:
+                raise NineMLRuntimeError(
+                    "Unrecognised port exposure '{}'".format(exposure))
         # =====================================================================
         # Set port connections
         # =====================================================================
