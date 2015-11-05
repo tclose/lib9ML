@@ -529,7 +529,7 @@ class MultiDynamics(Dynamics):
                         .format(port_connection.receive_port_name,
                                 port_connection.receiver_name, name))
                 self._analog_port_connections[
-                    rcv_key][snd_key] = port_connection                    
+                    rcv_key][snd_key] = port_connection
         self.annotations[nineml_ns][VALIDATE_DIMENSIONS] = validate_dimensions
         self.validate()
 

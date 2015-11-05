@@ -357,6 +357,7 @@ class TestNetwork(unittest.TestCase):
                     ('Proj3_psr', 'i', 'cell', 'i_ext'),
                     ('Proj3_pls', 'wsyn_current', 'Proj3_psr', 'weight')],
                 port_exposures=[
+                    ('cell', 'spike'),
                     ('Proj2_psr', 'spike'),
                     ('Proj3_psr', 'spike')]))
 
@@ -374,6 +375,7 @@ class TestNetwork(unittest.TestCase):
                     ('Proj4_psr', 'i', 'cell', 'i_ext'),
                     ('Proj4_pls', 'fixed_weight', 'Proj4_psr', 'weight')],
                 port_exposures=[
+                    ('cell', 'spike'),
                     ('Proj1_psr', 'spike'),
                     ('Proj4_psr', 'spike')]))
 
