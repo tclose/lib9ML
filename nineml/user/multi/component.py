@@ -498,8 +498,6 @@ class MultiDynamics(Dynamics):
         # =====================================================================
         # Set port connections
         # =====================================================================
-        # Insert an empty list for each event and reduce port in the combined
-        # model
         # Parse port connections (from tuples if required), bind them to the
         # ports within the subcomponents and append them to their respective
         # member dictionaries
@@ -592,7 +590,8 @@ class MultiDynamics(Dynamics):
             (p.alias for p in self.analog_receive_ports),
             (p.alias for p in self.analog_reduce_ports),
             (_LocalAnalogPortConnections(
-                rcv[1], rcv[0], snd_dct.values(), self)
+                receive_port=rcv[1], receiver=rcv[0],
+                port_connections=snd_dct.values(), parent=self)
              for rcv, snd_dct in self._analog_port_connections.iteritems()),
             *[sc.aliases for sc in self.sub_components])
 

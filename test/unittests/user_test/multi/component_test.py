@@ -254,7 +254,7 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
             name='TestDyn',
             regimes=[
                 Regime(
-                    'dSV1/dt = -SV1/(P1*t) + ADP1', name='r1')],
+                    'dSV1/dt = -P1/t + ADP1', name='r1')],
             analog_ports=[AnalogReducePort('ADP1', un.per_time)],
             parameters=['P1']
         )

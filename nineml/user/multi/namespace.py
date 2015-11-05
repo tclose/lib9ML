@@ -124,7 +124,7 @@ class _NamespaceNamed(_NamespaceObject):
 
     @property
     def _name(self):
-        return self.name
+        return self.sub_component.append_namespace(self._object._name)
 
     @property
     def relative_name(self):
