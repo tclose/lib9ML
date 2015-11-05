@@ -23,7 +23,7 @@ from nineml.annotations import VALIDATE_DIMENSIONS
 from nineml.abstraction import (
     Dynamics, Regime, AnalogReceivePort, EventReceivePort,
     StateVariable, OnEvent, OnCondition, OutputEvent, StateAssignment,
-    Trigger)
+    Trigger, Constant)
 from .port_exposures import (
     EventReceivePortExposure, EventSendPortExposure, AnalogReducePortExposure,
     AnalogReceivePortExposure, AnalogSendPortExposure, _BasePortExposure,
@@ -597,7 +597,16 @@ class MultiDynamics(Dynamics):
 
     @property
     def constants(self):
-        return chain(*[sc.constants for sc in self.sub_components])
+        # We need to insert a 0-valued constant for each internal reduce port
+        # that doesn't receive any connections
+        unused_reduce_ports = chain(*(
+            (Constant(append_namespace(p.name, sc.name), 0.0,
+                      p.dimension.origin.units)
+             for p in sc.analog_reduce_ports
+             if (sc.name, p.name) not in self._analog_port_connections)
+            for sc in self.sub_components))
+        return chain(unused_reduce_ports,
+                     *[sc.constants for sc in self.sub_components])
 
     @property
     def state_variables(self):
@@ -700,8 +709,25 @@ class MultiDynamics(Dynamics):
         return alias
 
     def constant(self, name):
-        _, comp_name = split_namespace(name)
-        return self.sub_component(comp_name).constant(name)
+        port_name, comp_name = split_namespace(name)
+        sub_component = self.sub_component(comp_name)
+        try:
+            return sub_component.constant(name)
+        except NineMLNameError:
+            try:
+                reduce_port = sub_component.analog_reduce_port(port_name)
+                if (port_name, comp_name) not in self._analog_port_connections:
+                    return Constant(name, 0.0,
+                                    reduce_port.dimension.origin.units)
+                else:
+                    raise NineMLNameError(
+                        "'{}' corresponds to a AnalogReduce port, but one that"
+                        "is used and so is represented by an Alias instead of"
+                        "a Constant in '{}'".format(port_name, comp_name))
+            except NineMLNameError:
+                raise NineMLNameError(
+                    "Could not find Constant '{}' in '{}"
+                    .format(name, self.name))
 
     def regime(self, name):
         try:

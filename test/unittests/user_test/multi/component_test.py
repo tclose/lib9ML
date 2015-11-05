@@ -8,7 +8,7 @@ from nineml.user.multi.component import (
     AnalogReceivePortExposure)
 from nineml.abstraction import (
     Dynamics, Regime, AnalogReceivePort, AnalogReducePort, OutputEvent,
-    AnalogSendPort, On, StateAssignment)
+    AnalogSendPort, On, StateAssignment, Constant)
 from nineml.user.port_connections import AnalogPortConnection
 from nineml.user.component import DynamicsProperties
 from nineml.exceptions import NineMLRuntimeError
@@ -248,8 +248,11 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         self.assertEqual(set(e.state_variable_names),
                          set(['SV1__a', 'SV1__b']))
 
-    def test_reduce_ports(self):
-
+    def test_unused_reduce_ports(self):
+        """
+        Tests whether empty reduce ports are "closed" by inserting a zero-
+        valued constant in their stead
+        """
         test_dyn = Dynamics(
             name='TestDyn',
             regimes=[
@@ -261,9 +264,12 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
 
         test_multi = MultiDynamics(
             name="TestMultiDyn",
-            sub_components={'a': test_dyn})
+            sub_components={'cell': test_dyn})
 
-        self.assert_('ADP1__cell' in test_multi.alias_names)
+        self.assert_(Constant('ADP1__cell', 0.0, un.per_time.origin.units)
+                     in test_multi.constants,
+                     "Zero-valued constant wasn't inserted for unused reduce "
+                     "port")
 
 #     def test_Flattening2(self):
 #         c = Dynamics(
