@@ -30,8 +30,7 @@ class EventPortsDynamicsValidator(BaseDynamicsValidator):
         self.output_events = []
         self.input_events = []
 
-
-        list(next(component_class.regimes).on_events)
+        # Visit all elements of the component class
         self.visit(component_class)
 
         # Check that each output event has a corresponding event_port with a
