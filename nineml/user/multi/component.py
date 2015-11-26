@@ -40,15 +40,15 @@ class MultiDynamicsProperties(DynamicsProperties):
     nineml_type = "MultiDynamicsProperties"
     defining_attributes = ('_name', 'component_class')
 
-    def __init__(self, name, sub_dynamics_properties, port_connections,
+    def __init__(self, name, sub_components, port_connections=[],
                  port_exposures=[]):
-        if isinstance(sub_dynamics_properties, dict):
+        if isinstance(sub_components, dict):
             sub_dynamics = [
                 SubDynamics(n, sc.component_class)
-                for n, sc in sub_dynamics_properties.iteritems()]
+                for n, sc in sub_components.iteritems()]
             sub_dynamics_properties = [
                 SubDynamicsProperties(n, p)
-                for n, p in sub_dynamics_properties.iteritems()]
+                for n, p in sub_components.iteritems()]
         else:
             sub_dynamics = [
                 SubDynamics(sc.name, sc.component.component_class)
@@ -778,6 +778,10 @@ class MultiDynamics(Dynamics):
     @property
     def num_constants(self):
         return len(list(self.constants))
+
+    @property
+    def num_regimes(self):
+        return len(list(self.regimes))
 
     @property
     def num_state_variables(self):
