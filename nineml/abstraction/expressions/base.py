@@ -36,7 +36,7 @@ class Expression(object):
     defining_attributes = ('rhs',)
 
     # Regular expression for extracting function names from strings (i.e. a
-    # chain of valid identifiers follwed by an open parenthesis.
+    # chain of valid identifiers followed by an open parenthesis.
     _func_re = re.compile(r'([\w\.]+) *\(')  # Match identifier followed by (
     _strip_parens_re = re.compile(r'^\(+(\w+)\)+$')  # Match if enclosed by ()
     _random_map = dict((str(v), Parser.unescape_random_namespace(k))
