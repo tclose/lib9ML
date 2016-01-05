@@ -41,7 +41,11 @@ class Expression(object):
     _strip_parens_re = re.compile(r'^\(+(\w+)\)+$')  # Match if enclosed by ()
     _random_map = dict((str(v), Parser.unescape_random_namespace(k))
                        for k, v in Parser.inline_randoms_dict.iteritems())
-    _cfunc_map = dict([(str(v), Parser.unescape_random_namespace(k))
+    # The inline randoms are not actually unescaped back to their "random.*"
+    # format, and are instead retained in their escaped format "random_*_",
+    # but this needs to be included into the cfunc_map to avoid
+    # "//Not Supported in C being prepended to the c string
+    _cfunc_map = dict([(str(v), str(v))
                        for k, v in Parser.inline_randoms_dict.iteritems()] +
                       [('abs', 'fabs')])
     _rationals_re = re.compile(r'(?<!\w)([\d\.]+)\L/(?<!\w)([\d\.]+)L')
