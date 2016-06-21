@@ -30,8 +30,9 @@ from .port_exposures import (
 from .namespace import (
     _NamespaceAlias, _NamespaceRegime, _NamespaceStateVariable,
     _NamespaceConstant, _NamespaceParameter, _NamespaceProperty,
-    _NamespaceOnCondition, append_namespace, split_namespace, make_regime_name,
-    make_delay_trigger_name, split_multi_regime_name)
+    _NamespaceOnCondition, append_namespace, split_namespace,
+    triple_underscore_re, make_delay_trigger_name, multiple_underscore_re,
+    more_than_double_underscore_re)
 
 
 class MultiDynamicsProperties(DynamicsProperties):
@@ -838,7 +839,7 @@ class MultiDynamics(Dynamics):
 
     def regime(self, name):
         try:
-            sub_regime_names = split_multi_regime_name(name)
+            sub_regime_names = self._split_multi_regime_name(name)
         except TypeError:
             sub_regime_names = name  # Assume it is already an iterable
         if len(sub_regime_names) != len(self._sub_component_keys):
@@ -925,6 +926,47 @@ class MultiDynamics(Dynamics):
             ((pc.receiver_name, pc.receive_port)
              for pc in self.analog_port_connections))
 
+    def _make_multi_regime_name(self, sub_regimes_dict):
+        """
+        Construct a name for a multi-component regime omitting any components
+        with only one regime
+        """
+        joined_names = '___'.join(
+            multiple_underscore_re.sub(
+                r'\1__', sub_regimes_dict[sc].relative_name)
+            for sc in sorted(sub_regimes_dict)
+            if self.sub_component(sc).num_regimes > 1)
+        if joined_names:
+            regime_name = joined_names + '___regime'
+        else:
+            regime_name = 'only_regime'
+        return regime_name
+
+    def _split_multi_regime_name(self, name):
+        """
+        Split a multi-component regime name into the separate component regime
+        names
+        """
+        if name == 'only_regime':
+            parts = []
+        else:
+            parts = triple_underscore_re.split(name)
+            if not parts or parts.pop() != 'regime':
+                raise NineMLNameError(
+                    "'{}' is not a multi-regime name, it must contain at least"
+                    " one '___' separator and end with 'regime'".format(name))
+        regime_names = []
+        for sc_name in sorted(self.sub_component_names):
+            if self.sub_component(sc_name).num_regimes == 1:
+                regime_names.append(
+                    next(self.sub_component(sc_name).regime_names))
+            else:
+                regime_names.append(
+                    more_than_double_underscore_re.sub(r'\1', parts.pop(0)))
+        assert len(parts) == 0, ("Not all parts in multi-regime '{}' name were"
+                                 " used ({})".format(sc_name, parts))
+        return regime_names
+
 # =============================================================================
 # _Namespace wrapper objects, which append namespaces to their names and
 # expressions
@@ -977,7 +1019,7 @@ class _MultiRegime(Regime):
 
     @property
     def _name(self):
-        return make_regime_name(self._sub_regimes)
+        return self._parent._make_multi_regime_name(self._sub_regimes)
 
     def lookup_member_dict(self, element):
         """
@@ -1180,7 +1222,7 @@ class _MultiTransition(BaseALObject, ContainerObject):
         sub_regime_names = copy(self._parent._sub_regimes)
         sub_regime_names.update(
             (k, t.target_regime) for k, t in self._sub_transitions.iteritems())
-        return make_regime_name(sub_regime_names)
+        return self._parent._parent._make_multi_regime_name(sub_regime_names)
 
     @property
     def sub_transitions(self):

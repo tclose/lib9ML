@@ -1,8 +1,8 @@
 import unittest
 import collections
 from nineml.user.multi.namespace import (
-    append_namespace, split_namespace, make_delay_trigger_name, 
-    split_delay_trigger_name, make_regime_name, split_multi_regime_name)
+    append_namespace, split_namespace, make_delay_trigger_name,
+    split_delay_trigger_name)
 
 
 DummyRegime = collections.namedtuple('DummyNamespaceRegime',
@@ -46,48 +46,6 @@ class TestConcatenationFunctions(unittest.TestCase):
                           ('a__x', 'b___x'))
         self.assertEqual(split_namespace(append_namespace('a__x', 'b____x')),
                           ('a__x', 'b____x'))
-
-    def test_make_regime_name(self):
-        self.assertEqual(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2')}),
-            'R1___R2')
-        self.assertEqual(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2'),
-             'c': DummyRegime('R3')}),
-            'R1___R2___R3')
-        self.assertEqual(make_regime_name(
-            {'a': DummyRegime('R1_x'), 'b': DummyRegime('R2'),
-             'c': DummyRegime('R3_x')}),
-            'R1_x___R2___R3_x')
-        self.assertEqual(make_regime_name(
-            {'a': DummyRegime('R1__x'), 'b': DummyRegime('R2__x'),
-             'c': DummyRegime('R3')}),
-            'R1____x___R2____x___R3')
-        self.assertEqual(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2___x'),
-             'c': DummyRegime('R3')}),
-            'R1___R2_____x___R3')
-
-    def test_split_multi_regime_name(self):
-        self.assertEqual(split_multi_regime_name(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2')})),
-            ('R1', 'R2'))
-        self.assertEqual(split_multi_regime_name(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2'),
-             'c': DummyRegime('R3')})),
-            ('R1', 'R2', 'R3'))
-        self.assertEqual(split_multi_regime_name(make_regime_name(
-            {'a': DummyRegime('R1_x'), 'b': DummyRegime('R2'),
-             'c': DummyRegime('R3_x')})),
-            ('R1_x', 'R2', 'R3_x'))
-        self.assertEqual(split_multi_regime_name(make_regime_name(
-            {'a': DummyRegime('R1__x'), 'b': DummyRegime('R2__x'),
-             'c': DummyRegime('R3')})),
-            ('R1__x', 'R2__x', 'R3'))
-        self.assertEqual(split_multi_regime_name(make_regime_name(
-            {'a': DummyRegime('R1'), 'b': DummyRegime('R2___x'),
-             'c': DummyRegime('R3')})),
-            ('R1', 'R2___x', 'R3'))
 
     def test_make_delay_trigger_name(self):
         self.assertEqual(make_delay_trigger_name(

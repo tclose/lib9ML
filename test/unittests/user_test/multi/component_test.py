@@ -172,12 +172,14 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
                          un.dimensionless)
         # - Regimes and Transitions:
         self.assertEqual(set(e.regime_names),
-                         set(['r1___r1', 'r1___r2',
-                              'r2___r1', 'r2___r2']))
+                         set(['r1___r1___regime',
+                              'r1___r2___regime',
+                              'r2___r1___regime',
+                              'r2___r2___regime']))
         # =====================================================================
         # Regime a=1, b=2
         # =====================================================================
-        r11 = e.regime('r1___r1')
+        r11 = e.regime('r1___r1___regime')
         self.assertEqual(r11.num_on_conditions, 2)
         self.assertEqual(r11.num_on_events, 1)
         oe1 = r11.on_event('ERP1')
@@ -202,7 +204,7 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         # =====================================================================
         # Regime a=1, b=2
         # =====================================================================
-        r12 = e.regime('r1___r2')
+        r12 = e.regime('r1___r2___regime')
         self.assertEqual(r12.num_on_conditions, 2)
         oc1 = r12.on_condition('SV1__a > cp1__a')
         self.assertEqual(set(oc1.output_event_port_names), set(('ESP1',)))
@@ -216,7 +218,7 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         # =====================================================================
         # Regime a=2, b=1
         # =====================================================================
-        r21 = e.regime('r2___r1')
+        r21 = e.regime('r2___r1___regime')
         self.assertEqual(r21.num_on_conditions, 2)
         oc1 = r21.on_condition('SV1__a > 1')
         self.assertEqual(oc1.num_output_events, 0)
@@ -230,7 +232,7 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
         # =====================================================================
         # Regime a=2, b=2
         # =====================================================================
-        r22 = e.regime('r2___r2')
+        r22 = e.regime('r2___r2___regime')
         self.assertEqual(r21.num_on_conditions, 2)
         oc1 = r22.on_condition('SV1__a > 1')
         self.assertEqual(oc1.num_output_events, 0)
@@ -270,6 +272,51 @@ class MultiDynamicsFlattening_test(unittest.TestCase):
                      in test_multi.constants,
                      "Zero-valued constant wasn't inserted for unused reduce "
                      "port")
+
+
+class MultiDynamicsRegimeNameTest(unittest.TestCase):
+
+    def test_make_regime_name(self):
+        self.assertEqual(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2')}),
+            'R1___R2')
+        self.assertEqual(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2'),
+             'c': DummyRegime('R3')}),
+            'R1___R2___R3')
+        self.assertEqual(make_regime_name(
+            {'a': DummyRegime('R1_x'), 'b': DummyRegime('R2'),
+             'c': DummyRegime('R3_x')}),
+            'R1_x___R2___R3_x')
+        self.assertEqual(make_regime_name(
+            {'a': DummyRegime('R1__x'), 'b': DummyRegime('R2__x'),
+             'c': DummyRegime('R3')}),
+            'R1____x___R2____x___R3')
+        self.assertEqual(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2___x'),
+             'c': DummyRegime('R3')}),
+            'R1___R2_____x___R3')
+
+    def test_split_multi_regime_name(self):
+        self.assertEqual(split_multi_regime_name(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2')})),
+            ('R1', 'R2'))
+        self.assertEqual(split_multi_regime_name(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2'),
+             'c': DummyRegime('R3')})),
+            ('R1', 'R2', 'R3'))
+        self.assertEqual(split_multi_regime_name(make_regime_name(
+            {'a': DummyRegime('R1_x'), 'b': DummyRegime('R2'),
+             'c': DummyRegime('R3_x')})),
+            ('R1_x', 'R2', 'R3_x'))
+        self.assertEqual(split_multi_regime_name(make_regime_name(
+            {'a': DummyRegime('R1__x'), 'b': DummyRegime('R2__x'),
+             'c': DummyRegime('R3')})),
+            ('R1__x', 'R2__x', 'R3'))
+        self.assertEqual(split_multi_regime_name(make_regime_name(
+            {'a': DummyRegime('R1'), 'b': DummyRegime('R2___x'),
+             'c': DummyRegime('R3')})),
+            ('R1', 'R2___x', 'R3'))
 
 #     def test_Flattening2(self):
 #         c = Dynamics(

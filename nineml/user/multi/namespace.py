@@ -79,20 +79,6 @@ def split_delay_trigger_name(name):
                  for p in (sender, send_port, receiver, receive_port))
 
 
-def make_regime_name(sub_regimes_dict):
-    sorted_keys = sorted(sub_regimes_dict.iterkeys())
-    return '___'.join(
-        multiple_underscore_re.sub(r'\1__', sub_regimes_dict[k].relative_name)
-        for k in sorted_keys)
-
-
-def split_multi_regime_name(name):
-    parts = triple_underscore_re.split(name)
-    if not parts:
-        raise NineMLNameError("'{}' is not a multi-regime name".format(name))
-    return tuple(more_than_double_underscore_re.sub(r'\1', p) for p in parts)
-
-
 class _NamespaceObject(object):
 
     def __init__(self, sub_component, element, parent=None):
