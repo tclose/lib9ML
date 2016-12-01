@@ -60,7 +60,7 @@ class BaseReference(AnnotatedNineMLObject):
                     .format(self.__class__.__name__, self._referred_to.name,
                             ' in "{}"'.format(self.url) if self.url else ''))
 
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         name = self._referred_to.name
         if E._namespace == NINEMLv1:
             attrs = {}
@@ -76,7 +76,7 @@ class BaseReference(AnnotatedNineMLObject):
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         xmlns = extract_xmlns(element.tag)
         if xmlns == NINEMLv1:
             name = element.text
@@ -121,19 +121,19 @@ class Reference(BaseReference):
         return copy(self)
 
 
-def resolve_reference(from_xml):
-    def resolving_from_xml(cls, element, document, **kwargs):  # @UnusedVariable @IgnorePep8
+def resolve_reference(unserialize):
+    def resolving_unserialize(cls, element, document, **kwargs):  # @UnusedVariable @IgnorePep8
         if element.tag in (ns + Reference.nineml_type for ns in ALL_NINEML):
-            reference = Reference.from_xml(element, document)
+            reference = Reference.unserialize(element, document)
             obj = reference.user_object
         else:
-            obj = from_xml(cls, element, document)
+            obj = unserialize(cls, element, document)
         return obj
-    return resolving_from_xml
+    return resolving_unserialize
 
 
-def write_reference(to_xml):
-    def unresolving_to_xml(self, document, as_ref=None, absolute_refs=False,
+def write_reference(serialize):
+    def unresolving_serialize(self, document, as_ref=None, absolute_refs=False,
                            prefer_refs=None, **kwargs):
         # Determine whether to write the elemnt as a reference or not depending
         # on whether it needs to be, as determined by `as_ref`, e.g. in the
@@ -185,17 +185,17 @@ def write_reference(to_xml):
                 if not url.startswith('.'):
                     url = './' + url
             # Write the element as a reference
-            xml = Reference(self.name, document, url=url).to_xml(
+            xml = Reference(self.name, document, url=url).serialize(
                 document, **kwargs)
         else:
             # Write the element inline. NB: This will effectively duplicate the
             # object in the saved xml if it is referred to in multiple places.
             # To avoid this from happening it is safer to avoid inline
             # definitions by setting the `prefer_refs` kwarg.
-            xml = to_xml(self, document, absolute_refs=absolute_refs,
+            xml = serialize(self, document, absolute_refs=absolute_refs,
                          prefer_refs=prefer_refs, **kwargs)
         return xml
-    return unresolving_to_xml
+    return unresolving_serialize
 
 
 from .document import read  # @IgnorePep8

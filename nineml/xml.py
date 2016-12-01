@@ -66,7 +66,7 @@ def from_child_xml(element, child_classes, document, multiple=False,
                    allowed_attrib=[], **kwargs):
     """
     Loads a child element from the element, matching the tag name to the
-    appropriate class and calling its 'from_xml' method
+    appropriate class and calling its 'unserialize' method
     """
     # Ensure child_classes is an iterable
     if isinstance(child_classes, type):
@@ -124,14 +124,14 @@ def from_child_xml(element, child_classes, document, multiple=False,
             else:
                 tag_name = child_cls.nineml_type
             for child_elem in parent.findall(xmlns + tag_name):
-                children.append(child_cls.from_xml(child_elem, document,
+                children.append(child_cls.unserialize(child_elem, document,
                                                    **kwargs))
                 if unprocessed and not within:
                     unprocessed[0].discard(child_elem)
     if allow_reference:
         for ref_elem in parent.findall(
                 xmlns + nineml.reference.Reference.nineml_type):
-            ref = nineml.reference.Reference.from_xml(ref_elem, document,
+            ref = nineml.reference.Reference.unserialize(ref_elem, document,
                                                       **kwargs)
             if isinstance(ref.user_object, child_classes):
                 children.append(ref.user_object)
@@ -244,8 +244,8 @@ def identify_element(element):
     return "'{}' {}".format(name, identity)
 
 
-def unprocessed_xml(from_xml):
-    def from_xml_with_exception_handling(cls, element, *args, **kwargs):  # @UnusedVariable @IgnorePep8
+def unprocessed_xml(unserialize):
+    def unserialize_with_exception_handling(cls, element, *args, **kwargs):  # @UnusedVariable @IgnorePep8
         # Get the document object for error messages
         if args or 'document' in kwargs:  # if UL classmethod
             if args:
@@ -275,7 +275,7 @@ def unprocessed_xml(from_xml):
                            if not isinstance(e, etree._Comment)),
                        set(element.attrib.iterkeys()))
         # The decorated method
-        obj = from_xml(cls, element, *args, unprocessed=unprocessed,
+        obj = unserialize(cls, element, *args, unprocessed=unprocessed,
                        **kwargs)
         # Check to see if there were blocks that were unprocessed in the
         # element
@@ -295,4 +295,4 @@ def unprocessed_xml(from_xml):
                         remaining="', '".join(attrs),
                         elem_name=identify_element(element), url=document.url))
         return obj
-    return from_xml_with_exception_handling
+    return unserialize_with_exception_handling

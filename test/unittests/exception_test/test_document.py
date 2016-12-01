@@ -135,7 +135,7 @@ class TestDocumentExceptions(unittest.TestCase):
             doc1.__getitem__,
             name='ZZ')
 
-    def test__load_elem_from_xml_ninemlruntimeerror(self):
+    def test__load_elem_unserialize_ninemlruntimeerror(self):
         """
         line #: 217
         message: Circular reference detected in '{}(name={})' element.
@@ -151,7 +151,7 @@ class TestDocumentExceptions(unittest.TestCase):
         document = Document.load(xml)
         self.assertRaises(
             NineMLRuntimeError,
-            document._load_elem_from_xml,
+            document._load_elem_unserialize,
             unloaded=super(Document, document).__getitem__('A'))
 
     def test_standardize_units_ninemlruntimeerror(self):
@@ -200,7 +200,7 @@ class TestDocumentExceptions(unittest.TestCase):
             NineMLRuntimeError,
             document.standardize_units)
 
-    def test_from_xml_ninemlxmlerror(self):
+    def test_unserialize_ninemlxmlerror(self):
         """
         line #: 312
         message: Unrecognised XML namespace '{}', can be one of '{}'
@@ -208,20 +208,20 @@ class TestDocumentExceptions(unittest.TestCase):
         bad_E = ElementMaker(namespace='http://bad_namespace.net')
         self.assertRaises(
             NineMLXMLError,
-            Document.from_xml,
+            Document.unserialize,
             element=bad_E.AnElement())
 
-    def test_from_xml_ninemlxmlerror2(self):
+    def test_unserialize_ninemlxmlerror2(self):
         """
         line #: 317
         message: '{}' document does not have a NineML root ('{}')
         """
         self.assertRaises(
             NineMLXMLError,
-            Document.from_xml,
+            Document.unserialize,
             element=Ev2.BadRoot())
 
-    def test_from_xml_ninemlruntimeerror(self):
+    def test_unserialize_ninemlruntimeerror(self):
         """
         line #: 340
         message: '{}' element does not correspond to a recognised
@@ -229,20 +229,20 @@ class TestDocumentExceptions(unittest.TestCase):
         """
         self.assertRaises(
             NineMLRuntimeError,
-            Document.from_xml,
+            Document.unserialize,
             element=Ev2(Trigger.nineml_type, 'a > b'))
 
-    def test_from_xml_ninemlxmlerror3(self):
+    def test_unserialize_ninemlxmlerror3(self):
         """
         line #: 350
         message: Did not find matching NineML class for '{}' element
         """
         self.assertRaises(
             NineMLXMLError,
-            Document.from_xml,
+            Document.unserialize,
             element=Ev2.BadElement())
 
-    def test_from_xml_notimplementederror(self):
+    def test_unserialize_notimplementederror(self):
         """
         line #: 358
         message: Cannot load '{}' element (extensions not implemented)
@@ -252,10 +252,10 @@ class TestDocumentExceptions(unittest.TestCase):
                       unrecogised_E.UnrecognisedExtension())
         self.assertRaises(
             NotImplementedError,
-            Document.from_xml,
+            Document.unserialize,
             element=element)
 
-    def test_from_xml_ninemlxmlerror5(self):
+    def test_unserialize_ninemlxmlerror5(self):
         """
         line #: 369
         message: Missing 'name' (or 'symbol') attribute from document level
@@ -265,10 +265,10 @@ class TestDocumentExceptions(unittest.TestCase):
                    Ev2(Dynamics.nineml_type))
         self.assertRaises(
             NineMLXMLError,
-            Document.from_xml,
+            Document.unserialize,
             element=elem)
 
-    def test_from_xml_ninemlxmlerror6(self):
+    def test_unserialize_ninemlxmlerror6(self):
         """
         line #: 373
         message: Duplicate identifier '{ob1}:{name}'in NineML file '{url}'
@@ -280,7 +280,7 @@ class TestDocumentExceptions(unittest.TestCase):
                       name='A'))
         self.assertRaises(
             NineMLXMLError,
-            Document.from_xml,
+            Document.unserialize,
             element=xml)
 
     def test_write_ninemlruntimeerror(self):
@@ -316,7 +316,7 @@ class TestDocumentExceptions(unittest.TestCase):
                 parameters=[
                     Parameter('P1', dimension=un.Dimension(name='D', t=1))],
                 regime=Regime(name='default'),
-                aliases=['A1 := P1 * 2'])).to_xml()
+                aliases=['A1 := P1 * 2'])).serialize()
         tmp_dir = tempfile.mkdtemp()
         url = os.path.join(tmp_dir, 'a_url.xml')
         doc1.write(url)

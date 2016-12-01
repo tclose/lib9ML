@@ -7,14 +7,14 @@ from nineml.exceptions import (
     NineMLXMLError, NineMLRuntimeError, NineMLNameError)
 
 
-def read_annotations(from_xml):
-    def annotate_from_xml(cls, element, *args, **kwargs):
+def read_annotations(unserialize):
+    def read_annotations_from_unserialize(cls, element, *args, **kwargs):
         nineml_xmlns = extract_xmlns(element.tag)
         annot_elem = expect_none_or_single(
             element.findall(nineml_xmlns + Annotations.nineml_type))
         if annot_elem is not None:
             # Extract the annotations
-            annotations = Annotations.from_xml(annot_elem, **kwargs)
+            annotations = Annotations.unserialize(annot_elem, **kwargs)
             # Get a copy of the element with the annotations stripped
             element = copy(element)
             element.remove(element.find(nineml_xmlns +
@@ -31,14 +31,14 @@ def read_annotations(from_xml):
             except KeyError:
                 valid_dims = True
             kwargs['validate_dimensions'] = valid_dims
-        nineml_object = from_xml(cls, element, *args, **kwargs)
+        nineml_object = unserialize(cls, element, *args, **kwargs)
         nineml_object._annotations = annotations
         return nineml_object
-    return annotate_from_xml
+    return read_annotations_from_unserialize
 
 
-def annotate_xml(to_xml):
-    def annotate_to_xml(self, document_or_obj, E=E, **kwargs):
+def annotate(serialize):
+    def annotate_serialize(self, document_or_obj, E=E, **kwargs):
         # If Abstraction Layer class
         if xml_visitor_module_re.match(type(self).__module__):
             obj = document_or_obj
@@ -47,11 +47,11 @@ def annotate_xml(to_xml):
         else:
             obj = self
             options = kwargs
-        elem = to_xml(self, document_or_obj, E=E, **kwargs)
+        elem = serialize(self, document_or_obj, E=E, **kwargs)
         if not options.get('no_annotations', False) and len(obj.annotations):
-            elem.append(obj.annotations.to_xml(E=E, **kwargs))
+            elem.append(obj.annotations.serialize(E=E, **kwargs))
         return elem
-    return annotate_to_xml
+    return annotate_serialize
 
 
 class Annotations(DocumentLevelObject):
@@ -101,18 +101,18 @@ class Annotations(DocumentLevelObject):
                 raise NineMLNameError(
                     "No annotation at path '{}'".format("', '".join(args)))
 
-    def to_xml(self, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, E=E, **kwargs):  # @UnusedVariable
         members = []
         for ns, annot_ns in self._namespaces.iteritems():
             if isinstance(annot_ns, _AnnotationsNamespace):
                 for branch in annot_ns.branches:
-                    members.append(branch.to_xml(ns=ns, E=E, **kwargs))
+                    members.append(branch.serialize(ns=ns, E=E, **kwargs))
             else:
                 members.append(annot_ns)  # Append unprocessed XML
         return E(self.nineml_type, *members)
 
     @classmethod
-    def from_xml(cls, element, annotations_ns=None, **kwargs):  # @UnusedVariable @IgnorePep8
+    def unserialize(cls, element, annotations_ns=None, **kwargs):  # @UnusedVariable @IgnorePep8
         if annotations_ns is None:
             annotations_ns = []
         elif isinstance(annotations_ns, basestring):
@@ -133,7 +133,7 @@ class Annotations(DocumentLevelObject):
                 except KeyError:
                     annot._namespaces[ns] = _AnnotationsNamespace(ns)
                     namespace = annot._namespaces[ns]
-                namespace[name] = _AnnotationsBranch.from_xml(child)
+                namespace[name] = _AnnotationsBranch.unserialize(child)
             else:
                 annot._namespaces[ns] = child  # Don't process, just ignore
         return annot
@@ -325,20 +325,20 @@ class _AnnotationsBranch(BaseNineMLObject):
     def __setitem__(self, key, val):
         self._attr[key] = str(val)
 
-    def to_xml(self, ns=None, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, ns=None, E=E, **kwargs):  # @UnusedVariable
         if ns is not None:
             E = ElementMaker(namespace=ns, nsmap={None: ns})
         return E(self.name,
-                 *(sb.to_xml(**kwargs) for sb in self.branches),
+                 *(sb.serialize(**kwargs) for sb in self.branches),
                  **self._attr)
 
     @classmethod
-    def from_xml(cls, element, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, **kwargs):  # @UnusedVariable
         name = strip_xmlns(element.tag)
         branches = {}
         for child in element.getchildren():
             branches[
-                strip_xmlns(child.tag)] = _AnnotationsBranch.from_xml(child)
+                strip_xmlns(child.tag)] = _AnnotationsBranch.unserialize(child)
         attr = dict(element.attrib)
         return cls(name, attr, branches)
 

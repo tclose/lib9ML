@@ -223,40 +223,40 @@ class TestExceptions(unittest.TestCase):
             unprocessed=[[]],
             document=doc1)
 
-    def test_from_xml_with_exception_handling_ninemlxmlblockerror(self):
+    def test_unserialize_with_exception_handling_ninemlxmlblockerror(self):
         """
         line #: 267
         message: Found unrecognised block{s} '{remaining}' within {elem_name}
         in '{url}'
         """
         elem = Ev2(DynamicsProperties.nineml_type,
-                   dynPropA.to_xml(doc1),
+                   dynPropA.serialize(doc1),
                    Ev2('BadBlock'),
                    *list(chain(
-                       (p.to_xml(doc1) for p in dynPropA.properties),
-                       (v.to_xml(doc1) for v in dynPropA.initial_values))),
+                       (p.serialize(doc1) for p in dynPropA.properties),
+                       (v.serialize(doc1) for v in dynPropA.initial_values))),
                    name='dynPropA2')
         self.assertRaises(
             NineMLXMLBlockError,
-            DynamicsProperties.from_xml,
+            DynamicsProperties.unserialize,
             element=elem,
             document=doc1)
 
-    def test_from_xml_with_exception_handling_ninemlxmlattributeerror(self):
+    def test_unserialize_with_exception_handling_ninemlxmlattributeerror(self):
         """
         line #: 274
         message: Found unrecognised attribute{s} '{remaining}' within
         {elem_name} in '{url}'
         """
         elem = Ev2(DynamicsProperties.nineml_type,
-                   dynPropA.to_xml(doc1),
+                   dynPropA.serialize(doc1),
                    *list(chain(
-                       (p.to_xml(doc1) for p in dynPropA.properties),
-                       (v.to_xml(doc1) for v in dynPropA.initial_values))),
+                       (p.serialize(doc1) for p in dynPropA.properties),
+                       (v.serialize(doc1) for v in dynPropA.initial_values))),
                    name='dynPropA2',
                    bad_attr='bad')
         self.assertRaises(
             NineMLXMLBlockError,
-            DynamicsProperties.from_xml,
+            DynamicsProperties.unserialize,
             element=elem,
             document=doc1)

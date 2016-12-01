@@ -148,7 +148,7 @@ class DynamicsProperties(Component, DynamicPortsObject):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
         name = get_xml_attr(element, "name", document, **kwargs)
         definition = from_child_xml(element, (Definition, Prototype), document,

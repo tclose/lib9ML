@@ -92,8 +92,8 @@ class TestProjection(unittest.TestCase):
 
     def test_xml_roundtrip(self):
         document = Document(un.ms, un.nA)
-        xml = self.projection.to_xml(document)
-        projection2 = Projection.from_xml(xml, document)
+        xml = self.projection.serialize(document)
+        projection2 = Projection.unserialize(xml, document)
         self.assertEquals(self.projection, projection2,
                           "Projection failed XML roundtrip:\n{}"
                           .format(self.projection.find_mismatch(projection2)))

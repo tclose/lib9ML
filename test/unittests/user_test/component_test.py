@@ -19,7 +19,7 @@ class TestComponent(unittest.TestCase):
     def test_component_xml_540degree_roundtrip(self):
         test_file = os.path.join(examples_dir, 'HodgkinHuxley.xml')
         document1 = read(test_file)
-        xml = document1.to_xml()
+        xml = document1.serialize()
         document2 = Document.load(xml, url=test_file,
                                   register_url=False)
         if document1 != document2:
@@ -31,7 +31,7 @@ class TestComponent(unittest.TestCase):
     def test_prototype_xml_540degree_roundtrip(self):
         test_file = os.path.join(examples_dir, 'HodgkinHuxleyModified.xml')
         document1 = read(test_file)
-        xml = document1.to_xml()
+        xml = document1.serialize()
         document2 = Document.load(xml, url=test_file,
                                   register_url=False)
         if document1 != document2:
@@ -52,6 +52,6 @@ class PropertyTest(unittest.TestCase):
     def test_xml_roundtrip(self):
         document = Document()
         p1 = Property("tau_m", 20.0 * mV)
-        element = p1.to_xml(document)
-        p2 = Property.from_xml(element, Document(mV))
+        element = p1.serialize(document)
+        p2 = Property.unserialize(element, Document(mV))
         self.assertEqual(p1, p2)

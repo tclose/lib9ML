@@ -5,7 +5,7 @@ from .dynamics import DynamicsProperties
 from nineml.base import DocumentLevelObject, DynamicPortsObject
 from nineml.xml import (
     E, unprocessed_xml, from_child_xml, get_xml_attr)
-from nineml.annotations import annotate_xml, read_annotations
+from nineml.annotations import annotate, read_annotations
 from nineml.utils import ensure_valid_identifier
 
 
@@ -91,18 +91,18 @@ class Population(BaseULObject, DocumentLevelObject, DynamicPortsObject):
         return chain(*[c.attributes_with_units for c in self.get_components()])
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):
+    @annotate
+    def serialize(self, document, E=E, **kwargs):
         return E(self.nineml_type,
                  E.Size(str(self.size)),
-                 E.Cell(self.cell.to_xml(document, E=E, **kwargs)),
+                 E.Cell(self.cell.serialize(document, E=E, **kwargs)),
                  name=self.name)
 
     @classmethod
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         cell = from_child_xml(element, DynamicsProperties, document,
                               allow_reference=True, within='Cell', **kwargs)
         return cls(name=get_xml_attr(element, 'name', document, **kwargs),

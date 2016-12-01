@@ -27,7 +27,7 @@ class TestBaseReferenceExceptions(unittest.TestCase):
             document=Document(),
             url='./a_relative_url.xml')
 
-    def test_from_xml_ninemlxmlattributeerror(self):
+    def test_unserialize_ninemlxmlattributeerror(self):
         """
         line #: 86
         message: References require the element name provided in the XML
@@ -36,6 +36,6 @@ class TestBaseReferenceExceptions(unittest.TestCase):
         element = Ev1(Reference.nineml_type)
         self.assertRaises(
             NineMLXMLAttributeError,
-            Reference.from_xml,
+            Reference.unserialize,
             element=element,
             document=Document())

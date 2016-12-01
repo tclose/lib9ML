@@ -144,7 +144,7 @@ class Document(AnnotatedNineMLObject, dict):
                 .format(name, self.url or '', "', '".join(self.iterkeys())))
         # Load (lazily) the element from the xml description
         if isinstance(elem, self._Unloaded):
-            elem = self._load_elem_from_xml(elem)
+            elem = self._load_elem_unserialize(elem)
         return elem
 
     @property
@@ -158,7 +158,7 @@ class Document(AnnotatedNineMLObject, dict):
     def itervalues(self):
         for v in super(Document, self).itervalues():
             if isinstance(v, self._Unloaded):
-                v = self._load_elem_from_xml(v)
+                v = self._load_elem_unserialize(v)
             yield v
 
     def values(self):
@@ -167,7 +167,7 @@ class Document(AnnotatedNineMLObject, dict):
     def iteritems(self):
         for k, v in super(Document, self).iteritems():
             if isinstance(v, self._Unloaded):
-                v = self._load_elem_from_xml(v)
+                v = self._load_elem_unserialize(v)
             yield k, v
 
     def items(self):
@@ -212,7 +212,7 @@ class Document(AnnotatedNineMLObject, dict):
         return (o for o in self.itervalues()
                 if isinstance(nineml.units.Dimension))  # @UndefinedVariable @IgnorePep8
 
-    def _load_elem_from_xml(self, unloaded):
+    def _load_elem_unserialize(self, unloaded):
         """
         Resolve an element from its XML description and store back in the
         element dictionary
@@ -227,7 +227,7 @@ class Document(AnnotatedNineMLObject, dict):
         # Keep track of the document-level elements that are in the process of
         # being loaded to catch circular references
         self._loading.append(unloaded)
-        elem = unloaded.cls.from_xml(unloaded.xml, self, **unloaded.kwargs)
+        elem = unloaded.cls.unserialize(unloaded.xml, self, **unloaded.kwargs)
         # Remove current element from "loading" stack as it has been loaded
         assert self._loading[-1] is unloaded
         self._loading.pop()
@@ -299,19 +299,19 @@ class Document(AnnotatedNineMLObject, dict):
                          " of units")
                 a.set_units(std_units)
 
-    def to_xml(self, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, E=E, **kwargs):  # @UnusedVariable
         self.standardize_units()
         self._added_in_write = []  # Initialise added_in_write
-        elements = [e.to_xml(self, E=E, as_ref=False)
+        elements = [e.serialize(self, E=E, as_ref=False)
                     for e in self.sorted_elements()]
         self.standardize_units()
-        elements.extend(e.to_xml(self, E=E, as_ref=False)
+        elements.extend(e.serialize(self, E=E, as_ref=False)
                         for e in self._added_in_write)
         self._added_in_write = None
         return E(self.nineml_type, *elements)
 
     @classmethod
-    def from_xml(cls, element, url=None, **kwargs):
+    def unserialize(cls, element, url=None, **kwargs):
         url = cls._standardise_url(url)
         xmlns = extract_xmlns(element.tag)
         if xmlns not in ALL_NINEML:
@@ -335,7 +335,7 @@ class Document(AnnotatedNineMLObject, dict):
                 if nineml_type == Annotations.nineml_type:
                     assert annotations is None, \
                         "Multiple annotations tags found"
-                    annotations = Annotations.from_xml(child, **kwargs)
+                    annotations = Annotations.unserialize(child, **kwargs)
                     continue
                 try:
                     child_cls = cls._get_class_from_type(nineml_type)
@@ -373,7 +373,7 @@ class Document(AnnotatedNineMLObject, dict):
         try:
             child_cls = getattr(nineml, nineml_type)
             if (not issubclass(child_cls, DocumentLevelObject) or
-                    not hasattr(child_cls, 'from_xml')):
+                    not hasattr(child_cls, 'unserialize')):
                 raise NineMLRuntimeError(
                     "'{}' element does not correspond to a recognised "
                     "document-level object".format(child_cls.__name__))
@@ -422,7 +422,7 @@ class Document(AnnotatedNineMLObject, dict):
                 "its `url` property or create a duplicate using the "
                 "`duplicate` method before attempting to write it to the new "
                 "location".format(self.url, url))
-        doc_xml = self.to_xml(E=get_element_maker(version), **kwargs)
+        doc_xml = self.serialize(E=get_element_maker(version), **kwargs)
         write_xml(doc_xml, url)
 
     @classmethod
@@ -442,7 +442,7 @@ class Document(AnnotatedNineMLObject, dict):
         if isinstance(xml, basestring):
             xml = etree.fromstring(xml)
         url = cls._standardise_url(url)
-        doc = cls.from_xml(xml, url=url, **kwargs)
+        doc = cls.unserialize(xml, url=url, **kwargs)
         if force_reload:
             if url in cls._loaded_docs:
                 logger.warning("Reloading '{}' URL, old references to this URL"

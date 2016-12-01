@@ -8,7 +8,7 @@ from lxml import etree
 from . import ComponentVisitor
 from ...expressions import Alias, Constant
 from nineml.abstraction.componentclass.base import Parameter
-from nineml.annotations import annotate_xml, read_annotations
+from nineml.annotations import annotate, read_annotations
 from nineml.xml import (
     E, strip_xmlns, extract_xmlns, get_xml_attr, identify_element,
     unprocessed_xml, ALL_NINEML, NINEMLv1)
@@ -110,19 +110,19 @@ class ComponentClassXMLWriter(ComponentVisitor):
     def xmlns(self):
         return self.E._namespace
 
-    @annotate_xml
+    @annotate
     def visit_parameter(self, parameter, **kwargs):
         return self.E(Parameter.nineml_type,
                       name=parameter.name,
                       dimension=parameter.dimension.name)
 
-    @annotate_xml
+    @annotate
     def visit_alias(self, alias, **kwargs):
         return self.E(Alias.nineml_type,
                       self.E("MathInline", alias.rhs_xml),
                       name=alias.lhs)
 
-    @annotate_xml
+    @annotate
     def visit_constant(self, constant, **kwargs):
         if self.xmlns == NINEMLv1:
             xml = self.E(Constant.nineml_type,

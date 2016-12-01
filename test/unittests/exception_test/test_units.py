@@ -121,7 +121,7 @@ class TestQuantityExceptions(unittest.TestCase):
             qty.in_units,
             units=un.mV)
 
-    def test_from_xml_ninemlnameerror(self):
+    def test_unserialize_ninemlnameerror(self):
         """
         line #: 532
         message: Did not find definition of '{}' units in the current document.
@@ -131,7 +131,7 @@ class TestQuantityExceptions(unittest.TestCase):
                     units='blah')
         self.assertRaises(
             NineMLNameError,
-            Quantity.from_xml,
+            Quantity.unserialize,
             element=element,
             document=Document())
 

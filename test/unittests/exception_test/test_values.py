@@ -20,7 +20,7 @@ class TestArrayValueExceptions(unittest.TestCase):
                 val.__init__,
                 values=['a', 'b', 'c'])
 
-    def test_from_xml_ninemlruntimeerror(self):
+    def test_unserialize_ninemlruntimeerror(self):
         """
         line #: 300
         message: Negative indices found in array rows
@@ -29,11 +29,11 @@ class TestArrayValueExceptions(unittest.TestCase):
                     E('ArrayValueRow', '1.0', index='-1'))
         self.assertRaises(
             NineMLRuntimeError,
-            ArrayValue.from_xml,
+            ArrayValue.unserialize,
             element=element,
             document=Document())
 
-    def test_from_xml_ninemlruntimeerror2(self):
+    def test_unserialize_ninemlruntimeerror2(self):
         """
         line #: 304
         message: Duplicate indices ({}) found in array rows
@@ -43,11 +43,11 @@ class TestArrayValueExceptions(unittest.TestCase):
                     E('ArrayValueRow', '2.0', index='0'))
         self.assertRaises(
             NineMLRuntimeError,
-            ArrayValue.from_xml,
+            ArrayValue.unserialize,
             element=element,
             document=Document())
 
-    def test_from_xml_ninemlruntimeerror3(self):
+    def test_unserialize_ninemlruntimeerror3(self):
         """
         line #: 308
         message: Indices greater or equal to the number of array rows
@@ -56,7 +56,7 @@ class TestArrayValueExceptions(unittest.TestCase):
                     E('ArrayValueRow', '1.0', index='2'))
         self.assertRaises(
             NineMLRuntimeError,
-            ArrayValue.from_xml,
+            ArrayValue.unserialize,
             element=element,
             document=Document())
 

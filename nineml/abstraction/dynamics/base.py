@@ -505,14 +505,14 @@ class Dynamics(ComponentClass, DynamicPortsObject):
                                                 trans.key))
                 trans.set_target_regime(target)
 
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         self.standardize_unit_dimensions()
         self.validate()
         return DynamicsXMLWriter(document=document, E=E, **kwargs).visit(self,
                                                                          E=E)
 
     @classmethod
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         return DynamicsXMLLoader(document).load_dynamics(
             element, **kwargs)
 

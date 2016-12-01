@@ -44,7 +44,7 @@ annot_xml = etree.fromstring(annot_str)
 class TestAnnotations(unittest.TestCase):
 
     def setUp(self):
-        self.annot = Annotations.from_xml(
+        self.annot = Annotations.unserialize(
             annot_xml, annotations_ns=[foreign_ns])
 
     def test_basic(self):
@@ -62,18 +62,18 @@ class TestAnnotations(unittest.TestCase):
                              annot[nineml_ns], self.annot[nineml_ns]))
         self.assertEqual(annot[foreign_ns], self.annot[foreign_ns])
         self.assertIsInstance(self.annot[unprocess_ns], etree._Element)
-        reloaded_annot = Annotations.from_xml(
+        reloaded_annot = Annotations.unserialize(
             annot_xml, annotations_ns=foreign_ns)
         self.assertEqual(self.annot, reloaded_annot)
 
-    def test_read_annotations_and_annotate_xml(self):
+    def test_read_annotations_and_annotate(self):
         param_xml = E(Parameter.nineml_type,
                       deepcopy(annot_xml), name="P1",
                       dimension="dimensionless")
         dim_xml = E(Dimension.nineml_type,
                      deepcopy(annot_xml), name='dimensionless')
         doc = Document()
-        dimension = Dimension.from_xml(dim_xml, doc,
+        dimension = Dimension.unserialize(dim_xml, doc,
                                        annotations_ns=foreign_ns)
         doc.add(dimension)
         loader = DynamicsXMLLoader(doc)
@@ -87,7 +87,7 @@ class TestAnnotations(unittest.TestCase):
                                                  self.annot))
         writer = DynamicsXMLWriter(doc, E)
         re_param_xml = writer.visit_parameter(parameter)
-        re_dim_xml = dimension.to_xml(doc)
+        re_dim_xml = dimension.serialize(doc)
         self.assertTrue(xml_equal(param_xml, re_param_xml))
         self.assertTrue(xml_equal(dim_xml, re_dim_xml))
 

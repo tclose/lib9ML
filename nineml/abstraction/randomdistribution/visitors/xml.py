@@ -4,7 +4,7 @@ docstring needed
 :copyright: Copyright 2010-2013 by the Python lib9ML team, see AUTHORS.
 :license: BSD-3, see LICENSE for details.
 """
-from nineml.annotations import annotate_xml
+from nineml.annotations import annotate
 from nineml.utils import expect_single
 from nineml.xml import (
     get_xml_attr, unprocessed_xml, NINEMLv1, extract_xmlns)
@@ -57,7 +57,7 @@ class RandomDistributionXMLLoader(ComponentClassXMLLoader,
 class RandomDistributionXMLWriter(ComponentClassXMLWriter,
                                   RandomDistributionVisitor):
 
-    @annotate_xml
+    @annotate
     def visit_componentclass(self, component_class, **kwargs):  # @UnusedVariable @IgnorePep8
         if self.xmlns == NINEMLv1:
             elems = [e.accept_visitor(self)

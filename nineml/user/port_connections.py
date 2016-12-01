@@ -1,7 +1,7 @@
 from . import BaseULObject
 from abc import ABCMeta, abstractmethod
 from nineml.xml import E, unprocessed_xml, get_xml_attr
-from nineml.annotations import read_annotations, annotate_xml
+from nineml.annotations import read_annotations, annotate
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, NineMLDimensionError)
 from nineml.abstraction.ports import (
@@ -287,8 +287,8 @@ class BasePortConnection(BaseULObject):
             bound = True
         return bound
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         attribs = {}
         try:
             attribs['sender_role'] = self.sender_role
@@ -306,7 +306,7 @@ class BasePortConnection(BaseULObject):
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(send_port=get_xml_attr(element, 'send_port',
                                           document, **kwargs),
                    receive_port=get_xml_attr(element, 'receive_port', document,

@@ -15,13 +15,13 @@ class TestPortConnection(unittest.TestCase):
     def test_xml_roundtrip(self):
         pc1 = AnalogPortConnection('response', 'destination', 'iSyn', 'iExt')
         document = Document()
-        xml = pc1.to_xml(document)
-        pc2 = AnalogPortConnection.from_xml(xml, document)
+        xml = pc1.serialize(document)
+        pc2 = AnalogPortConnection.unserialize(xml, document)
         self.assertEquals(pc1, pc2,
                           "XML round trip failed for AnalogPortConnection")
         pc1 = EventPortConnection('response', 'destination', 'iSyn', 'iExt')
-        xml = pc1.to_xml(document)
-        pc2 = EventPortConnection.from_xml(xml, document)
+        xml = pc1.serialize(document)
+        pc2 = EventPortConnection.unserialize(xml, document)
         self.assertEquals(pc1, pc2,
                           "XML round trip failed for AnalogPortConnection")
 

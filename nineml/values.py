@@ -2,7 +2,7 @@ from __future__ import division
 from .base import AnnotatedNineMLObject
 from nineml.xml import E, get_xml_attr
 from abc import ABCMeta, abstractmethod
-from nineml.annotations import read_annotations, annotate_xml
+from nineml.annotations import read_annotations, annotate
 from urllib import urlopen
 import contextlib
 import collections
@@ -76,7 +76,7 @@ class BaseValue(AnnotatedNineMLObject):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def to_xml(self, document, E=E, **kwargs):
+    def serialize(self, document, E=E, **kwargs):
         pass
 
     @classmethod
@@ -158,14 +158,14 @@ class SingleValue(BaseValue):
     def inverse(self):
         return SingleValue(1.0 / self._value)
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type, repr(self.value))
 
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(float(element.text))
 
     # =========================================================================
@@ -321,8 +321,8 @@ class ArrayValue(BaseValue):
         except AttributeError:
             return ArrayValue(1.0 / v for v in self._values)
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         if self._datafile is None:
             return E.ArrayValue(
                 *[E.ArrayValueRow(index=str(i), value=repr(v))
@@ -337,7 +337,7 @@ class ArrayValue(BaseValue):
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag == 'ExternalArrayValue':
             url = get_xml_attr(element, 'url', document, **kwargs)
             with contextlib.closing(urlopen(url)) as f:
@@ -556,10 +556,10 @@ class RandomValue(BaseValue):
     def __repr__(self):
         return ("RandomValue({})".format(self.distribution.name))
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type,
-                 self.distribution.to_xml(document, E=E, **kwargs))
+                 self.distribution.serialize(document, E=E, **kwargs))
 
     def inverse(self):
         raise NotImplementedError
@@ -567,7 +567,7 @@ class RandomValue(BaseValue):
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         distribution = from_child_xml(
             element, nineml.user.RandomDistributionProperties,
             document, allow_reference=True, **kwargs)

@@ -5,7 +5,7 @@ from nineml.exceptions import NineMLRuntimeError
 from nineml.reference import resolve_reference, write_reference
 from nineml.xml import (
     E, from_child_xml, unprocessed_xml, get_xml_attr, extract_xmlns, NINEMLv1)
-from nineml.annotations import read_annotations, annotate_xml
+from nineml.annotations import read_annotations, annotate
 from .connectionrule import ConnectionRuleProperties, Connectivity
 from .dynamics import DynamicsProperties
 from nineml.values import SingleValue, ArrayValue, RandomValue
@@ -175,8 +175,8 @@ class Projection(BaseULObject, DocumentLevelObject):
                      *[c.attributes_with_units for c in self.components])
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         if E._namespace == NINEMLv1:
             pcs = defaultdict(list)
             for pc in self.port_connections:
@@ -184,38 +184,38 @@ class Projection(BaseULObject, DocumentLevelObject):
                     E('From' + self.v2tov1[pc.sender_role],
                       send_port=pc.send_port_name,
                       receive_port=pc.receive_port_name))
-            args = [E.Source(self.pre.to_xml(document, E=E, as_ref=True,
+            args = [E.Source(self.pre.serialize(document, E=E, as_ref=True,
                                              **kwargs), *pcs['pre']),
-                    E.Destination(self.post.to_xml(document, E=E, as_ref=True,
+                    E.Destination(self.post.serialize(document, E=E, as_ref=True,
                                                    **kwargs), *pcs['post']),
-                    E.Response(self.response.to_xml(document, E=E, **kwargs),
+                    E.Response(self.response.serialize(document, E=E, **kwargs),
                                *pcs['response']),
                     E.Connectivity(
-                        self.connectivity.rule_properties.to_xml(document, E=E,
+                        self.connectivity.rule_properties.serialize(document, E=E,
                                                                  **kwargs))]
             if self.plasticity:
                 args.append(E.Plasticity(
-                    self.plasticity.to_xml(document, E=E, **kwargs),
+                    self.plasticity.serialize(document, E=E, **kwargs),
                     *pcs['plasticity']))
             args.append(E('Delay',
-                          self.delay._value.to_xml(document, E=E, **kwargs),
+                          self.delay._value.serialize(document, E=E, **kwargs),
                           units=self.delay.units.name))
             xml = E(self.nineml_type, *args, name=self.name)
         else:
             members = []
             for pop, tag_name in ((self.pre, 'Pre'), (self.post, 'Post')):
-                members.append(E(tag_name, pop.to_xml(
+                members.append(E(tag_name, pop.serialize(
                     document, E=E, as_ref=True, **kwargs)))
             members.extend([
-                E.Response(self.response.to_xml(document, E=E, **kwargs)),
-                E.Connectivity(self.connectivity.rule_properties.to_xml(
+                E.Response(self.response.serialize(document, E=E, **kwargs)),
+                E.Connectivity(self.connectivity.rule_properties.serialize(
                     document, E=E, **kwargs)),
-                E.Delay(self.delay.to_xml(document, E=E, **kwargs))])
+                E.Delay(self.delay.serialize(document, E=E, **kwargs))])
             if self.plasticity is not None:
                 members.append(
-                    E.Plasticity(self.plasticity.to_xml(document, E=E,
+                    E.Plasticity(self.plasticity.serialize(document, E=E,
                                                         **kwargs)))
-            members.extend([pc.to_xml(document, E=E, **kwargs)
+            members.extend([pc.serialize(document, E=E, **kwargs)
                             for pc in self.port_connections])
             xml = E(self.nineml_type, *members, name=self.name)
         return xml
@@ -224,7 +224,7 @@ class Projection(BaseULObject, DocumentLevelObject):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
         name = get_xml_attr(element, 'name', document, **kwargs)
         xmlns = extract_xmlns(element.tag)

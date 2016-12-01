@@ -471,8 +471,8 @@ class ComponentClass_test(unittest.TestCase):
                                       to='r1'),
                        aliases=[Alias('A', '8 / t')])])
         document = Document()
-        a_xml = a.to_xml(document)
-        b = Dynamics.from_xml(a_xml, Document(un.dimensionless))
+        a_xml = a.serialize(document)
+        b = Dynamics.unserialize(a_xml, Document(un.dimensionless))
         self.assertEqual(a, b,
                          "Dynamics with regime-specific alias failed xml "
                          "roundtrip:\n{}".format(a.find_mismatch(b)))

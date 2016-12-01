@@ -1,7 +1,7 @@
 from operator import itemgetter, and_
 from . import BaseULObject
 from nineml.reference import resolve_reference, write_reference, Reference
-from nineml.annotations import annotate_xml, read_annotations
+from nineml.annotations import annotate, read_annotations
 from nineml.xml import (
     extract_xmlns, E, from_child_xml, unprocessed_xml, get_xml_attr, NINEMLv1)
 from nineml.base import DocumentLevelObject, DynamicPortsObject
@@ -71,17 +71,17 @@ class Selection(BaseULObject, DocumentLevelObject, DynamicPortsObject):
         return self._operation
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type,
-                 self.operation.to_xml(document, E=E, **kwargs),
+                 self.operation.serialize(document, E=E, **kwargs),
                  name=self.name)
 
     @classmethod
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # The only supported op at this stage
         op = from_child_xml(
             element, Concatenate, document, **kwargs)
@@ -201,23 +201,23 @@ class Concatenate(BaseULObject):
         # method?
         return iter(self._items)
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
-        def item_to_xml(item):
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
+        def item_serialize(item):
             if isinstance(item, Reference):
-                return item.to_xml(document, E=E, **kwargs)
+                return item.serialize(document, E=E, **kwargs)
             elif E._namespace == NINEMLv1:
                 return E.Reference(item.name)
             else:
                 return E.Reference(name=item.name)
         return E(self.nineml_type,
-                 *[E.Item(item_to_xml(item), index=str(i))
+                 *[E.Item(item_serialize(item), index=str(i))
                    for i, item in enumerate(self.items)])
 
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
         for it_elem in element.findall(extract_xmlns(element.tag) + 'Item'):
@@ -268,17 +268,17 @@ class Concatenate(BaseULObject):
 #         self.populations = []
 #         self.evaluated = False
 #
-#     def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+#     def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
 #         return E(self.nineml_type,
-#                  E.select(self.condition.to_xml(document, E=E, **kwargs)),
+#                  E.select(self.condition.serialize(document, E=E, **kwargs)),
 #                  name=self.name)
 #
 #     @classmethod
-#     def from_xml(cls, element, components):
+#     def unserialize(cls, element, components):
 #         select_element = element.find(NINEML + 'select')
 #         assert len(select_element) == 1
 #         return cls(get_xml_attr(element, 'name', document, **kwargs),
-#                    Operator.from_xml(select_element.getchildren()[0]))
+#                    Operator.unserialize(select_element.getchildren()[0]))
 #
 #     def evaluate(self, group):
 #         if not self.evaluated:
@@ -366,27 +366,27 @@ class Concatenate(BaseULObject):
 #     def __init__(self, *operands):
 #         self.operands = operands
 #
-#     def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+#     def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
 #         operand_elements = []
 #         for c in self.operands:
 #             if isinstance(c, (basestring, float, int)):
 #                 operand_elements.append(E(StringValue.nineml_type, str(c)))
 #             else:
-#                 operand_elements.append(c.to_xml(document, E=E, **kwargs))
+#                 operand_elements.append(c.serialize(document, E=E, **kwargs))
 #         return E(self.nineml_type,
 #                  *operand_elements)
 #
 #     @classmethod
-#     def from_xml(cls, element):
+#     def unserialize(cls, element):
 #         if hasattr(cls, "nineml_type") and element.tag == (NINEML +
 #                                                            cls.nineml_type):
 #             dispatch = {
-#                 NINEML + StringValue.nineml_type: StringValue.from_xml,
-#                 NINEML + Eq.nineml_type: Eq.from_xml,
-#                 NINEML + Any.nineml_type: Any.from_xml,
-#                 NINEML + All.nineml_type: All.from_xml,
-#                 NINEML + Not.nineml_type: Not.from_xml,
-#                 NINEML + In.nineml_type: In.from_xml,
+#                 NINEML + StringValue.nineml_type: StringValue.unserialize,
+#                 NINEML + Eq.nineml_type: Eq.unserialize,
+#                 NINEML + Any.nineml_type: Any.unserialize,
+#                 NINEML + All.nineml_type: All.unserialize,
+#                 NINEML + Not.nineml_type: Not.unserialize,
+#                 NINEML + In.nineml_type: In.unserialize,
 #             }
 #             operands = []
 #             for child in element.iterchildren():
@@ -400,4 +400,4 @@ class Concatenate(BaseULObject):
 #                 NINEML + Not.nineml_type: Not,
 #                 NINEML + StringValue.nineml_type: StringValue,
 #                 NINEML + In.nineml_type: In,
-#             }[element.tag].from_xml(element)
+#             }[element.tag].unserialize(element)

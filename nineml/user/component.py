@@ -5,7 +5,7 @@ from nineml.exceptions import (
 from nineml.base import AnnotatedNineMLObject
 from nineml.reference import (
     BaseReference, write_reference, resolve_reference)
-from nineml.annotations import read_annotations, annotate_xml
+from nineml.annotations import read_annotations, annotate
 from nineml.utils import ensure_valid_identifier
 from nineml.xml import (
     from_child_xml, unprocessed_xml, get_xml_attr, E, extract_xmlns, NINEMLv1)
@@ -49,8 +49,8 @@ class Definition(BaseReference):
     def component_class(self):
         return self._referred_to
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         if self.url is None:
             # If definition was created in Python, add component class
             # reference to document argument before writing definition
@@ -64,7 +64,7 @@ class Definition(BaseReference):
                                 type(self._referred_to), type(doc_obj)))
             except NineMLNameError:
                 document.add(self._referred_to)
-        return super(Definition, self).to_xml(document, E=E, **kwargs)
+        return super(Definition, self).serialize(document, E=E, **kwargs)
 
     def clone(self, memo=None, clone_definitions=False, **kwargs):
         """
@@ -286,8 +286,8 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
                             self.component_class.name, param_dimension))
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         """
         docstring missing, although since the decorators don't
         preserve the docstring, it doesn't matter at the moment.
@@ -296,8 +296,8 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
             tag = self.v1_nineml_type
         else:
             tag = self.nineml_type
-        element = E(tag, self._definition.to_xml(document, E=E, **kwargs),
-                    *(p.to_xml(document, E=E, **kwargs)
+        element = E(tag, self._definition.serialize(document, E=E, **kwargs),
+                    *(p.serialize(document, E=E, **kwargs)
                       for p in self.sorted_elements(local=True)),
                       name=self.name)
         return element
@@ -306,7 +306,7 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
         name = get_xml_attr(element, "name", document, **kwargs)
         definition = from_child_xml(element, (Definition, Prototype), document,
@@ -459,23 +459,23 @@ class Property(BaseULObject):
         return ("{}(name={}, value={}, units={})"
                 .format(self.nineml_type, self.name, self.value, units))
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         if E._namespace == NINEMLv1:
             xml = E(self.nineml_type,
-                    self.value.to_xml(document, E=E, **kwargs),
+                    self.value.serialize(document, E=E, **kwargs),
                     name=self.name,
                     units=self.units.name)
         else:
             xml = E(self.nineml_type,
-                    self._quantity.to_xml(document, E=E, **kwargs),
+                    self._quantity.serialize(document, E=E, **kwargs),
                     name=self.name)
         return xml
 
     @classmethod
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         name = get_xml_attr(element, 'name', document, **kwargs)
         if extract_xmlns(element.tag) == NINEMLv1:
             value = from_child_xml(

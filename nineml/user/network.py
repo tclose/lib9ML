@@ -9,7 +9,7 @@ from . import BaseULObject
 from .component import write_reference, resolve_reference
 from nineml.abstraction.connectionrule import (
     explicit_connection_rule, one_to_one_connection_rule)
-from nineml.annotations import annotate_xml, read_annotations
+from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import name_error
 from nineml.base import DocumentLevelObject, ContainerObject
 from nineml.xml import (
@@ -129,12 +129,12 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         return any(p.connectivity.has_been_sampled() for p in self.projections)
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         member_elems = []
         for member in chain(self.populations, self.selections,
                             self.projections):
-            member_elems.append(member.to_xml(
+            member_elems.append(member.serialize(
                 document, E=E, as_ref=True, **kwargs))
         return E(self.nineml_type, name=self.name, *member_elems)
 
@@ -142,7 +142,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         populations = from_child_xml(element, Population, document,
                                      multiple=True, allow_reference='only',
                                      allow_none=True, **kwargs)
@@ -225,18 +225,18 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
         return self.dynamics_properties.component_class
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type,
                  E.Size(str(self.size)),
-                 self.dynamics_properties.to_xml(document, E=E, **kwargs),
+                 self.dynamics_properties.serialize(document, E=E, **kwargs),
                  name=self.name)
 
     @classmethod
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         dynamics_properties = from_child_xml(
             element, DynamicsProperties, document,
             allow_reference=True, **kwargs)
@@ -368,17 +368,17 @@ class BaseConnectionGroup(BaseULObject, DocumentLevelObject):
         assert isinstance(destination_port, ReceivePort)
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         members = [
-            E.Source(self.source.to_xml(document, E=E, **kwargs),
+            E.Source(self.source.serialize(document, E=E, **kwargs),
                      port=self.source_port),
-            E.Destination(self.destination.to_xml(document, E=E, **kwargs),
+            E.Destination(self.destination.serialize(document, E=E, **kwargs),
                           port=self.destination_port),
-            E.Connectivity(self.connectivity.rule_properties.to_xml(
+            E.Connectivity(self.connectivity.rule_properties.serialize(
                 document, E=E, **kwargs))]
         if self.delay is not None:
-            members.append(E.Delay(self.delay.to_xml(document, E=E, **kwargs)))
+            members.append(E.Delay(self.delay.serialize(document, E=E, **kwargs)))
         xml = E(self.nineml_type,
                 *members,
                 name=self.name)
@@ -388,7 +388,7 @@ class BaseConnectionGroup(BaseULObject, DocumentLevelObject):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
         name = get_xml_attr(element, 'name', document, **kwargs)
         connectivity = from_child_xml(

@@ -86,13 +86,13 @@ class ConnectionRule(ComponentClass):
         extractor.visit(self)
         return extractor.expressions
 
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         self.standardize_unit_dimensions()
         self.validate()
         return ConnectionRuleXMLWriter(document, E, **kwargs).visit(self)
 
     @classmethod
-    def from_xml(cls, element, document, **kwargs):  # @UnusedVariable
+    def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return ConnectionRuleXMLLoader(document).load_connectionruleclass(
             element, **kwargs)
 

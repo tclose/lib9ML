@@ -8,7 +8,7 @@ from nineml.reference import resolve_reference, write_reference
 from nineml.xml import (
     nineml_ns, E, from_child_xml, unprocessed_xml, get_xml_attr)
 from nineml.user import DynamicsProperties, Definition
-from nineml.annotations import annotate_xml, read_annotations
+from nineml.annotations import annotate, read_annotations
 from nineml.abstraction.dynamics.visitors.cloner import DynamicsCloner
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, name_error)
@@ -130,13 +130,13 @@ class MultiDynamicsProperties(DynamicsProperties):
         return len(self._sub_components)
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):
-        members = [c.to_xml(document, E=E, **kwargs)
+    @annotate
+    def serialize(self, document, E=E, **kwargs):
+        members = [c.serialize(document, E=E, **kwargs)
                    for c in self.sub_components]
-        members.extend(pe.to_xml(document, E=E, **kwargs)
+        members.extend(pe.serialize(document, E=E, **kwargs)
                         for pe in self.port_exposures)
-        members.extend(pc.to_xml(document, E=E, **kwargs)
+        members.extend(pc.serialize(document, E=E, **kwargs)
                        for pc in self.port_connections)
         return E(self.nineml_type, *members, name=self.name)
 
@@ -144,7 +144,7 @@ class MultiDynamicsProperties(DynamicsProperties):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         sub_component_properties = from_child_xml(
             element, SubDynamicsProperties, document, multiple=True,
             **kwargs)
@@ -282,17 +282,17 @@ class SubDynamicsProperties(BaseULObject):
                 "component name '{}'".format(name, self.name, self.name))
         return _NamespaceProperty(self, self._component.property(local_name))
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type,
-                 self._component.to_xml(document, E=E, **kwargs),
+                 self._component.serialize(document, E=E, **kwargs),
                  name=self.name)
 
     @classmethod
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         dynamics_properties = from_child_xml(
             element, (DynamicsProperties, MultiDynamicsProperties), document,
             allow_reference=True, **kwargs)
@@ -498,17 +498,17 @@ class SubDynamics(BaseULObject, DynamicPortsObject):
     def num_event_send_ports(self):
         return self.component_class.num_event_send_ports
 
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):  # @UnusedVariable
+    @annotate
+    def serialize(self, document, E=E, **kwargs):  # @UnusedVariable
         return E(self.nineml_type,
-                 self._component_class.to_xml(document, E=E, **kwargs),
+                 self._component_class.serialize(document, E=E, **kwargs),
                  name=self.name)
 
     @classmethod
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         dynamics = from_child_xml(
             element, (Dynamics, MultiDynamics), document,
             allow_reference=True, **kwargs)
@@ -953,13 +953,13 @@ class MultiDynamics(Dynamics):
         return ComponentClass.clone(self, **kwargs)
 
     @write_reference
-    @annotate_xml
-    def to_xml(self, document, E=E, **kwargs):
-        members = [c.to_xml(document, E=E, **kwargs)
+    @annotate
+    def serialize(self, document, E=E, **kwargs):
+        members = [c.serialize(document, E=E, **kwargs)
                    for c in self.sub_components]
-        members.extend(pe.to_xml(document, E=E, **kwargs)
+        members.extend(pe.serialize(document, E=E, **kwargs)
                         for pe in self.port_exposures)
-        members.extend(pc.to_xml(document, E=E, **kwargs)
+        members.extend(pc.serialize(document, E=E, **kwargs)
                        for pc in self.port_connections)
         return E(self.nineml_type, *members, name=self.name)
 
@@ -967,7 +967,7 @@ class MultiDynamics(Dynamics):
     @resolve_reference
     @read_annotations
     @unprocessed_xml
-    def from_xml(cls, element, document, **kwargs):
+    def unserialize(cls, element, document, **kwargs):
         sub_components = from_child_xml(
             element, SubDynamics, document, multiple=True,
             **kwargs)
