@@ -73,7 +73,7 @@ class TestConcatenateExceptions(unittest.TestCase):
                 from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
-                kwargs['unprocessed'][0].discard(it_elem)
+                kwargs['unprocessed_elems'][0].discard(it_elem)
             except KeyError:
                 pass
         # Sort by 'index' attribute
@@ -105,7 +105,7 @@ class TestConcatenateExceptions(unittest.TestCase):
                 from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
-                kwargs['unprocessed'][0].discard(it_elem)
+                kwargs['unprocessed_elems'][0].discard(it_elem)
             except KeyError:
                 pass
         # Sort by 'index' attribute
@@ -140,7 +140,7 @@ class TestConcatenateExceptions(unittest.TestCase):
                 from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
-                kwargs['unprocessed'][0].discard(it_elem)
+                kwargs['unprocessed_elems'][0].discard(it_elem)
             except KeyError:
                 pass
         # Sort by 'index' attribute

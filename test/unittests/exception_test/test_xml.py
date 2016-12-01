@@ -43,7 +43,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=True,
             allow_none=False,
             within='Pre',
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -68,7 +68,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=True,
             allow_none=False,
             within='Pre',
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -88,7 +88,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=True,
             allow_none=False,
             within='Pre',
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -112,7 +112,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=True,
             allow_none=False,
             within='Pre',
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -137,7 +137,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=False,
             allow_none=False,
             within=None,
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -157,7 +157,7 @@ class TestExceptions(unittest.TestCase):
             allow_reference=False,
             allow_none=False,
             within=None,
-            unprocessed=None,
+            unprocessed_elems=None,
             multiple_within=False,
             allowed_attrib=[])
 
@@ -203,7 +203,7 @@ class TestExceptions(unittest.TestCase):
             get_subblock,
             element=elem,
             name='AnotherSubBlock',
-            unprocessed=[[]],
+            unprocessed_elems=[[]],
             document=doc1)
 
     def test_get_subblock_ninemlxmlblockerror2(self):
@@ -220,7 +220,7 @@ class TestExceptions(unittest.TestCase):
             get_subblock,
             element=elem,
             name='ASubBlock',
-            unprocessed=[[]],
+            unprocessed_elems=[[]],
             document=doc1)
 
     def test_unserialize_with_exception_handling_ninemlxmlblockerror(self):

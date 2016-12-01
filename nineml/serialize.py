@@ -62,7 +62,7 @@ def strip_ns(tag_name):
 
 def from_child_elem(element, child_classes, document, multiple=False,
                     allow_reference=False, allow_none=False, within=None,
-                    unprocessed=None, multiple_within=False,
+                    unprocessed_elems=None, multiple_within=False,
                     allowed_attrib=[], **kwargs):
     """
     Loads a child element from the element, matching the tag name to the
@@ -95,8 +95,8 @@ def from_child_elem(element, child_classes, document, multiple=False,
                     "block, found {}"
                     .format(identify_element(parent), document.url,
                             ", ".join(e.tag for e in parent.getchildren())))
-            if unprocessed:
-                unprocessed[0].discard(parent)
+            if unprocessed_elems:
+                unprocessed_elems[0].discard(parent)
         elif not within_elems:
             if allow_none:
                 return None
@@ -126,8 +126,8 @@ def from_child_elem(element, child_classes, document, multiple=False,
             for child_elem in parent.findall(ns + tag_name):
                 children.append(child_cls.unserialize(child_elem, document,
                                                       **kwargs))
-                if unprocessed and not within:
-                    unprocessed[0].discard(child_elem)
+                if unprocessed_elems and not within:
+                    unprocessed_elems[0].discard(child_elem)
     if allow_reference:
         for ref_elem in parent.findall(
                 ns + nineml.reference.Reference.nineml_type):
@@ -135,8 +135,8 @@ def from_child_elem(element, child_classes, document, multiple=False,
                                                          **kwargs)
             if isinstance(ref.user_object, child_classes):
                 children.append(ref.user_object)
-                if unprocessed and not within:
-                    unprocessed[0].discard(ref_elem)
+                if unprocessed_elems and not within:
+                    unprocessed_elems[0].discard(ref_elem)
     if not children:
         if allow_none:
             result = [] if multiple else None
@@ -159,23 +159,23 @@ def from_child_elem(element, child_classes, document, multiple=False,
     return result
 
 
-def get_elem_attr(element, name, document, unprocessed=None, in_block=False,
+def get_elem_attr(element, name, document, unprocessed_elems=None, in_block=False,
                   within=None, dtype=str, **kwargs):  # @UnusedVariable @IgnorePep8
     """
     Gets an attribute from an xml element with exception handling
     """
     if in_block:
-        sub_elem = get_subblock(element, name, unprocessed, document)
+        sub_elem = get_subblock(element, name, unprocessed_elems, document)
         attr_str = sub_elem.text
     else:
         if within is not None:
-            elem = get_subblock(element, within, unprocessed, document)
+            elem = get_subblock(element, within, unprocessed_elems, document)
         else:
             elem = element
         try:
             attr_str = elem.attrib[name]
-            if unprocessed:
-                unprocessed[1].discard(name)
+            if unprocessed_elems:
+                unprocessed_elems[1].discard(name)
         except KeyError, e:
             try:
                 return kwargs['default']
@@ -198,12 +198,12 @@ def get_elem_attr(element, name, document, unprocessed=None, in_block=False,
     return attr
 
 
-def get_subblock(element, name, unprocessed, document, **kwargs):  # @UnusedVariable @IgnorePep8
+def get_subblock(element, name, unprocessed_elems, document, **kwargs):  # @UnusedVariable @IgnorePep8
     ns = extract_ns(element.tag)
     found = element.findall(ns + name)
     if len(found) == 1:
-        if unprocessed:
-            unprocessed[0].discard(found[0])
+        if unprocessed_elems:
+            unprocessed_elems[0].discard(found[0])
     elif not found:
         raise NineMLXMLBlockError(
             "Did not find and child blocks with the tag '{}' within {} in "
@@ -217,12 +217,12 @@ def get_subblock(element, name, unprocessed, document, **kwargs):  # @UnusedVari
     return found[0]
 
 
-def get_subblocks(element, name, unprocessed, **kwargs):  # @UnusedVariable
+def get_subblocks(element, name, unprocessed_elems, **kwargs):  # @UnusedVariable
     ns = extract_ns(element.tag)
     children = element.findall(ns + name)
     for child in children:
-        if unprocessed:
-            unprocessed[0].discard(child)
+        if unprocessed_elems:
+            unprocessed_elems[0].discard(child)
     return children
 
 
@@ -271,15 +271,15 @@ def un_proc_essed(unserialize):
             document = cls.document  # if AL visitor method
         # Keep track of which blocks and attributes were processed within the
         # element
-        unprocessed = (set(e for e in element.getchildren()
+        unprocessed_elems = (set(e for e in element.getchildren()
                            if not isinstance(e, etree._Comment)),
                        set(element.attrib.iterkeys()))
         # The decorated method
-        obj = unserialize(cls, element, *args, unprocessed=unprocessed,
+        obj = unserialize(cls, element, *args, unprocessed_elems=unprocessed_elems,
                           **kwargs)
-        # Check to see if there were blocks that were unprocessed in the
+        # Check to see if there were blocks that were unprocessed_elems in the
         # element
-        blocks, attrs = unprocessed
+        blocks, attrs = unprocessed_elems
         if blocks:
             raise NineMLXMLBlockError(
                 "Found unrecognised block{s} '{remaining}' within "

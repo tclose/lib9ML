@@ -14,7 +14,7 @@ class TestComponentClassXMLLoaderExceptions(unittest.TestCase):
 
         context:
         --------
-    def _load_blocks(self, element, block_names, unprocessed=None,
+    def _load_blocks(self, element, block_names, unprocessed_elems=None,
                      prev_block_names={}, ignore=[], **kwargs):  # @UnusedVariable @IgnorePep8
         \"\"\"
         Creates a dictionary that maps class-types to instantiated objects
@@ -26,8 +26,8 @@ class TestComponentClassXMLLoaderExceptions(unittest.TestCase):
         loaded_objects = dict((block, []) for block in block_names)
         for t in element.iterchildren(tag=etree.Element):
             # Used in un_proc_essed decorator
-            if unprocessed:
-                unprocessed[0].discard(t)
+            if unprocessed_elems:
+                unprocessed_elems[0].discard(t)
             # Strip namespace
             tag = (t.tag[len(ns):]
                    if t.tag.startswith(ns) else t.tag)
@@ -41,7 +41,7 @@ class TestComponentClassXMLLoaderExceptions(unittest.TestCase):
             componentclassxmlloader._load_blocks,
             element=None,
             block_names=None,
-            unprocessed=None,
+            unprocessed_elems=None,
             prev_block_names={},
             ignore=[])
 

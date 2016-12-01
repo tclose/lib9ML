@@ -241,8 +241,8 @@ class Projection(BaseULObject, DocumentLevelObject):
                 (SingleValue, ArrayValue, RandomValue),
                 document, **kwargs)
             delay = Quantity(value, units)
-            if 'unprocessed' in kwargs:
-                kwargs['unprocessed'][0].discard(delay_elem)
+            if 'unprocessed_elems' in kwargs:
+                kwargs['unprocessed_elems'][0].discard(delay_elem)
         else:
             pre_within = 'Pre'
             post_within = 'Post'

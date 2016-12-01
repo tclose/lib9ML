@@ -108,7 +108,7 @@ class Annotations(DocumentLevelObject):
                 for branch in annot_ns.branches:
                     members.append(branch.serialize(ns=ns, E=E, **kwargs))
             else:
-                members.append(annot_ns)  # Append unprocessed XML
+                members.append(annot_ns)  # Append unprocessed_elems XML
         return E(self.nineml_type, *members)
 
     @classmethod
