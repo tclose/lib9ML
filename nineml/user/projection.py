@@ -3,8 +3,8 @@ from . import BaseULObject
 from collections import defaultdict
 from nineml.exceptions import NineMLRuntimeError
 from nineml.reference import resolve_reference, write_reference
-from nineml.xml import (
-    E, from_child_xml, unprocessed_xml, get_xml_attr, extract_xmlns, NINEMLv1)
+from nineml.serialize import (
+    E, from_child_elem, un_proc_essed, get_elem_attr, extract_ns, NINEMLv1)
 from nineml.annotations import read_annotations, annotate
 from .connectionrule import ConnectionRuleProperties, Connectivity
 from .dynamics import DynamicsProperties
@@ -185,14 +185,14 @@ class Projection(BaseULObject, DocumentLevelObject):
                       send_port=pc.send_port_name,
                       receive_port=pc.receive_port_name))
             args = [E.Source(self.pre.serialize(document, E=E, as_ref=True,
-                                             **kwargs), *pcs['pre']),
-                    E.Destination(self.post.serialize(document, E=E, as_ref=True,
-                                                   **kwargs), *pcs['post']),
+                                                **kwargs), *pcs['pre']),
+                    E.Destination(self.post.serialize(
+                        document, E=E, as_ref=True, **kwargs), *pcs['post']),
                     E.Response(self.response.serialize(document, E=E, **kwargs),
                                *pcs['response']),
                     E.Connectivity(
                         self.connectivity.rule_properties.serialize(document, E=E,
-                                                                 **kwargs))]
+                                                                    **kwargs))]
             if self.plasticity:
                 args.append(E.Plasticity(
                     self.plasticity.serialize(document, E=E, **kwargs),
@@ -214,7 +214,7 @@ class Projection(BaseULObject, DocumentLevelObject):
             if self.plasticity is not None:
                 members.append(
                     E.Plasticity(self.plasticity.serialize(document, E=E,
-                                                        **kwargs)))
+                                                           **kwargs)))
             members.extend([pc.serialize(document, E=E, **kwargs)
                             for pc in self.port_connections])
             xml = E(self.nineml_type, *members, name=self.name)
@@ -223,20 +223,20 @@ class Projection(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
-        name = get_xml_attr(element, 'name', document, **kwargs)
-        xmlns = extract_xmlns(element.tag)
-        if xmlns == NINEMLv1:
+        name = get_elem_attr(element, 'name', document, **kwargs)
+        ns = extract_ns(element.tag)
+        if ns == NINEMLv1:
             pre_within = 'Source'
             post_within = 'Destination'
             multiple_within = True
             # Get Delay
             delay_elem = expect_single(element.findall(NINEMLv1 + 'Delay'))
             units = document[
-                get_xml_attr(delay_elem, 'units', document, **kwargs)]
-            value = from_child_xml(
+                get_elem_attr(delay_elem, 'units', document, **kwargs)]
+            value = from_child_elem(
                 delay_elem,
                 (SingleValue, ArrayValue, RandomValue),
                 document, **kwargs)
@@ -247,26 +247,26 @@ class Projection(BaseULObject, DocumentLevelObject):
             pre_within = 'Pre'
             post_within = 'Post'
             multiple_within = False
-            delay = from_child_xml(element, Quantity, document, within='Delay',
-                                   **kwargs)
+            delay = from_child_elem(element, Quantity, document, within='Delay',
+                                    **kwargs)
         # Get Pre
-        pre = from_child_xml(element, (Population, Selection), document,
-                             allow_reference='only', within=pre_within,
-                             multiple_within=multiple_within, **kwargs)
-        post = from_child_xml(element, (Population, Selection), document,
-                              allow_reference='only', within=post_within,
+        pre = from_child_elem(element, (Population, Selection), document,
+                              allow_reference='only', within=pre_within,
                               multiple_within=multiple_within, **kwargs)
-        response = from_child_xml(element, DynamicsProperties, document,
-                                  allow_reference=True, within='Response',
-                                  multiple_within=multiple_within, **kwargs)
-        plasticity = from_child_xml(element, DynamicsProperties, document,
-                                    allow_reference=True, within='Plasticity',
-                                    multiple_within=multiple_within,
-                                    allow_none=True, **kwargs)
-        connection_rule_props = from_child_xml(
+        post = from_child_elem(element, (Population, Selection), document,
+                               allow_reference='only', within=post_within,
+                               multiple_within=multiple_within, **kwargs)
+        response = from_child_elem(element, DynamicsProperties, document,
+                                   allow_reference=True, within='Response',
+                                   multiple_within=multiple_within, **kwargs)
+        plasticity = from_child_elem(element, DynamicsProperties, document,
+                                     allow_reference=True, within='Plasticity',
+                                     multiple_within=multiple_within,
+                                     allow_none=True, **kwargs)
+        connection_rule_props = from_child_elem(
             element, ConnectionRuleProperties, document, within='Connectivity',
             allow_reference=True, **kwargs)
-        if xmlns == NINEMLv1:
+        if ns == NINEMLv1:
             port_connections = []
             for receive_name in cls.version1_nodes:
                 try:
@@ -281,9 +281,9 @@ class Projection(BaseULObject, DocumentLevelObject):
                 for send_name in cls.version1_nodes:
                     for from_elem in receive_elem.findall(NINEMLv1 + 'From' +
                                                           send_name):
-                        send_port_name = get_xml_attr(
+                        send_port_name = get_elem_attr(
                             from_elem, 'send_port', document, **kwargs)
-                        receive_port_name = get_xml_attr(
+                        receive_port_name = get_elem_attr(
                             from_elem, 'receive_port', document, **kwargs)
                         receive_port = receiver.port(receive_port_name)
                         if isinstance(receive_port, EventReceivePort):
@@ -296,7 +296,7 @@ class Projection(BaseULObject, DocumentLevelObject):
                             send_port=send_port_name,
                             receive_port=receive_port_name))
         else:
-            port_connections = from_child_xml(
+            port_connections = from_child_elem(
                 element, (AnalogPortConnection, EventPortConnection),
                 document, multiple=True, allow_none=True, **kwargs)
         return cls(name=name,

@@ -11,14 +11,14 @@ from nineml.exceptions import (
 import re
 import nineml
 
-XML_VERSION = 1.0
+NINEML_VERSION = 1.0
 
 nineml_v1_ns = 'http://nineml.net/9ML/1.0'
 nineml_v2_ns = 'http://nineml.net/9ML/2.0'
 
-if XML_VERSION == 1.0:
+if NINEML_VERSION == 1.0:
     nineml_ns = nineml_v1_ns
-elif XML_VERSION == 2.0:
+elif NINEML_VERSION == 2.0:
     nineml_ns = nineml_v2_ns
 else:
     assert False
@@ -30,8 +30,8 @@ ALL_NINEML = (NINEMLv1, NINEMLv2)
 MATHML = "{http://www.w3.org/1998/Math/MathML}"
 UNCERTML = "{http://www.uncertml.org/2.0}"
 
-# Extracts the xmlns from an lxml element tag
-xmlns_re = re.compile(r'(\{.*\})(.*)')
+# Extracts the ns from an lxml element tag
+ns_re = re.compile(r'(\{.*\})(.*)')
 
 Ev1 = ElementMaker(namespace=nineml_v1_ns, nsmap={None: nineml_v1_ns})
 Ev2 = ElementMaker(namespace=nineml_v2_ns, nsmap={None: nineml_v2_ns})
@@ -52,18 +52,18 @@ def get_element_maker(version):
     return element_maker
 
 
-def extract_xmlns(tag_name):
-    return xmlns_re.match(tag_name).group(1)
+def extract_ns(tag_name):
+    return ns_re.match(tag_name).group(1)
 
 
-def strip_xmlns(tag_name):
-    return xmlns_re.match(tag_name).group(2)
+def strip_ns(tag_name):
+    return ns_re.match(tag_name).group(2)
 
 
-def from_child_xml(element, child_classes, document, multiple=False,
-                   allow_reference=False, allow_none=False, within=None,
-                   unprocessed=None, multiple_within=False,
-                   allowed_attrib=[], **kwargs):
+def from_child_elem(element, child_classes, document, multiple=False,
+                    allow_reference=False, allow_none=False, within=None,
+                    unprocessed=None, multiple_within=False,
+                    allowed_attrib=[], **kwargs):
     """
     Loads a child element from the element, matching the tag name to the
     appropriate class and calling its 'unserialize' method
@@ -73,12 +73,12 @@ def from_child_xml(element, child_classes, document, multiple=False,
         child_classes = (child_classes,)
     assert child_classes, "No child classes supplied"
     # Get the namespace of the element (i.e. NineML version)
-    xmlns = extract_xmlns(element.tag)
+    ns = extract_ns(element.tag)
     # Get the parent element of the child elements to parse. For example the
     # in Projection elements where pre and post synaptic population references
     # are enclosed within 'Pre' or 'Post' tags respectively
     if within:
-        within_elems = element.findall(xmlns + within)
+        within_elems = element.findall(ns + within)
         if len(within_elems) == 1:
             parent = within_elems[0]
             if any(a not in allowed_attrib for a in parent.attrib):
@@ -89,7 +89,7 @@ def from_child_xml(element, child_classes, document, multiple=False,
                             allowed_attrib))
             if not multiple_within and len([
                     c for c in parent.getchildren()
-                    if c.tag != xmlns + 'Annotations']) > 1:
+                    if c.tag != ns + 'Annotations']) > 1:
                 raise NineMLXMLBlockError(
                     "{} in '{}' is only expected to contain a single child "
                     "block, found {}"
@@ -116,23 +116,23 @@ def from_child_xml(element, child_classes, document, multiple=False,
     children = []
     if allow_reference != 'only':
         for child_cls in child_classes:
-            if xmlns == NINEMLv1:
+            if ns == NINEMLv1:
                 try:
                     tag_name = child_cls.v1_nineml_type
                 except AttributeError:
                     tag_name = child_cls.nineml_type
             else:
                 tag_name = child_cls.nineml_type
-            for child_elem in parent.findall(xmlns + tag_name):
+            for child_elem in parent.findall(ns + tag_name):
                 children.append(child_cls.unserialize(child_elem, document,
-                                                   **kwargs))
+                                                      **kwargs))
                 if unprocessed and not within:
                     unprocessed[0].discard(child_elem)
     if allow_reference:
         for ref_elem in parent.findall(
-                xmlns + nineml.reference.Reference.nineml_type):
+                ns + nineml.reference.Reference.nineml_type):
             ref = nineml.reference.Reference.unserialize(ref_elem, document,
-                                                      **kwargs)
+                                                         **kwargs)
             if isinstance(ref.user_object, child_classes):
                 children.append(ref.user_object)
                 if unprocessed and not within:
@@ -159,8 +159,8 @@ def from_child_xml(element, child_classes, document, multiple=False,
     return result
 
 
-def get_xml_attr(element, name, document, unprocessed=None, in_block=False,
-                 within=None, dtype=str, **kwargs):  # @UnusedVariable @IgnorePep8
+def get_elem_attr(element, name, document, unprocessed=None, in_block=False,
+                  within=None, dtype=str, **kwargs):  # @UnusedVariable @IgnorePep8
     """
     Gets an attribute from an xml element with exception handling
     """
@@ -199,8 +199,8 @@ def get_xml_attr(element, name, document, unprocessed=None, in_block=False,
 
 
 def get_subblock(element, name, unprocessed, document, **kwargs):  # @UnusedVariable @IgnorePep8
-    xmlns = extract_xmlns(element.tag)
-    found = element.findall(xmlns + name)
+    ns = extract_ns(element.tag)
+    found = element.findall(ns + name)
     if len(found) == 1:
         if unprocessed:
             unprocessed[0].discard(found[0])
@@ -218,8 +218,8 @@ def get_subblock(element, name, unprocessed, document, **kwargs):  # @UnusedVari
 
 
 def get_subblocks(element, name, unprocessed, **kwargs):  # @UnusedVariable
-    xmlns = extract_xmlns(element.tag)
-    children = element.findall(xmlns + name)
+    ns = extract_ns(element.tag)
+    children = element.findall(ns + name)
     for child in children:
         if unprocessed:
             unprocessed[0].discard(child)
@@ -231,9 +231,9 @@ def identify_element(element):
     Identifies an XML element for use in error messages
     """
     # Get the namespace of the element (i.e. NineML version)
-    xmlns = extract_xmlns(element.tag)
+    ns = extract_ns(element.tag)
     # Get the name of the element for error messages if present
-    identity = element.tag[len(xmlns):]
+    identity = element.tag[len(ns):]
     try:
         name = element.attrib['name']
     except KeyError:
@@ -244,7 +244,7 @@ def identify_element(element):
     return "'{}' {}".format(name, identity)
 
 
-def unprocessed_xml(unserialize):
+def un_proc_essed(unserialize):
     def unserialize_with_exception_handling(cls, element, *args, **kwargs):  # @UnusedVariable @IgnorePep8
         # Get the document object for error messages
         if args or 'document' in kwargs:  # if UL classmethod
@@ -252,8 +252,8 @@ def unprocessed_xml(unserialize):
                 document = args[0]
             else:
                 document = kwargs['document']
-            xmlns = extract_xmlns(element.tag)
-            if xmlns == NINEMLv1:
+            ns = extract_ns(element.tag)
+            if ns == NINEMLv1:
                 try:
                     nineml_type = cls.v1_nineml_type
                 except AttributeError:
@@ -262,9 +262,9 @@ def unprocessed_xml(unserialize):
                 nineml_type = cls.nineml_type
             # Check the tag of the element matches the class names
             try:
-                assert element.tag == (xmlns + nineml_type), (
+                assert element.tag == (ns + nineml_type), (
                     "Found '{}' element, expected '{}'"
-                    .format(element.tag, xmlns + nineml_type))
+                    .format(element.tag, ns + nineml_type))
             except:
                 raise
         else:
@@ -276,7 +276,7 @@ def unprocessed_xml(unserialize):
                        set(element.attrib.iterkeys()))
         # The decorated method
         obj = unserialize(cls, element, *args, unprocessed=unprocessed,
-                       **kwargs)
+                          **kwargs)
         # Check to see if there were blocks that were unprocessed in the
         # element
         blocks, attrs = unprocessed

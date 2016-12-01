@@ -2,8 +2,8 @@ from operator import itemgetter, and_
 from . import BaseULObject
 from nineml.reference import resolve_reference, write_reference, Reference
 from nineml.annotations import annotate, read_annotations
-from nineml.xml import (
-    extract_xmlns, E, from_child_xml, unprocessed_xml, get_xml_attr, NINEMLv1)
+from nineml.serialize import (
+    extract_ns, E, from_child_elem, un_proc_essed, get_elem_attr, NINEMLv1)
 from nineml.base import DocumentLevelObject, DynamicPortsObject
 from .population import Population
 from nineml.exceptions import NineMLNameError
@@ -80,12 +80,12 @@ class Selection(BaseULObject, DocumentLevelObject, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # The only supported op at this stage
-        op = from_child_xml(
+        op = from_child_elem(
             element, Concatenate, document, **kwargs)
-        return cls(get_xml_attr(element, 'name', document, **kwargs), op,
+        return cls(get_elem_attr(element, 'name', document, **kwargs), op,
                    document=document)
 
     def evaluate(self):
@@ -216,15 +216,15 @@ class Concatenate(BaseULObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
-        for it_elem in element.findall(extract_xmlns(element.tag) + 'Item'):
+        for it_elem in element.findall(extract_ns(element.tag) + 'Item'):
             items.append((
-                get_xml_attr(it_elem, 'index', document, dtype=int, **kwargs),
-                from_child_xml(it_elem, Population, document,
-                               allow_reference='only', **kwargs)))
+                get_elem_attr(it_elem, 'index', document, dtype=int, **kwargs),
+                from_child_elem(it_elem, Population, document,
+                                allow_reference='only', **kwargs)))
             try:
                 kwargs['unprocessed'][0].discard(it_elem)
             except KeyError:
@@ -277,7 +277,7 @@ class Concatenate(BaseULObject):
 #     def unserialize(cls, element, components):
 #         select_element = element.find(NINEML + 'select')
 #         assert len(select_element) == 1
-#         return cls(get_xml_attr(element, 'name', document, **kwargs),
+#         return cls(get_elem_attr(element, 'name', document, **kwargs),
 #                    Operator.unserialize(select_element.getchildren()[0]))
 #
 #     def evaluate(self, group):
