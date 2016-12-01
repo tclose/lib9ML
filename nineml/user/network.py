@@ -13,7 +13,7 @@ from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import name_error
 from nineml.base import DocumentLevelObject, ContainerObject
 from nineml.serialize import (
-    E, from_child_elem, un_proc_essed, get_elem_attr)
+    E, from_child_elem, unprocessed, get_elem_attr)
 from nineml.user.port_connections import EventPortConnection
 from nineml.user.dynamics import DynamicsProperties
 from nineml.user.connectionrule import ConnectionRuleProperties, Connectivity
@@ -141,7 +141,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         populations = from_child_elem(element, Population, document,
                                      multiple=True, allow_reference='only',
@@ -235,7 +235,7 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         dynamics_properties = from_child_elem(
             element, DynamicsProperties, document,
@@ -387,7 +387,7 @@ class BaseConnectionGroup(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
         name = get_elem_attr(element, 'name', document, **kwargs)

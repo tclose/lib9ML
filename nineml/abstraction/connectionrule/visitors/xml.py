@@ -8,7 +8,7 @@ from nineml.annotations import annotate
 from nineml.utils import expect_single
 from nineml.exceptions import NineMLXMLBlockError
 from nineml.serialize import (
-    get_elem_attr, un_proc_essed, NINEMLv1, extract_ns)
+    get_elem_attr, unprocessed, NINEMLv1, extract_ns)
 from nineml.annotations import read_annotations
 from ...componentclass.visitors.xml import (
     ComponentClassXMLLoader, ComponentClassXMLWriter)
@@ -26,7 +26,7 @@ class ConnectionRuleXMLLoader(ComponentClassXMLLoader, ConnectionRuleVisitor):
     """
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_connectionruleclass(self, element, **kwargs):  # @UnusedVariable
         ns = extract_ns(element.tag)
         if ns == NINEMLv1:

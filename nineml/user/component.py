@@ -8,7 +8,7 @@ from nineml.reference import (
 from nineml.annotations import read_annotations, annotate
 from nineml.utils import ensure_valid_identifier
 from nineml.serialize import (
-    from_child_elem, un_proc_essed, get_elem_attr, E, extract_ns, NINEMLv1)
+    from_child_elem, unprocessed, get_elem_attr, E, extract_ns, NINEMLv1)
 from ..abstraction import ComponentClass
 from nineml.units import Quantity
 from . import BaseULObject
@@ -305,7 +305,7 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
         name = get_elem_attr(element, "name", document, **kwargs)
@@ -474,7 +474,7 @@ class Property(BaseULObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         name = get_elem_attr(element, 'name', document, **kwargs)
         if extract_ns(element.tag) == NINEMLv1:

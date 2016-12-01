@@ -11,7 +11,7 @@ from nineml.abstraction.componentclass.base import Parameter
 from nineml.annotations import annotate, read_annotations
 from nineml.serialize import (
     E, strip_ns, extract_ns, get_elem_attr, identify_element,
-    un_proc_essed, ALL_NINEML, NINEMLv1)
+    unprocessed, ALL_NINEML, NINEMLv1)
 from nineml.exceptions import NineMLXMLBlockError
 from nineml.abstraction.expressions import Expression
 
@@ -32,7 +32,7 @@ class ComponentClassXMLLoader(object):
         self.document = document
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_parameter(self, element, **kwargs):  # @UnusedVariable
         return Parameter(name=get_elem_attr(element, 'name', self.document,
                                             **kwargs),
@@ -41,14 +41,14 @@ class ComponentClassXMLLoader(object):
                                            **kwargs)])
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_alias(self, element, **kwargs):  # @UnusedVariable
         name = get_elem_attr(element, 'name', self.document, **kwargs)
         rhs = self.load_expression(element, **kwargs)
         return Alias(lhs=name, rhs=rhs)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_constant(self, element, **kwargs):  # @UnusedVariable
         ns = extract_ns(element.tag)
         if ns == NINEMLv1:
@@ -77,7 +77,7 @@ class ComponentClassXMLLoader(object):
         # Initialise loaded objects with empty lists
         loaded_objects = dict((block, []) for block in block_names)
         for t in element.iterchildren(tag=etree.Element):
-            # Used in un_proc_essed decorator
+            # Used in unprocessed decorator
             if unprocessed_elems:
                 unprocessed_elems[0].discard(t)
             # Strip namespace

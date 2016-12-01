@@ -15,7 +15,7 @@ import nineml
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLValueError)
 from nineml.utils import nearly_equal
-from nineml.serialize import from_child_elem, un_proc_essed, get_subblocks
+from nineml.serialize import from_child_elem, unprocessed, get_subblocks
 
 
 # =============================================================================
@@ -164,7 +164,7 @@ class SingleValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(float(element.text))
 
@@ -336,7 +336,7 @@ class ArrayValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag == 'ExternalArrayValue':
             url = get_elem_attr(element, 'url', document, **kwargs)
@@ -566,7 +566,7 @@ class RandomValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         distribution = from_child_elem(
             element, nineml.user.RandomDistributionProperties,

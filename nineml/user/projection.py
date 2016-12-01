@@ -4,7 +4,7 @@ from collections import defaultdict
 from nineml.exceptions import NineMLRuntimeError
 from nineml.reference import resolve_reference, write_reference
 from nineml.serialize import (
-    E, from_child_elem, un_proc_essed, get_elem_attr, extract_ns, NINEMLv1)
+    E, from_child_elem, unprocessed, get_elem_attr, extract_ns, NINEMLv1)
 from nineml.annotations import read_annotations, annotate
 from .connectionrule import ConnectionRuleProperties, Connectivity
 from .dynamics import DynamicsProperties
@@ -223,7 +223,7 @@ class Projection(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
         name = get_elem_attr(element, 'name', document, **kwargs)

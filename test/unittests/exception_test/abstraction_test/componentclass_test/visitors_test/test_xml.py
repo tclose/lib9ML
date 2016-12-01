@@ -25,7 +25,7 @@ class TestComponentClassXMLLoaderExceptions(unittest.TestCase):
         # Initialise loaded objects with empty lists
         loaded_objects = dict((block, []) for block in block_names)
         for t in element.iterchildren(tag=etree.Element):
-            # Used in un_proc_essed decorator
+            # Used in unprocessed decorator
             if unprocessed_elems:
                 unprocessed_elems[0].discard(t)
             # Strip namespace

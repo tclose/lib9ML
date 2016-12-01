@@ -7,7 +7,7 @@ docstring needed
 from nineml.annotations import annotate
 from nineml.utils import expect_single
 from nineml.serialize import (
-    get_elem_attr, un_proc_essed, NINEMLv1, extract_ns)
+    get_elem_attr, unprocessed, NINEMLv1, extract_ns)
 from nineml.exceptions import NineMLXMLBlockError
 from nineml.annotations import read_annotations
 from ...componentclass.visitors.xml import (
@@ -27,7 +27,7 @@ class RandomDistributionXMLLoader(ComponentClassXMLLoader,
     """
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_randomdistributionclass(self, element, **kwargs):
         ns = extract_ns(element.tag)
         if ns == NINEMLv1:

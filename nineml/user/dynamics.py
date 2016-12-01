@@ -5,7 +5,7 @@ from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, name_error, NineMLUnitMismatchError)
 from nineml.annotations import read_annotations
 from nineml.serialize import (
-    from_child_elem, un_proc_essed, get_elem_attr)
+    from_child_elem, unprocessed, get_elem_attr)
 from nineml.base import (
     ContainerObject, DynamicPortsObject)
 
@@ -147,7 +147,7 @@ class DynamicsProperties(Component, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
         name = get_elem_attr(element, "name", document, **kwargs)

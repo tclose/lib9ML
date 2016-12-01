@@ -8,7 +8,7 @@ from itertools import chain
 from nineml.annotations import annotate
 from nineml.utils import expect_single
 from nineml.serialize import (
-    get_elem_attr, un_proc_essed, NINEMLv1, extract_ns)
+    get_elem_attr, unprocessed, NINEMLv1, extract_ns)
 from nineml.exceptions import NineMLXMLBlockError
 from ..base import Dynamics
 from nineml.annotations import read_annotations
@@ -36,7 +36,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
     """
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_dynamics(self, element, **kwargs):  # @UnusedVariable
         block_names = ('Parameter', 'AnalogSendPort', 'AnalogReceivePort',
                        'EventSendPort', 'EventReceivePort', 'AnalogReducePort',
@@ -74,19 +74,19 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
             **dyn_kwargs)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_eventsendport(self, element, **kwargs):  # @UnusedVariable
         return EventSendPort(name=get_elem_attr(element, 'name', self.document,
                                                **kwargs))
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_eventreceiveport(self, element, **kwargs):  # @UnusedVariable
         return EventReceivePort(name=get_elem_attr(element, 'name',
                                                   self.document, **kwargs))
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_analogsendport(self, element, **kwargs):  # @UnusedVariable
         return AnalogSendPort(
             name=get_elem_attr(element, 'name', self.document, **kwargs),
@@ -94,7 +94,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                                                  self.document, **kwargs)])
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_analogreceiveport(self, element, **kwargs):  # @UnusedVariable
         return AnalogReceivePort(
             name=get_elem_attr(element, 'name', self.document, **kwargs),
@@ -102,7 +102,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                                                  self.document, **kwargs)])
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_analogreduceport(self, element, **kwargs):  # @UnusedVariable
         return AnalogReducePort(
             name=get_elem_attr(element, 'name', self.document, **kwargs),
@@ -112,7 +112,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                                   **kwargs))
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_regime(self, element, **kwargs):  # @UnusedVariable
         block_names = ('TimeDerivative', 'OnCondition', 'OnEvent',
                        'Alias')
@@ -125,7 +125,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                       aliases=blocks['Alias'])
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_statevariable(self, element, **kwargs):  # @UnusedVariable
         name = get_elem_attr(element, 'name', self.document, **kwargs)
         dimension = self.document[get_elem_attr(element, 'dimension',
@@ -133,7 +133,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
         return StateVariable(name=name, dimension=dimension)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_timederivative(self, element, **kwargs):  # @UnusedVariable
         variable = get_elem_attr(element, 'variable', self.document, **kwargs)
         expr = self.load_expression(element, **kwargs)
@@ -141,7 +141,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                               rhs=expr)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_oncondition(self, element, **kwargs):  # @UnusedVariable
         block_names = ('Trigger', 'StateAssignment', 'OutputEvent')
         blocks = self._load_blocks(element, block_names=block_names, **kwargs)
@@ -154,7 +154,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                            target_regime=target_regime)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_onevent(self, element, **kwargs):  # @UnusedVariable
         block_names = ('StateAssignment', 'OutputEvent')
         blocks = self._load_blocks(element, block_names=block_names, **kwargs)
@@ -167,19 +167,19 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                        target_regime=target_regime)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_trigger(self, element, **kwargs):  # @UnusedVariable
         return Trigger(self.load_expression(element, **kwargs))
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_stateassignment(self, element, **kwargs):  # @UnusedVariable
         lhs = get_elem_attr(element, 'variable', self.document, **kwargs)
         rhs = self.load_expression(element, **kwargs)
         return StateAssignment(lhs=lhs, rhs=rhs)
 
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def load_outputevent(self, element, **kwargs):  # @UnusedVariable
         port_name = get_elem_attr(element, 'port', self.document, **kwargs)
         return OutputEvent(port_name=port_name)

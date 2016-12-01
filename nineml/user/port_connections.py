@@ -1,6 +1,6 @@
 from . import BaseULObject
 from abc import ABCMeta, abstractmethod
-from nineml.serialize import E, un_proc_essed, get_elem_attr
+from nineml.serialize import E, unprocessed, get_elem_attr
 from nineml.annotations import read_annotations, annotate
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, NineMLDimensionError)
@@ -305,7 +305,7 @@ class BasePortConnection(BaseULObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(send_port=get_elem_attr(element, 'send_port',
                                           document, **kwargs),

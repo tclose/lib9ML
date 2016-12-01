@@ -159,8 +159,8 @@ def from_child_elem(element, child_classes, document, multiple=False,
     return result
 
 
-def get_elem_attr(element, name, document, unprocessed_elems=None, in_block=False,
-                  within=None, dtype=str, **kwargs):  # @UnusedVariable @IgnorePep8
+def get_elem_attr(element, name, document, unprocessed_elems=None,
+                  in_block=False, within=None, dtype=str, **kwargs):  # @UnusedVariable @IgnorePep8
     """
     Gets an attribute from an xml element with exception handling
     """
@@ -217,7 +217,7 @@ def get_subblock(element, name, unprocessed_elems, document, **kwargs):  # @Unus
     return found[0]
 
 
-def get_subblocks(element, name, unprocessed_elems, **kwargs):  # @UnusedVariable
+def get_subblocks(element, name, unprocessed_elems, **kwargs):  # @UnusedVariable @IgnorePep8
     ns = extract_ns(element.tag)
     children = element.findall(ns + name)
     for child in children:
@@ -244,7 +244,7 @@ def identify_element(element):
     return "'{}' {}".format(name, identity)
 
 
-def un_proc_essed(unserialize):
+def unprocessed(unserialize):
     def unserialize_with_exception_handling(cls, element, *args, **kwargs):  # @UnusedVariable @IgnorePep8
         # Get the document object for error messages
         if args or 'document' in kwargs:  # if UL classmethod

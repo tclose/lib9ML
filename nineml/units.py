@@ -5,7 +5,7 @@ import operator
 from sympy import Symbol
 import sympy
 import math
-from nineml.serialize import E, un_proc_essed, get_elem_attr
+from nineml.serialize import E, unprocessed, get_elem_attr
 from nineml.base import AnnotatedNineMLObject, DocumentLevelObject
 from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import (
@@ -147,7 +147,7 @@ class Dimension(AnnotatedNineMLObject, DocumentLevelObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         name = get_elem_attr(element, 'name', document, **kwargs)
         # Get the attributes corresponding to the dimension symbols
@@ -352,7 +352,7 @@ class Unit(AnnotatedNineMLObject, DocumentLevelObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         name = get_elem_attr(element, 'symbol', document, **kwargs)
         dimension = document[get_elem_attr(element, 'dimension', document,
@@ -521,7 +521,7 @@ class Quantity(AnnotatedNineMLObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         value = BaseValue.from_parent_xml(element, document, **kwargs)
         try:

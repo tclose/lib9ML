@@ -6,7 +6,7 @@ import operator
 from itertools import product, groupby, izip, repeat
 from nineml.reference import resolve_reference, write_reference
 from nineml.serialize import (
-    nineml_ns, E, from_child_elem, un_proc_essed, get_elem_attr)
+    nineml_ns, E, from_child_elem, unprocessed, get_elem_attr)
 from nineml.user import DynamicsProperties, Definition
 from nineml.annotations import annotate, read_annotations
 from nineml.abstraction.dynamics.visitors.cloner import DynamicsCloner
@@ -143,7 +143,7 @@ class MultiDynamicsProperties(DynamicsProperties):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         sub_component_properties = from_child_elem(
             element, SubDynamicsProperties, document, multiple=True,
@@ -291,7 +291,7 @@ class SubDynamicsProperties(BaseULObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         dynamics_properties = from_child_elem(
             element, (DynamicsProperties, MultiDynamicsProperties), document,
@@ -507,7 +507,7 @@ class SubDynamics(BaseULObject, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         dynamics = from_child_elem(
             element, (Dynamics, MultiDynamics), document,
@@ -966,7 +966,7 @@ class MultiDynamics(Dynamics):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):
         sub_components = from_child_elem(
             element, SubDynamics, document, multiple=True,

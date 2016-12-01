@@ -5,7 +5,7 @@ import operator
 from nineml.abstraction import (
     AnalogSendPort, AnalogReceivePort, AnalogReducePort, EventSendPort,
     EventReceivePort, Alias, Dynamics)
-from nineml.serialize import E, un_proc_essed, get_elem_attr
+from nineml.serialize import E, unprocessed, get_elem_attr
 from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import NineMLRuntimeError, NineMLImmutableError
 from .namespace import append_namespace
@@ -104,7 +104,7 @@ class BasePortExposure(BaseULObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(name=get_elem_attr(element, 'name', document, **kwargs),
                    component=get_elem_attr(element, 'sub_component', document,

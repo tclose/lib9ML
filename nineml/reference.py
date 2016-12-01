@@ -2,7 +2,7 @@ import os
 from copy import copy
 from .base import AnnotatedNineMLObject
 from nineml.serialize import (
-    E, ALL_NINEML, un_proc_essed, get_elem_attr, extract_ns, NINEMLv1)
+    E, ALL_NINEML, unprocessed, get_elem_attr, extract_ns, NINEMLv1)
 from nineml.annotations import read_annotations
 from nineml.exceptions import NineMLRuntimeError, NineMLXMLAttributeError
 from nineml.exceptions import NineMLNameError
@@ -75,7 +75,7 @@ class BaseReference(AnnotatedNineMLObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         ns = extract_ns(element.tag)
         if ns == NINEMLv1:

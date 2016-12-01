@@ -3,7 +3,7 @@ from . import BaseULObject
 from nineml.reference import resolve_reference, write_reference, Reference
 from nineml.annotations import annotate, read_annotations
 from nineml.serialize import (
-    extract_ns, E, from_child_elem, un_proc_essed, get_elem_attr, NINEMLv1)
+    extract_ns, E, from_child_elem, unprocessed, get_elem_attr, NINEMLv1)
 from nineml.base import DocumentLevelObject, DynamicPortsObject
 from .population import Population
 from nineml.exceptions import NineMLNameError
@@ -80,7 +80,7 @@ class Selection(BaseULObject, DocumentLevelObject, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # The only supported op at this stage
         op = from_child_elem(
@@ -216,7 +216,7 @@ class Concatenate(BaseULObject):
 
     @classmethod
     @read_annotations
-    @un_proc_essed
+    @unprocessed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
