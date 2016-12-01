@@ -6,8 +6,8 @@ docstring needed
 """
 from nineml.annotations import annotate
 from nineml.utils import expect_single
-from nineml.xml import (
-    get_xml_attr, unprocessed_xml, NINEMLv1, extract_xmlns)
+from nineml.serialize import (
+    get_elem_attr, un_proc_essed, NINEMLv1, extract_ns)
 from nineml.exceptions import NineMLXMLBlockError
 from nineml.annotations import read_annotations
 from ...componentclass.visitors.xml import (
@@ -27,10 +27,10 @@ class RandomDistributionXMLLoader(ComponentClassXMLLoader,
     """
 
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def load_randomdistributionclass(self, element, **kwargs):
-        xmlns = extract_xmlns(element.tag)
-        if xmlns == NINEMLv1:
+        ns = extract_ns(element.tag)
+        if ns == NINEMLv1:
             lib_elem = expect_single(element.findall(NINEMLv1 +
                                                      'RandomDistribution'))
             if lib_elem.getchildren():
@@ -43,8 +43,8 @@ class RandomDistributionXMLLoader(ComponentClassXMLLoader,
             element, block_names=('Parameter',),
             ignore=[(NINEMLv1, 'RandomDistribution')], **kwargs)
         return RandomDistribution(
-            name=get_xml_attr(element, 'name', self.document, **kwargs),
-            standard_library=get_xml_attr(lib_elem, 'standard_library',
+            name=get_elem_attr(element, 'name', self.document, **kwargs),
+            standard_library=get_elem_attr(lib_elem, 'standard_library',
                                           self.document, **kwargs),
             parameters=blocks["Parameter"],
             document=self.document)
@@ -59,7 +59,7 @@ class RandomDistributionXMLWriter(ComponentClassXMLWriter,
 
     @annotate
     def visit_componentclass(self, component_class, **kwargs):  # @UnusedVariable @IgnorePep8
-        if self.xmlns == NINEMLv1:
+        if self.ns == NINEMLv1:
             elems = [e.accept_visitor(self)
                         for e in component_class.sorted_elements()]
             elems.append(

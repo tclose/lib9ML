@@ -3,7 +3,7 @@ from nineml.reference import (BaseReference)
 from nineml.document import Document
 from nineml.exceptions import (NineMLXMLAttributeError, NineMLRuntimeError)
 from nineml.reference import Reference
-from nineml.xml import Ev1
+from nineml.serialize import Ev1
 
 
 class TestBaseReferenceExceptions(unittest.TestCase):

@@ -14,7 +14,7 @@ from nineml.user.dynamics import DynamicsProperties
 from nineml.exceptions import NineMLRuntimeError
 from nineml.user.multi.port_exposures import (
     _LocalAnalogPortConnections, _ReceivePortExposureAlias)
-from nineml.xml import etree, Ev2
+from nineml.serialize import etree, Ev2
 
 
 examples_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..',

@@ -1,7 +1,7 @@
 import unittest
 from copy import deepcopy
 from nineml.annotations import Annotations
-from nineml.xml import etree, nineml_ns, ElementMaker, E
+from nineml.serialize import etree, nineml_ns, ElementMaker, E
 from nineml.abstraction import Parameter, Dynamics, Alias
 from nineml.units import Dimension
 from nineml.abstraction.dynamics.visitors.xml import (

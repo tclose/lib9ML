@@ -16,7 +16,7 @@ from ..ports import (AnalogReceivePort, AnalogSendPort,
                      EventSendPort)
 from nineml.utils import (check_inferred_against_declared,
                           assert_no_duplicates)
-from nineml.xml import nineml_ns, E
+from nineml.serialize import nineml_ns, E
 from nineml.annotations import VALIDATION, DIMENSIONALITY
 from nineml.base import DynamicPortsObject
 

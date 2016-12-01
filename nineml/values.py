@@ -1,6 +1,6 @@
 from __future__ import division
 from .base import AnnotatedNineMLObject
-from nineml.xml import E, get_xml_attr
+from nineml.serialize import E, get_elem_attr
 from abc import ABCMeta, abstractmethod
 from nineml.annotations import read_annotations, annotate
 from urllib import urlopen
@@ -15,7 +15,7 @@ import nineml
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLValueError)
 from nineml.utils import nearly_equal
-from nineml.xml import from_child_xml, unprocessed_xml, get_subblocks
+from nineml.serialize import from_child_elem, un_proc_essed, get_subblocks
 
 
 # =============================================================================
@@ -82,7 +82,7 @@ class BaseValue(AnnotatedNineMLObject):
     @classmethod
     @read_annotations
     def from_parent_xml(cls, element, document, **kwargs):  # @UnusedVariable
-        return from_child_xml(
+        return from_child_elem(
             element, (SingleValue, ArrayValue, RandomValue),
             document, allow_reference=True, **kwargs)
 
@@ -164,7 +164,7 @@ class SingleValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         return cls(float(element.text))
 
@@ -336,22 +336,22 @@ class ArrayValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         if element.tag == 'ExternalArrayValue':
-            url = get_xml_attr(element, 'url', document, **kwargs)
+            url = get_elem_attr(element, 'url', document, **kwargs)
             with contextlib.closing(urlopen(url)) as f:
                 # FIXME: Should use a non-numpy version of this load function
                 values = numpy.loadtxt(f)
-            return cls(values, (get_xml_attr(element, 'url', document,
+            return cls(values, (get_elem_attr(element, 'url', document,
                                              **kwargs),
-                                get_xml_attr(element, 'mimetype', document,
+                                get_elem_attr(element, 'mimetype', document,
                                              **kwargs),
-                                get_xml_attr(element, 'columnName', document,
+                                get_elem_attr(element, 'columnName', document,
                                              **kwargs)))
         else:
-            rows = [(get_xml_attr(e, 'index', document, dtype=int, **kwargs),
-                     get_xml_attr(e, 'value', document, dtype=float, **kwargs))
+            rows = [(get_elem_attr(e, 'index', document, dtype=int, **kwargs),
+                     get_elem_attr(e, 'value', document, dtype=float, **kwargs))
                     for e in get_subblocks(element, 'ArrayValueRow', **kwargs)]
             sorted_rows = sorted(rows, key=itemgetter(0))
             indices, values = zip(*sorted_rows)
@@ -566,9 +566,9 @@ class RandomValue(BaseValue):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        distribution = from_child_xml(
+        distribution = from_child_elem(
             element, nineml.user.RandomDistributionProperties,
             document, allow_reference=True, **kwargs)
         return cls(distribution)

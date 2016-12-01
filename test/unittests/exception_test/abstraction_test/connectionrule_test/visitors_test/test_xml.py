@@ -15,8 +15,8 @@ class TestConnectionRuleXMLLoaderExceptions(unittest.TestCase):
         context:
         --------
     def load_connectionruleclass(self, element, **kwargs):  # @UnusedVariable
-        xmlns = extract_xmlns(element.tag)
-        if xmlns == NINEMLv1:
+        ns = extract_ns(element.tag)
+        if ns == NINEMLv1:
             lib_elem = expect_single(element.findall(NINEMLv1 +
                                                      'ConnectionRule'))
             if lib_elem.getchildren():

@@ -3,8 +3,8 @@ from . import BaseULObject
 from .component import resolve_reference, write_reference
 from .dynamics import DynamicsProperties
 from nineml.base import DocumentLevelObject, DynamicPortsObject
-from nineml.xml import (
-    E, unprocessed_xml, from_child_xml, get_xml_attr)
+from nineml.serialize import (
+    E, un_proc_essed, from_child_elem, get_elem_attr)
 from nineml.annotations import annotate, read_annotations
 from nineml.utils import ensure_valid_identifier
 
@@ -101,12 +101,12 @@ class Population(BaseULObject, DocumentLevelObject, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        cell = from_child_xml(element, DynamicsProperties, document,
+        cell = from_child_elem(element, DynamicsProperties, document,
                               allow_reference=True, within='Cell', **kwargs)
-        return cls(name=get_xml_attr(element, 'name', document, **kwargs),
-                   size=get_xml_attr(element, 'Size', document, in_block=True,
+        return cls(name=get_elem_attr(element, 'name', document, **kwargs),
+                   size=get_elem_attr(element, 'Size', document, in_block=True,
                                      dtype=int, **kwargs),
                    cell=cell, document=document)
 

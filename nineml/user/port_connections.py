@@ -1,6 +1,6 @@
 from . import BaseULObject
 from abc import ABCMeta, abstractmethod
-from nineml.xml import E, unprocessed_xml, get_xml_attr
+from nineml.serialize import E, un_proc_essed, get_elem_attr
 from nineml.annotations import read_annotations, annotate
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, NineMLDimensionError)
@@ -305,20 +305,20 @@ class BasePortConnection(BaseULObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        return cls(send_port=get_xml_attr(element, 'send_port',
+        return cls(send_port=get_elem_attr(element, 'send_port',
                                           document, **kwargs),
-                   receive_port=get_xml_attr(element, 'receive_port', document,
+                   receive_port=get_elem_attr(element, 'receive_port', document,
                                              **kwargs),
-                   sender_role=get_xml_attr(element, 'sender_role', document,
+                   sender_role=get_elem_attr(element, 'sender_role', document,
                                             default=None, **kwargs),
-                   receiver_role=get_xml_attr(element, 'receiver_role',
+                   receiver_role=get_elem_attr(element, 'receiver_role',
                                               document, default=None,
                                               **kwargs),
-                   sender_name=get_xml_attr(element, 'sender_name', document,
+                   sender_name=get_elem_attr(element, 'sender_name', document,
                                             default=None, **kwargs),
-                   receiver_name=get_xml_attr(element, 'receiver_name',
+                   receiver_name=get_elem_attr(element, 'receiver_name',
                                               document, default=None,
                                               **kwargs))
 

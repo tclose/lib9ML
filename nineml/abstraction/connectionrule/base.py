@@ -13,7 +13,7 @@ docstring goes here
 :license: BSD-3, see LICENSE for details.
 """
 from ..componentclass import ComponentClass, Parameter
-from nineml.xml import E
+from nineml.serialize import E
 from nineml.exceptions import NineMLRuntimeError
 import nineml.units as un
 

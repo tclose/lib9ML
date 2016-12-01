@@ -20,7 +20,7 @@ class TestDynamicsXMLLoaderExceptions(unittest.TestCase):
                        'Regime', 'Alias', 'StateVariable', 'Constant')
         blocks = self._load_blocks(element, block_names=block_names,
                                    ignore=[(NINEMLv1, 'Dynamics')], **kwargs)
-        if extract_xmlns(element.tag) == NINEMLv1:
+        if extract_ns(element.tag) == NINEMLv1:
             if any(blocks[block_name] for block_name in version1_main):
         """
 

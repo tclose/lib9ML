@@ -6,7 +6,7 @@ from nineml.exceptions import (NineMLDimensionError, NineMLNameError,
 import nineml.units as un
 from nineml.document import Document
 from nineml.values import SingleValue
-from nineml.xml import E
+from nineml.serialize import E
 
 
 class TestDimensionExceptions(unittest.TestCase):

@@ -6,8 +6,8 @@ import weakref
 from copy import deepcopy
 from lxml import etree
 import collections
-from nineml.xml import (
-    E, ALL_NINEML, extract_xmlns, NINEMLv1, get_element_maker, XML_VERSION)
+from nineml.serialize import (
+    E, ALL_NINEML, extract_ns, NINEMLv1, get_element_maker, NINEML_VERSION)
 from nineml.annotations import Annotations
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, NineMLXMLError, NineMLXMLTagError)
@@ -313,13 +313,13 @@ class Document(AnnotatedNineMLObject, dict):
     @classmethod
     def unserialize(cls, element, url=None, **kwargs):
         url = cls._standardise_url(url)
-        xmlns = extract_xmlns(element.tag)
-        if xmlns not in ALL_NINEML:
+        ns = extract_ns(element.tag)
+        if ns not in ALL_NINEML:
             raise NineMLXMLError(
                 "Unrecognised XML namespace '{}', can be one of '{}'"
-                .format(xmlns[1:-1],
+                .format(ns[1:-1],
                         "', '".join(ns[1:-1] for ns in ALL_NINEML)))
-        if element.tag[len(xmlns):] != cls.nineml_type:
+        if element.tag[len(ns):] != cls.nineml_type:
             raise NineMLXMLError("'{}' document does not have a NineML root "
                                  "('{}')".format(url, element.tag))
         # Initialise the document
@@ -330,8 +330,8 @@ class Document(AnnotatedNineMLObject, dict):
         for child in element.getchildren():
             if isinstance(child, etree._Comment):
                 continue
-            if child.tag.startswith(xmlns):
-                nineml_type = child.tag[len(xmlns):]
+            if child.tag.startswith(ns):
+                nineml_type = child.tag[len(ns):]
                 if nineml_type == Annotations.nineml_type:
                     assert annotations is None, \
                         "Multiple annotations tags found"
@@ -340,7 +340,7 @@ class Document(AnnotatedNineMLObject, dict):
                 try:
                     child_cls = cls._get_class_from_type(nineml_type)
                 except NineMLXMLTagError:
-                    child_cls = cls._get_class_from_v1(nineml_type, xmlns,
+                    child_cls = cls._get_class_from_v1(nineml_type, ns,
                                                        child, element, url)
             else:
                 raise NotImplementedError(
@@ -382,11 +382,11 @@ class Document(AnnotatedNineMLObject, dict):
         return child_cls
 
     @classmethod
-    def _get_class_from_v1(cls, nineml_type, xmlns, child, element, url):
+    def _get_class_from_v1(cls, nineml_type, ns, child, element, url):
         # Check for v1 document-level objects
-        if (xmlns, nineml_type) == (NINEMLv1, 'ComponentClass'):
+        if (ns, nineml_type) == (NINEMLv1, 'ComponentClass'):
             child_cls = get_component_class_type(child)
-        elif (xmlns, nineml_type) == (NINEMLv1, 'Component'):
+        elif (ns, nineml_type) == (NINEMLv1, 'Component'):
             relative_to = (os.path.dirname(url)
                            if url is not None else None)
             child_cls = get_component_type(child, element,
@@ -412,7 +412,7 @@ class Document(AnnotatedNineMLObject, dict):
                                for e in self.itervalues()))
         return clone
 
-    def write(self, url, version=XML_VERSION, **kwargs):
+    def write(self, url, version=NINEML_VERSION, **kwargs):
         if self.url is None:
             self.url = url  # Required so relative urls can be generated
         elif self.url != url:

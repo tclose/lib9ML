@@ -1,23 +1,23 @@
 from copy import copy
-from nineml.xml import E, extract_xmlns, strip_xmlns
+from nineml.serialize import E, extract_ns, strip_ns
 from nineml.base import DocumentLevelObject, BaseNineMLObject
 import re
-from nineml.xml import ElementMaker, nineml_ns, etree
+from nineml.serialize import ElementMaker, nineml_ns, etree
 from nineml.exceptions import (
     NineMLXMLError, NineMLRuntimeError, NineMLNameError)
 
 
 def read_annotations(unserialize):
     def read_annotations_from_unserialize(cls, element, *args, **kwargs):
-        nineml_xmlns = extract_xmlns(element.tag)
+        nineml_ns = extract_ns(element.tag)
         annot_elem = expect_none_or_single(
-            element.findall(nineml_xmlns + Annotations.nineml_type))
+            element.findall(nineml_ns + Annotations.nineml_type))
         if annot_elem is not None:
             # Extract the annotations
             annotations = Annotations.unserialize(annot_elem, **kwargs)
             # Get a copy of the element with the annotations stripped
             element = copy(element)
-            element.remove(element.find(nineml_xmlns +
+            element.remove(element.find(nineml_ns +
                                         Annotations.nineml_type))
         else:
             annotations = Annotations()
@@ -117,17 +117,17 @@ class Annotations(DocumentLevelObject):
             annotations_ns = []
         elif isinstance(annotations_ns, basestring):
             annotations_ns = [annotations_ns]
-        assert strip_xmlns(element.tag) == cls.nineml_type
+        assert strip_ns(element.tag) == cls.nineml_type
         annot = cls(**kwargs)
         for child in element.getchildren():
-            ns = extract_xmlns(child.tag)
+            ns = extract_ns(child.tag)
             if not ns:
                 raise NineMLXMLError(
                     "All annotations must have a namespace: {}".format(
                         etree.tostring(child, pretty_print=True)))
             ns = ns[1:-1]  # strip braces
             if ns == nineml_ns or ns in annotations_ns:
-                name = strip_xmlns(child.tag)
+                name = strip_ns(child.tag)
                 try:
                     namespace = annot[ns]
                 except KeyError:
@@ -334,11 +334,11 @@ class _AnnotationsBranch(BaseNineMLObject):
 
     @classmethod
     def unserialize(cls, element, **kwargs):  # @UnusedVariable
-        name = strip_xmlns(element.tag)
+        name = strip_ns(element.tag)
         branches = {}
         for child in element.getchildren():
             branches[
-                strip_xmlns(child.tag)] = _AnnotationsBranch.unserialize(child)
+                strip_ns(child.tag)] = _AnnotationsBranch.unserialize(child)
         attr = dict(element.attrib)
         return cls(name, attr, branches)
 

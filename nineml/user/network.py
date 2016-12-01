@@ -12,8 +12,8 @@ from nineml.abstraction.connectionrule import (
 from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import name_error
 from nineml.base import DocumentLevelObject, ContainerObject
-from nineml.xml import (
-    E, from_child_xml, unprocessed_xml, get_xml_attr)
+from nineml.serialize import (
+    E, from_child_elem, un_proc_essed, get_elem_attr)
 from nineml.user.port_connections import EventPortConnection
 from nineml.user.dynamics import DynamicsProperties
 from nineml.user.connectionrule import ConnectionRuleProperties, Connectivity
@@ -141,18 +141,18 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        populations = from_child_xml(element, Population, document,
+        populations = from_child_elem(element, Population, document,
                                      multiple=True, allow_reference='only',
                                      allow_none=True, **kwargs)
-        projections = from_child_xml(element, Projection, document,
+        projections = from_child_elem(element, Projection, document,
                                      multiple=True, allow_reference='only',
                                      allow_none=True, **kwargs)
-        selections = from_child_xml(element, Selection, document,
+        selections = from_child_elem(element, Selection, document,
                                     multiple=True, allow_reference='only',
                                     allow_none=True, **kwargs)
-        network = cls(name=get_xml_attr(element, 'name', document, **kwargs),
+        network = cls(name=get_elem_attr(element, 'name', document, **kwargs),
                       populations=populations, projections=projections,
                       selections=selections)
         return network
@@ -235,13 +235,13 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        dynamics_properties = from_child_xml(
+        dynamics_properties = from_child_elem(
             element, DynamicsProperties, document,
             allow_reference=True, **kwargs)
-        return cls(name=get_xml_attr(element, 'name', document, **kwargs),
-                   size=get_xml_attr(element, 'Size', document, in_block=True,
+        return cls(name=get_elem_attr(element, 'name', document, **kwargs),
+                   size=get_elem_attr(element, 'Size', document, in_block=True,
                                      dtype=int, **kwargs),
                    dynamics_properties=dynamics_properties, document=document)
 
@@ -387,24 +387,24 @@ class BaseConnectionGroup(BaseULObject, DocumentLevelObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         # Get Name
-        name = get_xml_attr(element, 'name', document, **kwargs)
-        connectivity = from_child_xml(
+        name = get_elem_attr(element, 'name', document, **kwargs)
+        connectivity = from_child_elem(
             element, ConnectionRuleProperties, document, within='Connectivity',
             allow_reference=True, **kwargs)
-        source = from_child_xml(
+        source = from_child_elem(
             element, ComponentArray, document, within='Source',
             allow_reference=True, allowed_attrib=['port'], **kwargs)
-        destination = from_child_xml(
+        destination = from_child_elem(
             element, ComponentArray, document, within='Destination',
             allow_reference=True, allowed_attrib=['port'], **kwargs)
-        source_port = get_xml_attr(element, 'port', document,
+        source_port = get_elem_attr(element, 'port', document,
                                    within='Source', **kwargs)
-        destination_port = get_xml_attr(element, 'port', document,
+        destination_port = get_elem_attr(element, 'port', document,
                                         within='Destination', **kwargs)
-        delay = from_child_xml(element, Quantity, document, within='Delay',
+        delay = from_child_elem(element, Quantity, document, within='Delay',
                                allow_none=True, **kwargs)
         return cls(name=name, source=source, destination=destination,
                    source_port=source_port, destination_port=destination_port,

@@ -7,7 +7,7 @@ from nineml.exceptions import (NineMLXMLError, NineMLNameError,
                                NineMLRuntimeError)
 from tempfile import mkdtemp
 import os.path
-from nineml.xml import Ev1, Ev2, ElementMaker
+from nineml.serialize import Ev1, Ev2, ElementMaker
 from nineml.abstraction.dynamics import Trigger
 import shutil
 import nineml.units as un

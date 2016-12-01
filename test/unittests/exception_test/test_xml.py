@@ -1,14 +1,14 @@
 import unittest
 from itertools import chain
-from nineml.xml import (
-    get_element_maker, from_child_xml, from_child_xml,
-    from_child_xml, from_child_xml, from_child_xml, get_xml_attr,
+from nineml.serialize import (
+    get_element_maker, from_child_elem, from_child_elem,
+    from_child_elem, from_child_elem, from_child_elem, get_elem_attr,
     get_subblock)
 from nineml.utils.testing.comprehensive import (doc1, dynPropA)
 from nineml.exceptions import (
     NineMLXMLAttributeError, NineMLXMLBlockError, NineMLRuntimeError)
 from nineml.user import Projection, Population, Definition, DynamicsProperties
-from nineml.xml import Ev2
+from nineml.serialize import Ev2
 from nineml.reference import Reference
 
 
@@ -24,7 +24,7 @@ class TestExceptions(unittest.TestCase):
             get_element_maker,
             version=-1.0)
 
-    def test_from_child_xml_ninemlxmlattributeerror(self):
+    def test_from_child_elem_ninemlxmlattributeerror(self):
         """
         line #: 74
         message: {} in '{}' has '{}' attributes when {} are expected
@@ -35,7 +35,7 @@ class TestExceptions(unittest.TestCase):
                            bad_attr="bar"))
         self.assertRaises(
             NineMLXMLAttributeError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Population,),
             document=doc1,
@@ -47,7 +47,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_from_child_xml_ninemlxmlblockerror(self):
+    def test_from_child_elem_ninemlxmlblockerror(self):
         """
         line #: 82
         message: {} in '{}' is only expected to contain a single child block,
@@ -60,7 +60,7 @@ class TestExceptions(unittest.TestCase):
                                name="popA")))
         self.assertRaises(
             NineMLXMLBlockError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Population,),
             document=doc1,
@@ -72,7 +72,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_from_child_xml_ninemlxmlblockerror2(self):
+    def test_from_child_elem_ninemlxmlblockerror2(self):
         """
         line #: 93
         message: Did not find {} block within {} element in '{}'
@@ -80,7 +80,7 @@ class TestExceptions(unittest.TestCase):
         elem = Ev2(Projection.nineml_type)
         self.assertRaises(
             NineMLXMLBlockError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Population,),
             document=doc1,
@@ -92,7 +92,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_from_child_xml_ninemlxmlblockerror3(self):
+    def test_from_child_elem_ninemlxmlblockerror3(self):
         """
         line #: 97
         message: Found unexpected multiple {} blocks within {} in '{}'
@@ -104,7 +104,7 @@ class TestExceptions(unittest.TestCase):
                                name="popB")))
         self.assertRaises(
             NineMLXMLBlockError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Population,),
             document=doc1,
@@ -116,7 +116,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_from_child_xml_ninemlxmlblockerror4(self):
+    def test_from_child_elem_ninemlxmlblockerror4(self):
         """
         line #: 133
         message: Did not find any child blocks with the tag{s}
@@ -129,7 +129,7 @@ class TestExceptions(unittest.TestCase):
                        name="dynB"))
         self.assertRaises(
             NineMLXMLBlockError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Definition,),
             document=doc1,
@@ -141,7 +141,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_from_child_xml_ninemlxmlblockerror5(self):
+    def test_from_child_elem_ninemlxmlblockerror5(self):
         """
         line #: 145
         message: Multiple children of types '{}' found within {} in '{}'
@@ -149,7 +149,7 @@ class TestExceptions(unittest.TestCase):
         elem = Ev2(DynamicsProperties.nineml_type)
         self.assertRaises(
             NineMLXMLBlockError,
-            from_child_xml,
+            from_child_elem,
             element=elem,
             child_classes=(Definition,),
             document=doc1,
@@ -161,7 +161,7 @@ class TestExceptions(unittest.TestCase):
             multiple_within=False,
             allowed_attrib=[])
 
-    def test_get_xml_attr_ninemlxmlattributeerror(self):
+    def test_get_elem_attr_ninemlxmlattributeerror(self):
         """
         line #: 172
         message: {} in '{}' is missing the {} attribute (found '{}' attributes)
@@ -169,12 +169,12 @@ class TestExceptions(unittest.TestCase):
         elem = Ev2(DynamicsProperties.nineml_type)
         self.assertRaises(
             NineMLXMLAttributeError,
-            get_xml_attr,
+            get_elem_attr,
             element=elem,
             name='name',
             document=doc1)
 
-    def test_get_xml_attr_ninemlxmlattributeerror2(self):
+    def test_get_elem_attr_ninemlxmlattributeerror2(self):
         """
         line #: 183
         message: '{}' attribute of {} in '{}', {}, cannot be converted to {}
@@ -184,7 +184,7 @@ class TestExceptions(unittest.TestCase):
                    name='foo')
         self.assertRaises(
             NineMLXMLAttributeError,
-            get_xml_attr,
+            get_elem_attr,
             element=elem,
             name='name',
             document=doc1,

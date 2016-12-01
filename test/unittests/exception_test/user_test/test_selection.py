@@ -67,10 +67,10 @@ class TestConcatenateExceptions(unittest.TestCase):
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
-        for it_elem in element.findall(extract_xmlns(element.tag) + 'Item'):
+        for it_elem in element.findall(extract_ns(element.tag) + 'Item'):
             items.append((
-                get_xml_attr(it_elem, 'index', document, dtype=int, **kwargs),
-                from_child_xml(it_elem, Population, document,
+                get_elem_attr(it_elem, 'index', document, dtype=int, **kwargs),
+                from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
                 kwargs['unprocessed'][0].discard(it_elem)
@@ -99,10 +99,10 @@ class TestConcatenateExceptions(unittest.TestCase):
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
-        for it_elem in element.findall(extract_xmlns(element.tag) + 'Item'):
+        for it_elem in element.findall(extract_ns(element.tag) + 'Item'):
             items.append((
-                get_xml_attr(it_elem, 'index', document, dtype=int, **kwargs),
-                from_child_xml(it_elem, Population, document,
+                get_elem_attr(it_elem, 'index', document, dtype=int, **kwargs),
+                from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
                 kwargs['unprocessed'][0].discard(it_elem)
@@ -134,10 +134,10 @@ class TestConcatenateExceptions(unittest.TestCase):
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         items = []
         # Load references and indices from xml
-        for it_elem in element.findall(extract_xmlns(element.tag) + 'Item'):
+        for it_elem in element.findall(extract_ns(element.tag) + 'Item'):
             items.append((
-                get_xml_attr(it_elem, 'index', document, dtype=int, **kwargs),
-                from_child_xml(it_elem, Population, document,
+                get_elem_attr(it_elem, 'index', document, dtype=int, **kwargs),
+                from_child_elem(it_elem, Population, document,
                                allow_reference='only', **kwargs)))
             try:
                 kwargs['unprocessed'][0].discard(it_elem)

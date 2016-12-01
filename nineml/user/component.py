@@ -7,8 +7,8 @@ from nineml.reference import (
     BaseReference, write_reference, resolve_reference)
 from nineml.annotations import read_annotations, annotate
 from nineml.utils import ensure_valid_identifier
-from nineml.xml import (
-    from_child_xml, unprocessed_xml, get_xml_attr, E, extract_xmlns, NINEMLv1)
+from nineml.serialize import (
+    from_child_elem, un_proc_essed, get_elem_attr, E, extract_ns, NINEMLv1)
 from ..abstraction import ComponentClass
 from nineml.units import Quantity
 from . import BaseULObject
@@ -305,13 +305,13 @@ class Component(BaseULObject, DocumentLevelObject, ContainerObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
-        name = get_xml_attr(element, "name", document, **kwargs)
-        definition = from_child_xml(element, (Definition, Prototype), document,
+        name = get_elem_attr(element, "name", document, **kwargs)
+        definition = from_child_elem(element, (Definition, Prototype), document,
                                     **kwargs)
-        properties = from_child_xml(element, Property, document, multiple=True,
+        properties = from_child_elem(element, Property, document, multiple=True,
                                     allow_none=True, **kwargs)
         if name in document:
             doc = document
@@ -474,19 +474,19 @@ class Property(BaseULObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        name = get_xml_attr(element, 'name', document, **kwargs)
-        if extract_xmlns(element.tag) == NINEMLv1:
-            value = from_child_xml(
+        name = get_elem_attr(element, 'name', document, **kwargs)
+        if extract_ns(element.tag) == NINEMLv1:
+            value = from_child_elem(
                 element,
                 (SingleValue, ArrayValue, RandomValue),
                 document, **kwargs)
             units = document[
-                get_xml_attr(element, 'units', document, **kwargs)]
+                get_elem_attr(element, 'units', document, **kwargs)]
             quantity = Quantity(value, units)
         else:
-            quantity = from_child_xml(
+            quantity = from_child_elem(
                 element, Quantity, document, **kwargs)
         return cls(name=name, quantity=quantity)
 

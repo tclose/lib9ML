@@ -1,6 +1,6 @@
 
 import unittest
-from nineml.xml import E
+from nineml.serialize import E
 from nineml.abstraction import (Expression, Alias, StateAssignment,
                                 TimeDerivative, Constant, AnalogReducePort,
                                 AnalogReceivePort)

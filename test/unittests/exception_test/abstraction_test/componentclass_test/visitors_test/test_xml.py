@@ -20,18 +20,18 @@ class TestComponentClassXMLLoaderExceptions(unittest.TestCase):
         Creates a dictionary that maps class-types to instantiated objects
         \"\"\"
         # Get the XML namespace (i.e. NineML version)
-        xmlns = extract_xmlns(element.tag)
-        assert xmlns in ALL_NINEML
+        ns = extract_ns(element.tag)
+        assert ns in ALL_NINEML
         # Initialise loaded objects with empty lists
         loaded_objects = dict((block, []) for block in block_names)
         for t in element.iterchildren(tag=etree.Element):
-            # Used in unprocessed_xml decorator
+            # Used in un_proc_essed decorator
             if unprocessed:
                 unprocessed[0].discard(t)
             # Strip namespace
-            tag = (t.tag[len(xmlns):]
-                   if t.tag.startswith(xmlns) else t.tag)
-            if (xmlns, tag) not in ignore:
+            tag = (t.tag[len(ns):]
+                   if t.tag.startswith(ns) else t.tag)
+            if (ns, tag) not in ignore:
                 if tag not in block_names:
         """
 

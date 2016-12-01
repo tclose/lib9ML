@@ -1,8 +1,8 @@
 import os
 from copy import copy
 from .base import AnnotatedNineMLObject
-from nineml.xml import (
-    E, ALL_NINEML, unprocessed_xml, get_xml_attr, extract_xmlns, NINEMLv1)
+from nineml.serialize import (
+    E, ALL_NINEML, un_proc_essed, get_elem_attr, extract_ns, NINEMLv1)
 from nineml.annotations import read_annotations
 from nineml.exceptions import NineMLRuntimeError, NineMLXMLAttributeError
 from nineml.exceptions import NineMLNameError
@@ -75,18 +75,18 @@ class BaseReference(AnnotatedNineMLObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        xmlns = extract_xmlns(element.tag)
-        if xmlns == NINEMLv1:
+        ns = extract_ns(element.tag)
+        if ns == NINEMLv1:
             name = element.text
             if name is None:
                 raise NineMLXMLAttributeError(
                     "References require the element name provided in the XML "
                     "element text")
         else:
-            name = get_xml_attr(element, 'name', document, **kwargs)
-        url = get_xml_attr(element, 'url', document, default=None, **kwargs)
+            name = get_elem_attr(element, 'name', document, **kwargs)
+        url = get_elem_attr(element, 'url', document, default=None, **kwargs)
         return cls(name=name, document=document, url=url)
 
 

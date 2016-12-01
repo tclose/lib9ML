@@ -1,5 +1,5 @@
 from ..componentclass import ComponentClass
-from nineml.xml import E
+from nineml.serialize import E
 from nineml.exceptions import NineMLRuntimeError
 
 

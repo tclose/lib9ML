@@ -5,7 +5,7 @@ import operator
 from sympy import Symbol
 import sympy
 import math
-from nineml.xml import E, unprocessed_xml, get_xml_attr
+from nineml.serialize import E, un_proc_essed, get_elem_attr
 from nineml.base import AnnotatedNineMLObject, DocumentLevelObject
 from nineml.annotations import annotate, read_annotations
 from nineml.exceptions import (
@@ -147,11 +147,11 @@ class Dimension(AnnotatedNineMLObject, DocumentLevelObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        name = get_xml_attr(element, 'name', document, **kwargs)
+        name = get_elem_attr(element, 'name', document, **kwargs)
         # Get the attributes corresponding to the dimension symbols
-        dim_args = dict((s, get_xml_attr(element, s, document, default=0,
+        dim_args = dict((s, get_elem_attr(element, s, document, default=0,
                                          dtype=int, **kwargs))
                          for s in cls.dimension_symbols)
         return cls(name, document=document, **dim_args)
@@ -352,14 +352,14 @@ class Unit(AnnotatedNineMLObject, DocumentLevelObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
-        name = get_xml_attr(element, 'symbol', document, **kwargs)
-        dimension = document[get_xml_attr(element, 'dimension', document,
+        name = get_elem_attr(element, 'symbol', document, **kwargs)
+        dimension = document[get_elem_attr(element, 'dimension', document,
                                           **kwargs)]
-        power = get_xml_attr(element, 'power', document, dtype=int,
+        power = get_elem_attr(element, 'power', document, dtype=int,
                              default=0, **kwargs)
-        offset = get_xml_attr(element, 'offset', document, dtype=float,
+        offset = get_elem_attr(element, 'offset', document, dtype=float,
                               default=0.0, **kwargs)
         return cls(name, dimension, power, offset=offset, document=document)
 
@@ -521,11 +521,11 @@ class Quantity(AnnotatedNineMLObject):
 
     @classmethod
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         value = BaseValue.from_parent_xml(element, document, **kwargs)
         try:
-            units_str = get_xml_attr(element, 'units', document, **kwargs)
+            units_str = get_elem_attr(element, 'units', document, **kwargs)
         except KeyError:
             raise NineMLRuntimeError(
                 "{} element '{}' is missing 'units' attribute (found '{}')"

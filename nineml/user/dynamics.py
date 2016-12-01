@@ -4,8 +4,8 @@ from nineml.user.component import Property, Component, Prototype, Definition
 from nineml.exceptions import (
     NineMLRuntimeError, NineMLNameError, name_error, NineMLUnitMismatchError)
 from nineml.annotations import read_annotations
-from nineml.xml import (
-    from_child_xml, unprocessed_xml, get_xml_attr)
+from nineml.serialize import (
+    from_child_elem, un_proc_essed, get_elem_attr)
 from nineml.base import (
     ContainerObject, DynamicPortsObject)
 
@@ -147,15 +147,15 @@ class DynamicsProperties(Component, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):  # @UnusedVariable
         """docstring missing"""
-        name = get_xml_attr(element, "name", document, **kwargs)
-        definition = from_child_xml(element, (Definition, Prototype), document,
+        name = get_elem_attr(element, "name", document, **kwargs)
+        definition = from_child_elem(element, (Definition, Prototype), document,
                                     **kwargs)
-        properties = from_child_xml(element, Property, document, multiple=True,
+        properties = from_child_elem(element, Property, document, multiple=True,
                                     allow_none=True, **kwargs)
-        initial_values = from_child_xml(element, Initial, document,
+        initial_values = from_child_elem(element, Initial, document,
                                         multiple=True, allow_none=True,
                                         **kwargs)
         return cls(name, definition, properties=properties,

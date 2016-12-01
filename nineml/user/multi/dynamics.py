@@ -5,8 +5,8 @@ import sympy
 import operator
 from itertools import product, groupby, izip, repeat
 from nineml.reference import resolve_reference, write_reference
-from nineml.xml import (
-    nineml_ns, E, from_child_xml, unprocessed_xml, get_xml_attr)
+from nineml.serialize import (
+    nineml_ns, E, from_child_elem, un_proc_essed, get_elem_attr)
 from nineml.user import DynamicsProperties, Definition
 from nineml.annotations import annotate, read_annotations
 from nineml.abstraction.dynamics.visitors.cloner import DynamicsCloner
@@ -143,22 +143,22 @@ class MultiDynamicsProperties(DynamicsProperties):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        sub_component_properties = from_child_xml(
+        sub_component_properties = from_child_elem(
             element, SubDynamicsProperties, document, multiple=True,
             **kwargs)
-        port_exposures = from_child_xml(
+        port_exposures = from_child_elem(
             element,
             (AnalogSendPortExposure, AnalogReceivePortExposure,
              AnalogReducePortExposure, EventSendPortExposure,
              EventReceivePortExposure), document, multiple=True,
             allow_none=True, **kwargs)
-        port_connections = from_child_xml(
+        port_connections = from_child_elem(
             element,
             (AnalogPortConnection, EventPortConnection), document,
             multiple=True, allow_none=True, **kwargs)
-        return cls(name=get_xml_attr(element, 'name', document, **kwargs),
+        return cls(name=get_elem_attr(element, 'name', document, **kwargs),
                    sub_components=sub_component_properties,
                    port_exposures=port_exposures,
                    port_connections=port_connections)
@@ -291,12 +291,12 @@ class SubDynamicsProperties(BaseULObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        dynamics_properties = from_child_xml(
+        dynamics_properties = from_child_elem(
             element, (DynamicsProperties, MultiDynamicsProperties), document,
             allow_reference=True, **kwargs)
-        return cls(get_xml_attr(element, 'name', document, **kwargs),
+        return cls(get_elem_attr(element, 'name', document, **kwargs),
                    dynamics_properties)
 
 
@@ -507,12 +507,12 @@ class SubDynamics(BaseULObject, DynamicPortsObject):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        dynamics = from_child_xml(
+        dynamics = from_child_elem(
             element, (Dynamics, MultiDynamics), document,
             allow_reference=True, **kwargs)
-        return cls(get_xml_attr(element, 'name', document, **kwargs),
+        return cls(get_elem_attr(element, 'name', document, **kwargs),
                    dynamics)
 
 
@@ -966,22 +966,22 @@ class MultiDynamics(Dynamics):
     @classmethod
     @resolve_reference
     @read_annotations
-    @unprocessed_xml
+    @un_proc_essed
     def unserialize(cls, element, document, **kwargs):
-        sub_components = from_child_xml(
+        sub_components = from_child_elem(
             element, SubDynamics, document, multiple=True,
             **kwargs)
-        port_exposures = from_child_xml(
+        port_exposures = from_child_elem(
             element,
             (AnalogSendPortExposure, AnalogReceivePortExposure,
              AnalogReducePortExposure, EventSendPortExposure,
              EventReceivePortExposure), document, multiple=True,
             allow_none=True, **kwargs)
-        port_connections = from_child_xml(
+        port_connections = from_child_elem(
             element,
             (AnalogPortConnection, EventPortConnection), document,
             multiple=True, allow_none=True, **kwargs)
-        return cls(name=get_xml_attr(element, 'name', document, **kwargs),
+        return cls(name=get_elem_attr(element, 'name', document, **kwargs),
                    sub_components=sub_components,
                    port_exposures=port_exposures,
                    port_connections=port_connections)

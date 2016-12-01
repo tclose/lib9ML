@@ -27,7 +27,7 @@ from nineml.user import (
 from nineml.user.multi import (
     EventSendPortExposure, EventReceivePortExposure, AnalogSendPortExposure,
     AnalogReceivePortExposure, AnalogReducePortExposure)
-from nineml.xml import nineml_v1_ns
+from nineml.serialize import nineml_v1_ns
 import sympy
 from nineml.user.projection import Connectivity
 
