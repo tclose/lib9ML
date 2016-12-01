@@ -27,11 +27,11 @@ class TestBackwardsCompatibility(unittest.TestCase):
                 v1, v2, "Loaded version 1 didn't match loaded version 2:\n{}"
                 .format(v1.find_mismatch(v2)))
             v1_to_v2_xml = v1.serialize(self.v2_doc, as_ref=False,
-                                     E=get_element_maker(2.0),
-                                     no_annotations=True)
+                                        E=get_element_maker(2.0),
+                                        no_annotations=True)
             v2_to_v1_xml = v2.serialize(self.v1_doc, as_ref=False,
-                                     E=get_element_maker(1.0),
-                                     no_annotations=True)
+                                        E=get_element_maker(1.0),
+                                        no_annotations=True)
 
             v1_xml = self._get_xml_element(self.v1_xml, name)
             v2_xml = self._get_xml_element(self.v2_xml, name)

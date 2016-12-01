@@ -5,13 +5,14 @@ docstring goes here
 :license: BSD-3, see LICENSE for details.
 """
 from lxml import etree  # @UnusedImport
-from lxml.builder import ElementMaker
+from lxml.builder import ElementMaker as XMLElementMaker
 from nineml.exceptions import (
     NineMLXMLAttributeError, NineMLXMLBlockError, NineMLRuntimeError)
 import re
 import nineml
+import collections
 
-NINEML_VERSION = 1.0
+NINEML_VERSION = 3.0
 
 nineml_v1_ns = 'http://nineml.net/9ML/1.0'
 nineml_v2_ns = 'http://nineml.net/9ML/2.0'
@@ -33,19 +34,58 @@ UNCERTML = "{http://www.uncertml.org/2.0}"
 # Extracts the ns from an lxml element tag
 ns_re = re.compile(r'(\{.*\})(.*)')
 
-Ev1 = ElementMaker(namespace=nineml_v1_ns, nsmap={None: nineml_v1_ns})
-Ev2 = ElementMaker(namespace=nineml_v2_ns, nsmap={None: nineml_v2_ns})
-E = ElementMaker(namespace=nineml_ns, nsmap={None: nineml_ns})
+Ev1 = XMLElementMaker(namespace=nineml_v1_ns, nsmap={None: nineml_v1_ns})
+Ev2 = XMLElementMaker(namespace=nineml_v2_ns, nsmap={None: nineml_v2_ns})
+E = XMLElementMaker(namespace=nineml_ns, nsmap={None: nineml_ns})
+
+
+class Element(collections.namedtuple('tag', 'children', 'attrib', 'text',
+                                     'ns')):
+    """
+    A type that abstracts the structure of standard serialisation
+    formats such as XML, YAML, HDF5, JSON, etc...
+    """
+
+    def findall(self, ns, tag):
+        return [c for c in self.children if c.ns == ns and c.tag == tag]
+
+    def getchildren(self):
+        return self.children
+
+
+class ElementMaker(object):
+    """
+    Has the same format as etree's XML ElementMaker but instead of an xml
+    object it produces a nameduple, which can then be written to any
+    serialisation format
+    """
+
+    def __init__(self, namespace):
+        self._ns = namespace
+
+    @property
+    def ns(self):
+        return self._ns
+
+    def __call__(self, tag, *args, **kwargs):
+        if len(args) == 1 and not isinstance(args[0], Element):
+            text = args[0]
+            children = []
+        else:
+            children = args
+            text = None
+        attr = kwargs
+        return Element(tag, children, attr, text, self.ns)
 
 
 def get_element_maker(version):
-    if isinstance(version, int):
-        version = float(version)
-    version = str(version)
-    if str(version) == '1.0':
+    version = float(version)
+    if version == 1.0:
         element_maker = Ev1
-    elif str(version) == '2.0':
+    elif version == 2.0:
         element_maker = Ev2
+    elif version == 3.0:
+        element_maker = ElementMaker
     else:
         raise NineMLRuntimeError(
             "Unrecognised 9ML version {} (1.0".format(version))
@@ -78,7 +118,7 @@ def from_child_elem(element, child_classes, document, multiple=False,
     # in Projection elements where pre and post synaptic population references
     # are enclosed within 'Pre' or 'Post' tags respectively
     if within:
-        within_elems = element.findall(ns + within)
+        within_elems = element.findall(ns, within)
         if len(within_elems) == 1:
             parent = within_elems[0]
             if any(a not in allowed_attrib for a in parent.attrib):
@@ -123,7 +163,7 @@ def from_child_elem(element, child_classes, document, multiple=False,
                     tag_name = child_cls.nineml_type
             else:
                 tag_name = child_cls.nineml_type
-            for child_elem in parent.findall(ns + tag_name):
+            for child_elem in parent.findall(ns, tag_name):
                 children.append(child_cls.unserialize(child_elem, document,
                                                       **kwargs))
                 if unprocessed_elems and not within:
@@ -200,7 +240,7 @@ def get_elem_attr(element, name, document, unprocessed_elems=None,
 
 def get_subblock(element, name, unprocessed_elems, document, **kwargs):  # @UnusedVariable @IgnorePep8
     ns = extract_ns(element.tag)
-    found = element.findall(ns + name)
+    found = element.findall(ns, name)
     if len(found) == 1:
         if unprocessed_elems:
             unprocessed_elems[0].discard(found[0])
@@ -219,7 +259,7 @@ def get_subblock(element, name, unprocessed_elems, document, **kwargs):  # @Unus
 
 def get_subblocks(element, name, unprocessed_elems, **kwargs):  # @UnusedVariable @IgnorePep8
     ns = extract_ns(element.tag)
-    children = element.findall(ns + name)
+    children = element.findall(ns, name)
     for child in children:
         if unprocessed_elems:
             unprocessed_elems[0].discard(child)
@@ -272,11 +312,11 @@ def unprocessed(unserialize):
         # Keep track of which blocks and attributes were processed within the
         # element
         unprocessed_elems = (set(e for e in element.getchildren()
-                           if not isinstance(e, etree._Comment)),
-                       set(element.attrib.iterkeys()))
+                                 if not isinstance(e, etree._Comment)),
+                             set(element.attrib.iterkeys()))
         # The decorated method
-        obj = unserialize(cls, element, *args, unprocessed_elems=unprocessed_elems,
-                          **kwargs)
+        obj = unserialize(cls, element, *args,
+                          unprocessed_elems=unprocessed_elems, **kwargs)
         # Check to see if there were blocks that were unprocessed_elems in the
         # element
         blocks, attrs = unprocessed_elems

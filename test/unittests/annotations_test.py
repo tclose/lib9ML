@@ -1,7 +1,7 @@
 import unittest
 from copy import deepcopy
 from nineml.annotations import Annotations
-from nineml.serialize import etree, nineml_ns, ElementMaker, E
+from nineml.serialize import etree, nineml_ns, XMLElementMaker, E
 from nineml.abstraction import Parameter, Dynamics, Alias
 from nineml.units import Dimension
 from nineml.abstraction.dynamics.visitors.xml import (
@@ -15,7 +15,7 @@ import nineml.units as un
 foreign_ns = "http://some.other.namespace.org"
 unprocess_ns = "http://some.other.unprocessable.namespace.org"
 
-unp_E = ElementMaker(namespace=unprocess_ns, nsmap={None: unprocess_ns})
+unp_E = XMLElementMaker(namespace=unprocess_ns, nsmap={None: unprocess_ns})
 
 annot_str = """
     <Annotations xmlns="{nineml}">

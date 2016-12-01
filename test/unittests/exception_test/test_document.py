@@ -7,7 +7,7 @@ from nineml.exceptions import (NineMLXMLError, NineMLNameError,
                                NineMLRuntimeError)
 from tempfile import mkdtemp
 import os.path
-from nineml.serialize import Ev1, Ev2, ElementMaker
+from nineml.serialize import Ev1, Ev2, XMLElementMaker
 from nineml.abstraction.dynamics import Trigger
 import shutil
 import nineml.units as un
@@ -205,7 +205,7 @@ class TestDocumentExceptions(unittest.TestCase):
         line #: 312
         message: Unrecognised XML namespace '{}', can be one of '{}'
         """
-        bad_E = ElementMaker(namespace='http://bad_namespace.net')
+        bad_E = XMLElementMaker(namespace='http://bad_namespace.net')
         self.assertRaises(
             NineMLXMLError,
             Document.unserialize,
@@ -247,7 +247,7 @@ class TestDocumentExceptions(unittest.TestCase):
         line #: 358
         message: Cannot load '{}' element (extensions not implemented)
         """
-        unrecogised_E = ElementMaker(namespace='http://unrecognised.net')
+        unrecogised_E = XMLElementMaker(namespace='http://unrecognised.net')
         element = Ev2(Document.nineml_type,
                       unrecogised_E.UnrecognisedExtension())
         self.assertRaises(

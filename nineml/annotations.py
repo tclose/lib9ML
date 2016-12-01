@@ -2,7 +2,7 @@ from copy import copy
 from nineml.serialize import E, extract_ns, strip_ns
 from nineml.base import DocumentLevelObject, BaseNineMLObject
 import re
-from nineml.serialize import ElementMaker, nineml_ns, etree
+from nineml.serialize import XMLElementMaker, nineml_ns, etree
 from nineml.exceptions import (
     NineMLXMLError, NineMLRuntimeError, NineMLNameError)
 
@@ -11,7 +11,7 @@ def read_annotations(unserialize):
     def read_annotations_from_unserialize(cls, element, *args, **kwargs):
         nineml_ns = extract_ns(element.tag)
         annot_elem = expect_none_or_single(
-            element.findall(nineml_ns + Annotations.nineml_type))
+            element.findall(nineml_ns, Annotations.nineml_type))
         if annot_elem is not None:
             # Extract the annotations
             annotations = Annotations.unserialize(annot_elem, **kwargs)
@@ -327,7 +327,7 @@ class _AnnotationsBranch(BaseNineMLObject):
 
     def serialize(self, ns=None, E=E, **kwargs):  # @UnusedVariable
         if ns is not None:
-            E = ElementMaker(namespace=ns, nsmap={None: ns})
+            E = XMLElementMaker(namespace=ns, nsmap={None: ns})
         return E(self.name,
                  *(sb.serialize(**kwargs) for sb in self.branches),
                  **self._attr)

@@ -604,11 +604,11 @@ def write_xml(xml, filename):
 
 
 def get_component_class_type(elem):
-    if elem.findall(NINEMLv1 + 'Dynamics'):
+    if elem.findall(NINEMLv1, 'Dynamics'):
         cls = nineml.Dynamics
-    elif elem.findall(NINEMLv1 + 'ConnectionRule'):
+    elif elem.findall(NINEMLv1, 'ConnectionRule'):
         cls = nineml.ConnectionRule
-    elif elem.findall(NINEMLv1 + 'RandomDistribution'):
+    elif elem.findall(NINEMLv1, 'RandomDistribution'):
         cls = nineml.RandomDistribution
     else:
         raise NineMLXMLError(
@@ -618,8 +618,8 @@ def get_component_class_type(elem):
 
 def get_component_type(comp_xml, doc_xml, relative_to):
     definition = expect_single(chain(
-        comp_xml.findall(NINEMLv1 + 'Definition'),
-        comp_xml.findall(NINEMLv1 + 'Prototype')))
+        comp_xml.findall(NINEMLv1, 'Definition'),
+        comp_xml.findall(NINEMLv1, 'Prototype')))
     name = definition.text
     url = definition.get('url', None)
     if url:
@@ -627,8 +627,8 @@ def get_component_type(comp_xml, doc_xml, relative_to):
         cc_cls = doc[name].__class__
     else:
         cc_cls = None
-        for ref_elem in chain(doc_xml.findall(NINEMLv1 + 'ComponentClass'),
-                              doc_xml.findall(NINEMLv1 + 'Component')):
+        for ref_elem in chain(doc_xml.findall(NINEMLv1, 'ComponentClass'),
+                              doc_xml.findall(NINEMLv1, 'Component')):
             if ref_elem.attrib['name'] == name:
                 if ref_elem.tag == NINEMLv1 + 'ComponentClass':
                     cc_cls = get_component_class_type(ref_elem)

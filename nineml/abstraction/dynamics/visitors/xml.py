@@ -50,7 +50,7 @@ class DynamicsXMLLoader(ComponentClassXMLLoader, DynamicsVisitor):
                     "not the outer ComponentClass block) in version 1.0 "
                     "(they belong in the outer block in later versions)"
                     .format(', '.join(n for n in version1_main if blocks[n])))
-            dyn_elem = expect_single(element.findall(NINEMLv1 + 'Dynamics'))
+            dyn_elem = expect_single(element.findall(NINEMLv1, 'Dynamics'))
             dyn_blocks = self._load_blocks(
                 dyn_elem,
                 block_names=version1_main,

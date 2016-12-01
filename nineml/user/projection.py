@@ -233,7 +233,7 @@ class Projection(BaseULObject, DocumentLevelObject):
             post_within = 'Destination'
             multiple_within = True
             # Get Delay
-            delay_elem = expect_single(element.findall(NINEMLv1 + 'Delay'))
+            delay_elem = expect_single(element.findall(NINEMLv1, 'Delay'))
             units = document[
                 get_elem_attr(delay_elem, 'units', document, **kwargs)]
             value = from_child_elem(
@@ -271,7 +271,7 @@ class Projection(BaseULObject, DocumentLevelObject):
             for receive_name in cls.version1_nodes:
                 try:
                     receive_elem = expect_single(
-                        element.findall(NINEMLv1 + receive_name))
+                        element.findall(NINEMLv1, receive_name))
                 except NineMLRuntimeError:
                     if receive_name == 'Plasticity':
                         continue
