@@ -14,7 +14,7 @@ setup(
     long_description=open("README.rst").read(),
     license="BSD 3 License",
     keywords="computational neuroscience modeling interoperability XML",
-    url="http://nineml.incf.org",
+    url="http://nineml.net",
     classifiers=['Development Status :: 4 - Beta',
                  'Environment :: Console',
                  'Intended Audience :: Science/Research',
@@ -23,6 +23,7 @@ setup(
                  'Operating System :: OS Independent',
                  'Programming Language :: Python :: 2',
                  'Topic :: Scientific/Engineering'],
-    install_requires=['lxml', 'sympy'], # NB: sympy 1.0 has a bug in ccode, which is fixed in the master branch 30/7/16
+    install_requires=['lxml',
+                      'sympy==0.7.6'], # NB: sympy 1.0 has a bug in ccode, which is fixed in the master branch 30/7/16
     tests_require=['nose', 'numpy']
 )
