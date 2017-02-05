@@ -489,8 +489,7 @@ doc1 = Document(
 doc2 = Document(
     dynA, dynB, dynC, dynE, dynF, dynPropA, dynPropB, dynPropC,
     ranDistrA, ranDistrPropA, popA, popB, popC, popD, popE,
-    selA, conA, conPropA, conB, projA, projB, projC, projD, netA, netB,
-    clone=True, clone_definitions=True)
+    selA, conA, conPropA, conB, projA, projB, projC, projD, netA, netB)
 
 # -----------------------------------------------------------------------------
 # Create dictionaries holding all nineml types and corresponding examples in

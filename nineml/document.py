@@ -59,20 +59,18 @@ class Document(AnnotatedNineMLObject, dict):
         AnnotatedNineMLObject.__init__(
             self, annotations=kwargs.pop('annotations', None))
         self._url = self._standardise_url(kwargs.pop('url', None))
-        clone = kwargs.pop('clone', False)
         # Stores the list of elements that are being loaded to check for
         # circular references
         self._loading = []
         self._added_in_write = None
-        memo = {}
         for element in elements:
-            self.add(element, clone=clone, memo=memo, **kwargs)
+            self.add(element, memo={}, **kwargs)
 
     def __repr__(self):
         return "NineMLDocument(url='{}', {} elements)".format(
             str(self.url), len(self))
 
-    def add(self, element, clone=False, **kwargs):
+    def add(self, element, **kwargs):
         if not isinstance(element, (DocumentLevelObject, self._Unloaded)):
             raise NineMLRuntimeError(
                 "Could not add {} to document '{}' as it is not a 'document "
@@ -89,19 +87,14 @@ class Document(AnnotatedNineMLObject, dict):
                     .format(element.name, self.url))
         else:
             if not isinstance(element, self._Unloaded):
-                if clone:
-                    element = element.clone(**kwargs)
-                elif element.document is not None:
-                    raise NineMLRuntimeError(
-                        "Attempting to add the same object '{}' {} to document"
-                        " '{}' document when it is already in another "
-                        "document, '{}'. Please remove it from the original "
-                        "document first or use the 'clone' keyword to add a "
-                        "clone of the element instead"
-                        .format(element.name, element.nineml_type,
-                                self.url, element.document.url))
+                element = element.clone(**kwargs)
                 element._document = self  # Set its document to this one
+            # Adds the element the dictionary base class of the document
             self[element.name] = element
+        # FIXME: This is a hack to catch elements that are added to the
+        #        document while it is written (e.g. units). These dependency
+        #        elements should be detected in this method and added to the
+        #        document upfront when the dependent element is added.
         if self._added_in_write is not None:
             self._added_in_write.append(element)
 
