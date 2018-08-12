@@ -18,6 +18,7 @@ from nineml.units import dimensionless, Dimension
 from nineml.base import ContainerObject
 from ..expressions import Alias, Expression  # @IgnorePep8
 from .transitions import OnEvent, OnCondition, Trigger  # @IgnorePep8
+from . import visitors
 
 
 class StateVariable(BaseALObject):
@@ -265,6 +266,24 @@ class Regime(BaseALObject, ContainerObject):
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__, self.name)
+
+    def is_linear(self):
+        """
+        Queries whether time derivatives in the regime are linear
+        inputs and states. Note: the regime must be already embedded
+        with a component class
+
+        Parameters
+        ----------
+        outputs : list(str)
+            List of relevant outputs to check for linearity. I.e. expressions
+            that only mapped to analog send ports that aren't in the list are
+            not checked for linearity (presumably as they are not connected).
+            If outputs is None all expressions are checked.
+        """
+        return visitors.queriers.DynamicsIsLinear(
+            check_state_assignments=False).is_linear(
+                self.parent, regime_name=self.name)
 
     # Regime Properties:
     # ------------------

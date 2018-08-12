@@ -10,14 +10,13 @@ from past.builtins import basestring
 from nineml.exceptions import NineMLUsageError, name_error
 from nineml.utils.iterables import (
     normalise_parameter_as_list, filter_discrete_types)
-from nineml.visitors import Cloner
 from itertools import chain
 from nineml.abstraction.componentclass import (
     ComponentClass, Parameter)
+from .regimes import Regime, StateVariable  # @IgnorePep8
 from ..ports import (AnalogReceivePort, AnalogSendPort,
                      AnalogReducePort, EventReceivePort,
                      EventSendPort)
-from .regimes import Regime, StateVariable
 from nineml.utils import (check_inferred_against_declared,
                           assert_no_duplicates)
 from nineml.annotations import VALIDATION, DIMENSIONALITY, PY9ML_NS

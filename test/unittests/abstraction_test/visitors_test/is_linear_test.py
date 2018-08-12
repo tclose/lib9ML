@@ -19,6 +19,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
             parameters=[Parameter('P1', dimension=un.time),
                         Parameter('P2', dimension=un.dimensionless)])
         self.assertTrue(a.is_linear())
+        self.assertTrue(a.regime('R1').is_linear())
 
     def test_multi_regime_nonlinear(self):
         """Nonlinear due to multiple regimes"""
@@ -34,6 +35,8 @@ class DynamicsIsLinearTest(unittest.TestCase):
             event_ports=[EventReceivePort('ERP1')],
             parameters=[Parameter('P1', dimension=un.time)])
         self.assertFalse(b.is_linear())
+        self.assertTrue(b.regime('R1').is_linear())
+        self.assertTrue(b.regime('R2').is_linear())
 
     def test_on_condition_state_assignment_nonlinear(self):
         """
@@ -50,6 +53,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
                        name='R1')],
             parameters=[Parameter('P1', dimension=un.per_time)])
         self.assertFalse(c.is_linear())
+        self.assertFalse(c.regime('R1').is_linear())
 
     def test_input_multiplication_nonlinear(self):
         """Nonlinear due to multiplication of SV1 and SV2 in SV1 T.D."""
@@ -62,6 +66,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
             parameters=[Parameter('P1', dimension=un.time),
                         Parameter('P2', dimension=un.dimensionless)])
         self.assertFalse(d.is_linear())
+        self.assertFalse(d.regime('R1').is_linear())
 
     def test_output_filtering(self):
         """
@@ -83,6 +88,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
             constants=[Constant('C1', 10, units=un.mA)])
         self.assertFalse(e.is_linear())
         self.assertTrue(e.is_linear(outputs=['A1']))
+        self.assertTrue(e.regime('R1').is_linear())
 
     def test_linear_state_assignment_in_onevent(self):
         """Test linear state assignments in on events"""
@@ -105,6 +111,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
                         Parameter('P4', dimension=un.conductance)],
             constants=[Constant('C1', 10, units=un.pA)])
         self.assertTrue(f.is_linear())
+        self.assertTrue(f.regime('R1').is_linear())
 
     def test_nonlinear_state_assignment_in_onevent(self):
         """Test that nonlinear state assignements in on events"""
@@ -130,6 +137,7 @@ class DynamicsIsLinearTest(unittest.TestCase):
                         Parameter('P4', dimension=un.conductance)],
             constants=[Constant('C1', 10, units=un.nA)])
         self.assertFalse(g.is_linear())
+        self.assertTrue(g.regime('R1').is_linear())
 
     def test_nonlinear_function(self):
         """Nonlinear due function in SV1 T.D."""
@@ -142,3 +150,4 @@ class DynamicsIsLinearTest(unittest.TestCase):
             parameters=[Parameter('P1', dimension=un.time),
                         Parameter('P2', dimension=un.dimensionless)])
         self.assertFalse(h.is_linear())
+        self.assertFalse(h.regime('R1').is_linear())

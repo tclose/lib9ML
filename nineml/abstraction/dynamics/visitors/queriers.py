@@ -130,9 +130,17 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
         is an analog send port on a synapse that is not connected to the cell
         then any alias that maps the state variable/inputs to the analog send
         port is not relevant.
+    regime_name : str
+        Name of the regime to limit the check to. If provided the
+        visitor will only visit this regime.
+    check_state_assignments : bool
+        Flags whether to check if state assignments are linear
     """
 
-    def is_linear(self, dynamics, outputs=None):
+    def __init__(self, check_state_assignments=True):
+        self._check_state_assignments = check_state_assignments
+
+    def is_linear(self, dynamics, outputs=None, regime_name=None):
         self.outputs = (set(dynamics.analog_send_port_names)
                         if outputs is None else outputs)
         substituted = dynamics.flatten()
@@ -142,6 +150,8 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
                 substituted.state_variable_names,
                 substituted.analog_receive_port_names,
                 substituted.analog_reduce_port_names)]
+        if regime_name is not None:
+            substituted = substituted.regime(regime_name)
         try:
             self.visit(substituted)
         except NineMLStopVisitException:
@@ -161,7 +171,8 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
             raise NineMLStopVisitException()
 
     def action_stateassignment(self, state_assignment, **kwargs):  # @UnusedVariable @IgnorePep8
-        self._check_linear(state_assignment)
+        if self._check_state_assignments:
+            self._check_linear(state_assignment)
 
     def action_timederivative(self, time_derivative, **kwargs):  # @UnusedVariable @IgnorePep8
         self._check_linear(time_derivative)
