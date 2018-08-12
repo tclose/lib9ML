@@ -11,7 +11,8 @@ import sympy
 from nineml.utils import validate_identifier, assert_no_duplicates
 from nineml.utils.iterables import (filter_discrete_types,
                                     normalise_parameter_as_list)
-from nineml.exceptions import NineMLUsageError, name_error
+from nineml.exceptions import (
+    NineMLUsageError, name_error, NineMLSimulationEvent)
 from ..expressions import ODE
 from .. import BaseALObject
 from nineml.units import dimensionless, Dimension
@@ -284,6 +285,31 @@ class Regime(BaseALObject, ContainerObject):
         return visitors.queriers.DynamicsIsLinear(
             check_state_assignments=False).is_linear(
                 self.parent, regime_name=self.name)
+
+    def simulate(self, start_t, stop_t, state, solver):
+        """
+        Simulate the regime for the given duration unless an event is
+        raised.
+
+        Parameters
+        ----------
+        start_t : Quantity(time)
+            The time to run the simulation from
+        stop_t : Quantity(time)
+            The time to run the simulation until
+        state : dict[str, Quantity]
+            The initial state of the simulation
+        solver : Solver
+            A solver object, which runs the state updates
+        """
+        t = start_t
+        while t < stop_t:
+            new_state, new_t = solver.step(self, state, t)
+            for oc in self.on_conditions:
+                oc.check(state, new_state, t, new_t)
+            state = new_state
+            t = new_t
+        return state, t
 
     # Regime Properties:
     # ------------------

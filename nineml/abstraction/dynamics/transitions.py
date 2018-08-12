@@ -426,10 +426,17 @@ class Trigger(BaseALObject, Expression):
         be able to handle common basic cases (e.g. t > next_spike_time).
         """
         try:
-            return ExpressionWithSimpleLHS('t', self._becomes_true(self.rhs),
-                                           assign_to_reserved=True)
-        except NineMLNoSolutionException:
-            return None
+            expr = self._cross_expr
+        except AttributeError:
+            try:
+                expr = ExpressionWithSimpleLHS(
+                    't', self._becomes_true(self.rhs),
+                    assign_to_reserved=True)
+            except NineMLNoSolutionException:
+                expr = None
+            else:
+                self._cross_expr = expr
+        return expr
 
     @classmethod
     def _becomes_true(cls, expr):
@@ -504,6 +511,24 @@ class OnCondition(Transition):
 
     def __repr__(self):
         return 'OnCondition({})'.format(self.trigger.rhs)
+
+    def check(self, old_state, new_state, old_t, new_t):
+        """
+        Checks the "on-conditions" of the regime to see if any have
+        been triggered during the update from old to new states/time
+
+        Parameter
+        ---------
+        old_state : dict[str, Quantity]
+            The old state variables
+        new_state : dict[str, Quantity]
+            The new state variables
+        old_t : Quantity(time)
+            The old time
+        new_t : Quantity(time)
+            The new time
+        """
+        pass
 
     @property
     def trigger(self):
