@@ -14,6 +14,7 @@ from nineml.document import Document
 from nineml.base import (
     DocumentLevelObject, ContainerObject)
 from nineml.values import SingleValue, ArrayValue, RandomDistributionValue
+from nineml.visitors.modifiers import ToSIUnitsConvertor
 from future.utils import with_metaclass
 
 
@@ -240,6 +241,12 @@ class Component(with_metaclass(
 
     def is_base_component(self):
         return isinstance(self.definition, Prototype)
+
+    def in_si_units(self):
+        clone = self.clone()
+        converter = ToSIUnitsConvertor()
+        converter.visit(clone)
+        return clone
 
     @property
     def definition(self):

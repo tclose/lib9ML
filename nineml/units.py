@@ -485,7 +485,7 @@ class Quantity(AnnotatedNineMLObject):
                 .format(self.units.dimension, units.dimension))
         return self.value * 10 ** (self.units.power - units.power)
 
-    def in_SI(self):
+    def in_si_units(self):
         """
         Returns float value in terms of SI units
         """
@@ -678,6 +678,15 @@ energy_per_temperature = Dimension(name="energy_per_temperature", m=1, l=2,  # @
                                    t=-2, k=-1)
 luminous_intensity = Dimension(name="luminous_intensity", j=1)
 
+common_dimensions = [
+    time, per_time, voltage, velocity, per_voltage, conductance,
+    conductanceDensity, capacitance, specificCapacitance, resistance,
+    resistivity, charge, charge_per_mole, charge_density, mass_per_charge,
+    current, currentDensity, current_per_time, length, area, volume,
+    concentration, per_time_per_concentration, substance, flux,
+    substance_per_area, permeability, temperature, idealGasConstantDims,
+    rho_factor, dimensionless, energy_per_temperature, luminous_intensity]
+
 # ------------ #
 # Common units #
 # ------------ #
@@ -755,6 +764,15 @@ kg_per_coulomb = Unit(name="kg_per_coulomb", dimension=mass_per_charge,
                       power=0)
 cm_per_s = Unit(name="cm_per_s", dimension=velocity, power=-2)
 pF_per_nA = Unit(name='pF_per_nA', dimension=voltage / time, power=-6)
+
+common_units = [
+    s, per_s, Hz, kHz, ms, per_ms, m, cm, um, m2, cm2, um2, m3, cm3, litre,
+    um3, V, mV, per_V, per_mV, ohm, kohm, Mohm, S, mS, uS, nS, pS, S_per_m2,
+    mS_per_cm2, S_per_cm2, F, uF, nF, pF, F_per_m2, uF_per_cm2, ohm_m, kohm_cm,
+    ohm_cm, C, C_per_mol, A, mA, uA, nA, pA, A_per_m2, uA_per_cm2, mA_per_cm2,
+    mol_per_m3, mol_per_cm3, M, mM, mol, m_per_s, cm_per_s, um_per_ms,
+    cm_per_ms, degC, K, J_per_K_per_mol, J_per_K, mol_per_m_per_A_per_s,
+    unitless, coulomb, cd, kg_per_coulomb, cm_per_s]
 
 
 from nineml.values import (  # @IgnorePep8

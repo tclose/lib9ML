@@ -1,22 +1,20 @@
-from .base import BaseVisitorWithContext
-from nineml.exceptions import NineMLFoundElementException
+from .base import BaseVisitor
+from nineml.units import Unit, common_units
 
 
-class ObjectFinder(BaseVisitorWithContext):
+class ToSIUnitsConvertor(BaseVisitor):
+    """
+    Converts all quantities in the object to SI units (i.e. unit.power = 0)
+    """
 
-    def __init__(self, ref_obj, container):
-        super(ObjectFinder, self).__init__()
-        self.ref_obj = ref_obj
-        self._found = None
+    def __init__(self):
+        self.si_units = {u.dimension: u for u in common_units if u.power == 0}
+
+    def action_quantity(self, quantity, **kwargs):  # @UnusedVariable
+        dim = quantity.units.dimension
         try:
-            self.visit(container)
-        except NineMLFoundElementException as e:
-            self._found = e
-
-    @property
-    def found(self):
-        return self._found
-
-    def action(self, obj, nineml_cls, **kwargs):  # @UnusedVariable
-        if obj == self.ref_obj:
-            raise NineMLFoundElementException(obj, self.context)
+            si_unit = self.si_units[dim]
+        except KeyError:
+            si_unit = Unit(self.name + 'SIUnit', dim, power=0)
+            self.si_units[dim] = si_unit
+        quantity.set_units(si_unit)
