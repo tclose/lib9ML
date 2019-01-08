@@ -76,20 +76,17 @@ class Dimension(AnnotatedNineMLObject, DocumentLevelObject):
         Create a sympy expression by multiplying symbols representing each of
         the dimensions together
         """
-        try:
-            return reduce(
-                operator.mul,
-                (Symbol(n) ** p
-                 for n, p in zip(self.dimension_symbols, self._dims)))
-        except:
-            raise
+        return reduce(
+            operator.mul,
+            (Symbol(n) ** p
+             for n, p in zip(self.dimension_symbols, self._dims)))
 
     @property
     def m(self):
         return self._dims[0]
 
     @property
-    def l(self):
+    def l(self):  # @IgnorePep8
         return self._dims[1]
 
     @property
@@ -488,6 +485,12 @@ class Quantity(AnnotatedNineMLObject):
                 .format(self.units.dimension, units.dimension))
         return self.value * 10 ** (self.units.power - units.power)
 
+    def in_SI(self):
+        """
+        Returns float value in terms of SI units
+        """
+        return self.value * 10 ** self.units.power
+
     def __repr__(self):
         return '{} * {}'.format(
             (self.value.value if isinstance(self.value, SingleValue)
@@ -637,40 +640,41 @@ class Quantity(AnnotatedNineMLObject):
 # Common dimensions #
 # ----------------- #
 
+
 time = Dimension(name="time", t=1)
 per_time = Dimension(name="per_time", t=-1)
-voltage = Dimension(name="voltage", m=1, l=2, t=-3, i=-1)
-velocity = Dimension(name="velocity", l=1, t=-1)
-per_voltage = Dimension(name="per_voltage", m=-1, l=-2, t=3, i=1)
-conductance = Dimension(name="conductance", m=-1, l=-2, t=3, i=2)
-conductanceDensity = Dimension(name="conductanceDensity", m=-1, l=-4, t=3, i=2)
-capacitance = Dimension(name="capacitance", m=-1, l=-2, t=4, i=2)
-specificCapacitance = Dimension(name="specificCapacitance", m=-1, l=-4, t=4,
+voltage = Dimension(name="voltage", m=1, l=2, t=-3, i=-1)  # @IgnorePep8
+velocity = Dimension(name="velocity", l=1, t=-1)  # @IgnorePep8
+per_voltage = Dimension(name="per_voltage", m=-1, l=-2, t=3, i=1)  # @IgnorePep8
+conductance = Dimension(name="conductance", m=-1, l=-2, t=3, i=2)  # @IgnorePep8
+conductanceDensity = Dimension(name="conductanceDensity", m=-1, l=-4, t=3, i=2)  # @IgnorePep8
+capacitance = Dimension(name="capacitance", m=-1, l=-2, t=4, i=2)  # @IgnorePep8
+specificCapacitance = Dimension(name="specificCapacitance", m=-1, l=-4, t=4,  # @IgnorePep8
                                 i=2)
-resistance = Dimension(name="resistance", m=1, l=2, t=-3, i=-2)
-resistivity = Dimension(name="resistivity", m=2, l=2, t=-3, i=-2)
+resistance = Dimension(name="resistance", m=1, l=2, t=-3, i=-2)  # @IgnorePep8
+resistivity = Dimension(name="resistivity", m=2, l=2, t=-3, i=-2)  # @IgnorePep8
 charge = Dimension(name="charge", i=1, t=1)
 charge_per_mole = Dimension(name="charge_per_mole", i=1, t=1, n=-1)
 charge_density = Dimension(name="charge_per_mole", i=1, t=1, m=-3)
 mass_per_charge = Dimension(name="mass_per_charge", i=-1, t=-1)
 current = Dimension(name="current", i=1)
-currentDensity = Dimension(name="currentDensity", i=1, l=-2)
+currentDensity = Dimension(name="currentDensity", i=1, l=-2)  # @IgnorePep8
 current_per_time = Dimension(name="current", i=1, t=-1)
-length = Dimension(name="length", l=1)
-area = Dimension(name="area", l=2)
-volume = Dimension(name="volume", l=3)
-concentration = Dimension(name="concentration", l=-3, n=1)
-per_time_per_concentration = Dimension(name="concentration", l=3, n=-1, t=-1)
+length = Dimension(name="length", l=1)  # @IgnorePep8
+area = Dimension(name="area", l=2)  # @IgnorePep8
+volume = Dimension(name="volume", l=3)  # @IgnorePep8
+concentration = Dimension(name="concentration", l=-3, n=1)  # @IgnorePep8
+per_time_per_concentration = Dimension(name="concentration", l=3, n=-1, t=-1)  # @IgnorePep8
 substance = Dimension(name="substance", n=1)
-flux = Dimension(name="flux", m=1, l=-3, t=-1)
-substance_per_area = Dimension(name="substance", n=1, l=-2)
-permeability = Dimension(name="permeability", l=1, t=-1)
+flux = Dimension(name="flux", m=1, l=-3, t=-1)  # @IgnorePep8
+substance_per_area = Dimension(name="substance", n=1, l=-2)  # @IgnorePep8
+permeability = Dimension(name="permeability", l=1, t=-1)  # @IgnorePep8
 temperature = Dimension(name="temperature", k=1)
-idealGasConstantDims = Dimension(name="idealGasConstantDims", m=1, l=2, t=-2,
+idealGasConstantDims = Dimension(name="idealGasConstantDims", m=1, l=2, t=-2,  # @IgnorePep8
                                  k=-1, n=-1)
-rho_factor = Dimension(name="rho_factor", l=-1, n=1, i=-1, t=-1)
+rho_factor = Dimension(name="rho_factor", l=-1, n=1, i=-1, t=-1)  # @IgnorePep8
 dimensionless = Dimension(name="dimensionless")
-energy_per_temperature = Dimension(name="energy_per_temperature", m=1, l=2,
+energy_per_temperature = Dimension(name="energy_per_temperature", m=1, l=2,  # @IgnorePep8
                                    t=-2, k=-1)
 luminous_intensity = Dimension(name="luminous_intensity", j=1)
 

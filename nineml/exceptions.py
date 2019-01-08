@@ -240,24 +240,6 @@ class NineMLDualVisitAnnotationsMismatchException(NineMLDualVisitException):
                                       self.key[1]))))
 
 
-class NineMLSimulationEvent(Exception):
-    """
-    Parameters
-    ----------
-    name : str
-        Name of the event raised
-    t : Quantity(time)
-        The exact time of the event
-    state : dict[str, Quantity]
-        The values of the states of the Dynamics at the time of the event
-    """
-
-    def __init__(self, name, t, state):
-        self.name = name
-        self.t = t
-        self.state = state
-
-
 def format_context(contexts, obj=None):
     lst = [(type(c.parent).__name__, c.parent.key) for c in contexts]
     if obj is not None:

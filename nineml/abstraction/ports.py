@@ -9,6 +9,7 @@ from abc import ABCMeta
 import sympy
 from . import BaseALObject
 from operator import add
+from functools import reduce
 from nineml.units import dimensionless
 from nineml.utils import validate_identifier
 from nineml.exceptions import NineMLUsageError

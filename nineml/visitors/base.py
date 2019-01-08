@@ -11,6 +11,7 @@ class OrderedDefaultOrderedDictDict(OrderedDict):
         self[key] = value = OrderedDict()
         return value
 
+
 Context = namedtuple('Context', ('parent', 'parent_cls', 'parent_result',
                                  'attr_name', 'dct'))
 

@@ -12,7 +12,7 @@ from nineml.utils import validate_identifier, assert_no_duplicates
 from nineml.utils.iterables import (filter_discrete_types,
                                     normalise_parameter_as_list)
 from nineml.exceptions import (
-    NineMLUsageError, name_error, NineMLSimulationEvent)
+    NineMLUsageError, name_error)
 from ..expressions import ODE
 from .. import BaseALObject
 from nineml.units import dimensionless, Dimension
