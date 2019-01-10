@@ -18,3 +18,6 @@ class ToSIUnitsConvertor(BaseVisitor):
             si_unit = Unit(self.name + 'SIUnit', dim, power=0)
             self.si_units[dim] = si_unit
         quantity.set_units(si_unit)
+
+    def default_action(self, obj, nineml_cls, **kwargs):  # @UnusedVariable
+        pass

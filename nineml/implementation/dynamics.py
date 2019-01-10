@@ -3,7 +3,7 @@ from operator import itemgetter
 from itertools import chain
 from collections import deque, OrderedDict
 import bisect
-import math.pi
+import math
 import numpy as np
 import sympy as sp
 import nineml.units as un
@@ -15,18 +15,19 @@ class Dynamics(object):
     Representation of a Dynamics object
     """
 
-    def __init__(self, definition, properties, initial_state, start_t):
-        if properties.definition != definition:
+    def __init__(self, component_class, properties, initial_state, start_t,
+                 regime_kwargs=None, **kwargs):
+        if properties.component_class != component_class:
             raise NineMLUsageError(
                 "Provided properties do not match definition ({} and {})"
-                .format(properties, definition))
-        if initial_state.definition != definition:
+                .format(properties, component_class))
+        if initial_state.component_class != component_class:
             raise NineMLUsageError(
                 "Provided state does not match definition ({} and {})"
-                .format(initial_state, definition))
+                .format(initial_state, component_class))
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
-        self.definition = definition.subsitute_aliases()
+        self.definition = component_class.substitute_aliases()
         # Convert all quantities to SI units for simplicity
         properties = properties.in_si_units()
         initial_state = initial_state.in_si_units()
@@ -61,19 +62,18 @@ class Dynamics(object):
         # Initialise regimes
         self.regimes = {}
         for regime_def in self.definition.regimes:
+            if regime_kwargs is not None:
+                kwgs = regime_kwargs[regime_def.name]
+            else:
+                kwgs = kwargs
             try:
-                regime = LinearRegime(regime_def, self)
+                regime = LinearRegime(regime_def, self, **kwgs)
             except SolverNotValidForRegimeException:
-                regime = NonlinearRegime(regime_def, self)
+                regime = NonlinearRegime(regime_def, self, **kwgs)
             self.regimes[regime_def.name] = regime
-        self._current_regime = self.regimes[initial_state.regime_name]
+        self._current_regime = self.regimes[initial_state.regime]
 
-    def simulate(self, stop_t, incoming_events=None):
-        # Register incoming events, with the closest on top, only used
-        # when simulating the dynamics object independently, i.e. not in
-        # a network where the events are passed directly between ports
-        for port_name, t in incoming_events:
-            self.event_receive_ports[port_name].receive(t)
+    def simulate(self, stop_t):
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
@@ -185,9 +185,9 @@ class Regime(object):
                 # the solver should be small enough for acceptable levels of
                 # accuracy and so that the time of trigger-activations can be
                 # approximated by linear intersections.
-                max_step = (min(self.time_of_next_handled_event, stop_t) -
+                max_dt = (min(self.time_of_next_handled_event, stop_t) -
                             self.t)
-                proposed_state, proposed_t = self.step_odes(max_step=max_step)
+                proposed_state, proposed_t = self.step_odes(max_dt=max_dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
@@ -224,7 +224,7 @@ class Regime(object):
             if new_regime is not None:
                 raise RegimeTransition(new_regime)
 
-    def step_odes(self, max_step=None):
+    def step_odes(self, max_dt=None):
         # Implemented in sub-classes
         raise NotImplementedError
 
@@ -249,9 +249,13 @@ class OnCondition(Transition):
     def __init__(self, definition, parent):
         Transition.__init__(self, definition, parent)
         dynamics = parent.parent
-        self.trigger = dynamics.sub_parameters(self.definition.trigger.rhs)
-        self.trigger_time = dynamics.sub_parameters(
-            self.definition.trigger.crossing_time_expr.rhs)
+        self.trigger_expr = dynamics.sub_parameters(
+            self.definition.trigger.rhs)
+        if self.definition.trigger.crossing_time_expr is not None:
+            self.trigger_time_expr = dynamics.sub_parameters(
+                self.definition.trigger.crossing_time_expr.rhs)
+        else:
+            self.trigger_time_expr = None
 
     def time_of_trigger(self, proposed_state, proposed_t):
         """
@@ -273,10 +277,10 @@ class OnCondition(Transition):
             triggered then it returns 'inf'
         """
         dynamics = self.parent.parent
-        if (dynamics.eval(self.trigger, state=proposed_state, t=proposed_t) and
-                not dynamics.eval(self.trigger_time)):
-            if self.trigger_time is not None:
-                trigger_time = dynamics.eval(self.trigger_time)
+        if not dynamics.eval(self.trigger_time_expr) and dynamics.eval(
+                self.trigger_expr, state=proposed_state, t=proposed_t):
+            if self.trigger_time_expr is not None:
+                trigger_time = dynamics.eval(self.trigger_time_expr)
             else:
                 # Default to proposed time if we can't solve trigger expression
                 trigger_time = proposed_t
@@ -430,23 +434,89 @@ class AnalogReducePort(Port):
                                       for sender, delay in self.senders))
 
 
+class AnalogSource(object):
+    """
+    An input source that can be connected to an AnalogReceivePort or
+    AnalogSendPort
+    """
+
+    def __init__(self, signal):
+        self.buffer = list(signal)
+
+    def connect_to(self, receive_port, delay):
+        receive_port.connect_from(self, delay)
+
+    def value(self, times):
+        """
+        Returns value of the buffer linearly interpolated to the requested
+        time
+
+        Parameters
+        ----------
+        times : np.array(float)
+            The times (in seconds) to return the value of the send port at
+
+        Returns
+        -------
+        values : np.array(float)
+            The values of the state-variable/alias that the send port
+            references interpolated to the given time points
+        """
+        return np.interp(times, *np.array(self.buffer).T)
+
+    @classmethod
+    def step(cls, amplitude, start_time, duration, dt, delay):
+        start_time = float(start_time.in_units(un.s))
+        duration = float(duration.in_units(un.s))
+        dt = float(dt.in_units(un.s))
+        delay = float(delay.in_units(un.s))
+        start_minus_delay = start_time - delay
+        num_preceding = int(np.floor(start_minus_delay / dt))
+        num_remaining = int(np.ceil((duration - start_minus_delay) / dt))
+        amplitude = amplitude.in_si_units()
+        signal = np.concatenate((np.zeros(num_preceding),
+                                 (np.ones(num_remaining) * float(amplitude))))
+        times = np.arange(start_time, start_time + duration, dt)
+        return AnalogSource(zip(times, signal))
+
+
+class EventSource(object):
+
+    def __init__(self, events):
+        self.events = list(events)
+
+    def connect_to(self, receive_port, delay):
+        for event_t in self.events:
+            receive_port.receive(event_t + delay)
+
+
 class LinearRegime(Regime):
     """
     Extends the base Regime class to implements a solver for a set of linear
     ODES. The solver is adapted from Brian2's "exact" state updater module.
 
     <brian2-cite-to-go-here>
+
+    Parameters
+    ----------
+    definition : nineml.Regime
+        The 9ML definition of the regime
+    parent : Dynamics
+        The dynamics object containing the current regime
+    dt : nineml.Quantity (time)
+        The default step size for the ODE updates
     """
 
-    def __init__(self, definition, parent, dt):
-        Regime.__init__(definition, parent)
+    def __init__(self, definition, parent, dt, **kwargs):  # @UnusedVariable
+        Regime.__init__(self, definition, parent)
+        self.dt = dt.in_units(un.s)
 
         # Convert state variable names into Sympy symbols
         state_vars = [
             sp.Symbol(n) for n in self.parent.definition.state_variable_names]
 
         # Get coefficient matrix
-        coeffs = sp.zeros(len(state_vars))
+        self.coeffs = sp.zeros(len(state_vars))
         constants = sp.zeros(len(state_vars), 1)
 
         # Populate matrix of coefficients
@@ -464,45 +534,63 @@ class LinearRegime(Regime):
 
             for j, sv_col in enumerate(state_vars):
                 expr = expr.collect(sv_row)
-                coeff_wildcard = sp.Wild('__k__', exclude=state_vars)
+                coeff_wildcard = sp.Wild('__k_{}__'.format(sv_col),
+                                         exclude=state_vars)
                 constant_wildcard = sp.Wild('__c__', exclude=[sv_col])
                 pattern = coeff_wildcard * sv_col + constant_wildcard
                 match = expr.match(pattern)
                 if match is None:
                     raise SolverNotValidForRegimeException
-                coeffs[i, j] = match[coeff_wildcard]
+                self.coeffs[i, j] = match[coeff_wildcard]
                 expr = match[constant_wildcard]
 
-        # The remaining expression should be numeric
-        try:
-            float(expr)
-        except ValueError:
-            raise SolverNotValidForRegimeException
-        constants[i] = expr
+            # The remaining expression should be numeric
+            try:
+                float(expr)
+            except TypeError:
+                raise SolverNotValidForRegimeException
+            constants[i] = expr
 
-        solution = sp.solve_linear_system(coeffs.row_join(constants),
+        solution = sp.solve_linear_system(self.coeffs.row_join(constants),
                                           *state_vars)
         if solution is None or sorted(solution.keys()) != state_vars:
             raise SolverNotValidForRegimeException
 
-        b = sp.ImmutableMatrix(solution[s] for s in state_vars).transpose()
+        self.b = sp.ImmutableMatrix(
+            solution[s] for s in state_vars).transpose()
 
         # Solve the system
         try:
-            self.A = (coeffs * dt).exp()
+            A = (self.coeffs * self.dt).exp()
         except NotImplementedError:
             raise SolverNotValidForRegimeException
-        self.C = sp.ImmutableMatrix([self.A.dot(b)]) - b
+        C = sp.ImmutableMatrix([self.A.dot(self.b)]) - self.b
 
-    def step_odes(self, max_step=None):
-        
-        
+        self.A = np.asarray(A)
+        self.C = np.asarray(C).T
+
+    def step_odes(self, max_dt=None):  # @UnusedVariable
+        if max_dt < self.dt:
+            # Create custom evolution matrices to handle custom step size until
+            # next event
+            A = (self.coeffs * max_dt).exp()
+            C = np.asarray(sp.ImmutableMatrix([A.dot(self.b)]) - self.b).T
+            A = np.asarray(A)
+        else:
+            A = self.A
+            C = self.C
+        x = np.asarray(self.parent.state.values())
+        stepped_x = np.dot(A, x) + C
+        self.parent.state.update(zip(self.state.keys(), stepped_x))
 
 
 class NonlinearRegime(Regime):
 
-    def step_odes(self, max_step=None):
-        pass
+    def __init__(self, definition, parent, dt, **kwargs):  # @UnusedVariable
+        Regime.__init__(self, definition, parent)
+
+    def step_odes(self, max_dt=None):
+        raise NotImplementedError
 
 
 class RegimeTransition(Exception):
