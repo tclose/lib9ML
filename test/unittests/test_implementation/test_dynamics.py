@@ -43,5 +43,6 @@ input_signal = AnalogSource.step(1 * un.ms, 50 * un.ms, 100 * un.ms,
                                  dt, 20 * un.ms)
 dynamics = Dynamics(definition, properties, initial_state, start_t=0.0 * un.s,
                     dt=dt)
-input_signal.connect_to(dynamics.port('i_synaptic'), delay=0.1 * un.ms)
+input_signal.connect_to(dynamics.analog_reduce_ports['i_synaptic'],
+                        delay=0.1 * un.ms)
 dynamics.simulate(duration)

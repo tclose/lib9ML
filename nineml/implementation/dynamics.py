@@ -1,6 +1,7 @@
 from functools import reduce  # Required for Python 3
 from operator import itemgetter
 from itertools import chain
+from copy import copy
 from collections import deque, OrderedDict
 import bisect
 import math
@@ -19,19 +20,19 @@ class Dynamics(object):
                  regime_kwargs=None, **kwargs):
         if properties.component_class != component_class:
             raise NineMLUsageError(
-                "Provided properties do not match definition ({} and {})"
+                "Provided properties do not match defn ({} and {})"
                 .format(properties, component_class))
         if initial_state.component_class != component_class:
             raise NineMLUsageError(
-                "Provided state does not match definition ({} and {})"
+                "Provided state does not match defn ({} and {})"
                 .format(initial_state, component_class))
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
-        self.definition = component_class.substitute_aliases()
+        self.defn = component_class.substitute_aliases()
         # Convert all quantities to SI units for simplicity
         properties = properties.in_si_units()
         initial_state = initial_state.in_si_units()
-        start_t = start_t.in_units(un.s)
+        start_t = float(start_t.in_units(un.s))
         # Initialise state information
         self._parameters = {p.name: float(p.value)
                             for p in properties.properties}
@@ -44,24 +45,24 @@ class Dynamics(object):
         self.event_receive_ports = {}
         self.analog_receive_ports = {}
         self.analog_reduce_ports = {}
-        for port_def in self.definition.event_send_ports:
-            self.event_send_ports[port_def.name] = AnalogSendPort(
-                port_def, self)
-        for port_def in self.definition.analog_send_ports:
-            self.analog_send_ports[port_def.name] = AnalogSendPort(
-                port_def, self)
-        for port_def in self.definition.event_receive_ports:
-            self.event_receive_ports[port_def.name] = EventReceivePort(
-                port_def, self)
-        for port_def in self.definition.analog_receive_ports:
-            self.analog_receive_ports[port_def.name] = AnalogReceivePort(
-                port_def, self)
-        for port_def in self.definition.analog_reduce_ports:
-            self.analog_reduce_ports[port_def.name] = AnalogReducePort(
-                port_def, self)
+        for port_defn in self.defn.event_send_ports:
+            self.event_send_ports[port_defn.name] = AnalogSendPort(
+                port_defn, self)
+        for port_defn in self.defn.analog_send_ports:
+            self.analog_send_ports[port_defn.name] = AnalogSendPort(
+                port_defn, self)
+        for port_defn in self.defn.event_receive_ports:
+            self.event_receive_ports[port_defn.name] = EventReceivePort(
+                port_defn, self)
+        for port_defn in self.defn.analog_receive_ports:
+            self.analog_receive_ports[port_defn.name] = AnalogReceivePort(
+                port_defn, self)
+        for port_defn in self.defn.analog_reduce_ports:
+            self.analog_reduce_ports[port_defn.name] = AnalogReducePort(
+                port_defn, self)
         # Initialise regimes
         self.regimes = {}
-        for regime_def in self.definition.regimes:
+        for regime_def in self.defn.regimes:
             if regime_kwargs is not None:
                 kwgs = regime_kwargs[regime_def.name]
             else:
@@ -71,9 +72,10 @@ class Dynamics(object):
             except SolverNotValidForRegimeException:
                 regime = NonlinearRegime(regime_def, self, **kwgs)
             self.regimes[regime_def.name] = regime
-        self._current_regime = self.regimes[initial_state.regime]
+        self.current_regime = self.regimes[initial_state.regime]
 
     def simulate(self, stop_t):
+        stop_t = float(stop_t.in_units(un.s))
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
@@ -107,24 +109,27 @@ class Dynamics(object):
             state = self.state
         if t is None:
             t = self.t
-        values = {'t': t}
+        # Add special symbols
+        values = {'t': t, 'pi': math.pi}
         values.update(state)
-        values.update((p.name, p.value(t))
-                      for p in chain(self.analog_receive_ports,
-                                     self.analog_reduce_ports))
+        values.update((n, p.value(t))
+                      for n, p in chain(self.analog_receive_ports.items(),
+                                        self.analog_reduce_ports.items()))
+        values.update(self.parameters.items())
         try:
             value = values[expr]  # For simple exprs, which are just a var name
         except KeyError:
-            value = float(expr.evalf(values))
+            try:
+                value = float(expr.evalf(subs=values))
+            except TypeError:
+                value = bool(expr.subs(values))
         return value
 
-    def sub_parameters(self, expr):
-        return expr.subs(chain(self.parameters.items(), [('pi', math.pi)]))
-
     def update_state(self, new_state, new_t):
-        self.state_array = new_state
-        self.t = new_t
-        for port in chain(self.analog_send_ports, self.event_receive_ports):
+        self._state = new_state
+        self._t = new_t
+        for port in chain(self.analog_send_ports.values(),
+                          self.event_receive_ports.values()):
             port.update_buffer()
 
     @property
@@ -154,14 +159,14 @@ class Regime(object):
     ----------
     """
 
-    def __init__(self, definition, parent):
-        self.definition = definition
+    def __init__(self, defn, parent):
+        self.defn = defn
         self.parent = parent
         self.on_conditions = []
-        for oc_def in self.definition.on_conditions:
+        for oc_def in self.defn.on_conditions:
             self.on_conditions.append(OnCondition(oc_def, self))
         self.on_events = []
-        for oe_def in self.definition.on_events:
+        for oe_def in self.defn.on_events:
             self.on_events.append(OnEvent(oe_def, self))
 
     def simulate(self, stop_t):
@@ -175,7 +180,7 @@ class Regime(object):
             The time to run the simulation until
         """
         transition = None
-        while self.t < stop_t:
+        while self.parent.t < stop_t:
             # If new state has been assigned by a transition in a previous
             # iteration then we don't do an ODE step to allow for multiple
             # transitions at the same time-point
@@ -186,7 +191,7 @@ class Regime(object):
                 # accuracy and so that the time of trigger-activations can be
                 # approximated by linear intersections.
                 max_dt = (min(self.time_of_next_handled_event, stop_t) -
-                            self.t)
+                          self.parent.t)
                 proposed_state, proposed_t = self.step_odes(max_dt=max_dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
@@ -230,30 +235,35 @@ class Regime(object):
 
     @property
     def time_of_next_handled_event(self):
-        return min(oe.port.next_event for oe in self.on_events.values())
+        try:
+            return min(oe.port.next_event for oe in self.on_events)
+        except ValueError:
+            return float('inf')
+
+    @property
+    def name(self):
+        return self.defn.name
 
 
 class Transition(object):
 
-    def __init__(self, definition, parent):
-        self.definition = definition
+    def __init__(self, defn, parent):
+        self.defn = defn
         self.parent = parent
 
     @property
     def output_event_names(self):
-        return self.definition.output_event_names
+        return self.defn.output_event_names
 
 
 class OnCondition(Transition):
 
-    def __init__(self, definition, parent):
-        Transition.__init__(self, definition, parent)
-        dynamics = parent.parent
-        self.trigger_expr = dynamics.sub_parameters(
-            self.definition.trigger.rhs)
-        if self.definition.trigger.crossing_time_expr is not None:
-            self.trigger_time_expr = dynamics.sub_parameters(
-                self.definition.trigger.crossing_time_expr.rhs)
+    def __init__(self, defn, parent):
+        Transition.__init__(self, defn, parent)
+        self.trigger_expr = self.defn.trigger.rhs
+        if self.defn.trigger.crossing_time_expr is not None:
+            self.trigger_time_expr = (
+                self.defn.trigger.crossing_time_expr.rhs)
         else:
             self.trigger_time_expr = None
 
@@ -277,7 +287,7 @@ class OnCondition(Transition):
             triggered then it returns 'inf'
         """
         dynamics = self.parent.parent
-        if not dynamics.eval(self.trigger_time_expr) and dynamics.eval(
+        if not dynamics.eval(self.trigger_expr) and dynamics.eval(
                 self.trigger_expr, state=proposed_state, t=proposed_t):
             if self.trigger_time_expr is not None:
                 trigger_time = dynamics.eval(self.trigger_time_expr)
@@ -291,27 +301,27 @@ class OnCondition(Transition):
 
 class OnEvent(Transition):
 
-    def __init__(self, definition, parent):
-        Transition.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Transition.__init__(self, defn, parent)
         self.port = self.parent.parent.event_receive_ports[
-            self.definition.name]
+            self.defn.name]
 
 
 class Port(object):
 
-    def __init__(self, definition, parent):
-        self.definition = definition
+    def __init__(self, defn, parent):
+        self.defn = defn
         self.parent = parent
 
     @property
     def name(self):
-        return self.definition.name
+        return self.defn.name
 
 
 class EventSendPort(Port):
 
-    def __init__(self, definition, parent):
-        Port.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Port.__init__(self, defn, parent)
         self.receivers = []
 
     def send(self, t):
@@ -324,8 +334,8 @@ class EventSendPort(Port):
 
 class EventReceivePort(Port):
 
-    def __init__(self, definition, parent):
-        Port.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Port.__init__(self, defn, parent)
         self.events = []
 
     def receive(self, t):
@@ -344,19 +354,19 @@ class EventReceivePort(Port):
 
 class AnalogSendPort(Port):
 
-    def __init__(self, definition, parent):
-        Port.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Port.__init__(self, defn, parent)
         self.receivers = []
         # A list that saves the value of the send port in a buffer at
         self.buffer = deque()
         # Get the expression that defines the value of the port
         try:
-            self.expr = self.parent.definition.alias(self.name).rhs.subs(
+            self.expr = self.parent.defn.alias(self.name).rhs.subs(
                 self.parent.parent.parameters)
         except NineMLNameError:
             self.expr = self.name
 
-    def value(self, times):
+    def values(self, times):
         """
         Returns value of the buffer linearly interpolated to the requested
         time
@@ -372,7 +382,8 @@ class AnalogSendPort(Port):
             The values of the state-variable/alias that the send port
             references interpolated to the given time points
         """
-        return np.interp(times, *np.array(self.buffer).T)
+        rec_times, values = np.array(self.buffer).T
+        return np.interp(times, rec_times, values)
 
     def connect_to(self, receive_port, delay):
         # Register the sending port with the receiving port so it can retrieve
@@ -395,8 +406,8 @@ class AnalogSendPort(Port):
 
 class AnalogReceivePort(Port):
 
-    def __init__(self, definition, parent):
-        Port.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Port.__init__(self, defn, parent)
         self.sender = None
         self.delay = None
 
@@ -406,31 +417,37 @@ class AnalogReceivePort(Port):
                 "Cannot connect analog receive port '{}' in {} to multiple "
                 "receive ports")
         self.sender = send_port
-        self.delay = delay
+        self.delay = float(delay.in_units(un.s))
 
-    def value(self, times):
+    def value(self, t):
+        return self.values([t])[0]
+
+    def values(self, times):
         if self.sender is None:
             raise NineMLUsageError(
                 "Analog receive port '{}' in {} has not been connected"
                 .format(self.name, self.parent))
-        return self.sender.value(t - self.delay for t in times)
+        return self.sender.values(t - self.delay for t in times)
 
 
 class AnalogReducePort(Port):
 
-    def __init__(self, definition, parent):
-        Port.__init__(self, definition, parent)
+    def __init__(self, defn, parent):
+        Port.__init__(self, defn, parent)
         self.senders = []
 
     @property
     def operator(self):
-        return self.definition.python_op
+        return self.defn.python_op
 
     def connect_from(self, send_port, delay):
-        self.senders.append((send_port, delay))
+        self.senders.append((send_port, float(delay.in_units(un.s))))
 
-    def value(self, times):
-        return reduce(self.operator, (sender.value(t - delay for t in times)
+    def value(self, t):
+        return self.values([t])[0]
+
+    def values(self, times):
+        return reduce(self.operator, (sender.values([t - delay for t in times])
                                       for sender, delay in self.senders))
 
 
@@ -446,7 +463,10 @@ class AnalogSource(object):
     def connect_to(self, receive_port, delay):
         receive_port.connect_from(self, delay)
 
-    def value(self, times):
+    def value(self, t):
+        return self.values([t])[0]
+
+    def values(self, times):
         """
         Returns value of the buffer linearly interpolated to the requested
         time
@@ -462,7 +482,8 @@ class AnalogSource(object):
             The values of the state-variable/alias that the send port
             references interpolated to the given time points
         """
-        return np.interp(times, *np.array(self.buffer).T)
+        rec_times, values = np.array(self.buffer).T
+        return np.interp(times, rec_times, values)
 
     @classmethod
     def step(cls, amplitude, start_time, duration, dt, delay):
@@ -499,98 +520,111 @@ class LinearRegime(Regime):
 
     Parameters
     ----------
-    definition : nineml.Regime
-        The 9ML definition of the regime
+    defn : nineml.Regime
+        The 9ML defn of the regime
     parent : Dynamics
         The dynamics object containing the current regime
     dt : nineml.Quantity (time)
         The default step size for the ODE updates
     """
 
-    def __init__(self, definition, parent, dt, **kwargs):  # @UnusedVariable
-        Regime.__init__(self, definition, parent)
-        self.dt = dt.in_units(un.s)
+    def __init__(self, defn, parent, dt, **kwargs):  # @UnusedVariable
+        Regime.__init__(self, defn, parent)
+        self.dt = float(dt.in_units(un.s))
 
         # Convert state variable names into Sympy symbols
-        state_vars = [
-            sp.Symbol(n) for n in self.parent.definition.state_variable_names]
+        active_vars = [
+            sp.Symbol(n) for n in self.defn.time_derivative_variables]
 
-        # Get coefficient matrix
-        self.coeffs = sp.zeros(len(state_vars))
-        constants = sp.zeros(len(state_vars), 1)
+        if not active_vars:
+            self.default_update_exprs = None
+        else:
 
-        # Populate matrix of coefficients
-        for i, sv_row in enumerate(state_vars):
-            try:
-                time_deriv = self.definition.time_derivative(str(sv_row))
-            except NineMLNameError:
-                # No time derivative for the state variable in this regime
-                # so the matrix/vector rows should stay zero
-                continue
-            # Iterate over all state variables one at a time and detect their
-            # coefficients. Each iteration removes a state variable from the
-            # expression until all that is left is the constant
-            expr = self.parent.sub_parameters(time_deriv.rhs)
+            # Get coefficient matrix
+            self.coeffs = sp.zeros(len(active_vars))
+            constants = sp.zeros(len(active_vars), 1)
 
-            for j, sv_col in enumerate(state_vars):
-                expr = expr.collect(sv_row)
-                coeff_wildcard = sp.Wild('__k_{}__'.format(sv_col),
-                                         exclude=state_vars)
-                constant_wildcard = sp.Wild('__c__', exclude=[sv_col])
-                pattern = coeff_wildcard * sv_col + constant_wildcard
-                match = expr.match(pattern)
-                if match is None:
-                    raise SolverNotValidForRegimeException
-                self.coeffs[i, j] = match[coeff_wildcard]
-                expr = match[constant_wildcard]
+            # Populate matrix of coefficients
+            for i, sv_row in enumerate(active_vars):
+                try:
+                    time_deriv = self.defn.time_derivative(str(sv_row))
+                except NineMLNameError:
+                    # No time derivative for the state variable in this regime
+                    # so the matrix/vector rows should stay zero
+                    continue
+                # Iterate over all state variables one at a time and detect
+                # their coefficients. Each iteration removes a state variable
+                # from the expression until all that is left is the constant
+                expr = time_deriv.rhs.expand()
 
-            # The remaining expression should be numeric
-            try:
-                float(expr)
-            except TypeError:
+                for j, sv_col in enumerate(active_vars):
+                    expr = expr.collect(sv_col)
+                    coeff_wildcard = sp.Wild('_k', exclude=active_vars)
+                    constant_wildcard = sp.Wild('_c', exclude=[sv_col])
+                    pattern = coeff_wildcard * sv_col + constant_wildcard
+                    match = expr.match(pattern)
+                    if match is None:
+                        raise SolverNotValidForRegimeException
+                    self.coeffs[i, j] = match[coeff_wildcard]
+                    expr = match[constant_wildcard]
+
+                constants[i] = expr
+
+            solution = sp.solve_linear_system(self.coeffs.row_join(constants),
+                                              *active_vars)
+            if solution is None or sorted(solution.keys()) != active_vars:
                 raise SolverNotValidForRegimeException
-            constants[i] = expr
 
-        solution = sp.solve_linear_system(self.coeffs.row_join(constants),
-                                          *state_vars)
-        if solution is None or sorted(solution.keys()) != state_vars:
-            raise SolverNotValidForRegimeException
+            self.b = sp.ImmutableMatrix(
+                [solution[s] for s in active_vars]).transpose()
 
-        self.b = sp.ImmutableMatrix(
-            solution[s] for s in state_vars).transpose()
+            self.default_update_exprs = self._update_exprs(self.dt)
+
+    def _update_exprs(self, dt):
 
         # Solve the system
         try:
-            A = (self.coeffs * self.dt).exp()
+            A = (self.coeffs * dt).exp()
         except NotImplementedError:
             raise SolverNotValidForRegimeException
-        C = sp.ImmutableMatrix([self.A.dot(self.b)]) - self.b
+        C = sp.ImmutableMatrix([A.dot(self.b)]) - self.b
+        _S = sp.MatrixSymbol('_S', self.defn.num_time_derivatives, 1)
+        updates = A * _S + C.transpose()
+        updates = updates.as_explicit()
 
-        self.A = np.asarray(A)
-        self.C = np.asarray(C).T
+        update_exprs = {}
+
+        for td_var, update in zip(self.defn.time_derivative_variables,
+                                  updates):
+            expr = update
+            if len(expr.atoms(sp.I)) > 0:
+                raise SolverNotValidForRegimeException
+            for i, state_var in enumerate(self.defn.time_derivative_variables):
+                expr = expr.subs(_S[i, 0], state_var)
+            update_exprs[td_var] = expr
+        return update_exprs
 
     def step_odes(self, max_dt=None):  # @UnusedVariable
         if max_dt < self.dt:
-            # Create custom evolution matrices to handle custom step size until
-            # next event
-            A = (self.coeffs * max_dt).exp()
-            C = np.asarray(sp.ImmutableMatrix([A.dot(self.b)]) - self.b).T
-            A = np.asarray(A)
+            update_exprs = (self.update_exprs(max_dt)
+                            if self.default_update_exprs is not None else None)
+            proposed_t = self.parent.t + max_dt
         else:
-            A = self.A
-            C = self.C
-        x = np.asarray(self.parent.state.values())
-        stepped_x = np.dot(A, x) + C
-        self.parent.state.update(zip(self.state.keys(), stepped_x))
+            update_exprs = self.default_update_exprs
+            proposed_t = self.parent.t + self.dt
+        if update_exprs is not None:
+            proposed_state = copy(self.parent.state)
+            proposed_state.update(
+                (n, self.parent.eval(e)) for n, e in update_exprs.items())
+        else:
+            proposed_state = self.parent.state
+        return proposed_state, proposed_t
 
 
 class NonlinearRegime(Regime):
 
-    def __init__(self, definition, parent, dt, **kwargs):  # @UnusedVariable
-        Regime.__init__(self, definition, parent)
-
-    def step_odes(self, max_dt=None):
-        raise NotImplementedError
+    def __init__(self, defn, parent, dt, **kwargs):  # @UnusedVariable
+        Regime.__init__(self, defn, parent)
 
 
 class RegimeTransition(Exception):
