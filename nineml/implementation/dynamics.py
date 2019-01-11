@@ -7,6 +7,7 @@ import bisect
 import math
 import numpy as np
 import sympy as sp
+import time
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 
@@ -180,6 +181,8 @@ class Regime(object):
             The time to run the simulation until
         """
         transition = None
+        count = 0
+        start_real_time = time.time()
         while self.parent.t < stop_t:
             # If new state has been assigned by a transition in a previous
             # iteration then we don't do an ODE step to allow for multiple
@@ -228,6 +231,14 @@ class Regime(object):
             # transition and the update of the state/time
             if new_regime is not None:
                 raise RegimeTransition(new_regime)
+            count += 1
+            if count > 10:
+                end_real_time = time.time()
+                real_duration = end_real_time - start_real_time
+                print("Simulated until {} in {} seconds".format(self.parent.t,
+                                                                real_duration))
+                count = 0
+                start_real_time = time.time()
 
     def step_odes(self, max_dt=None):
         # Implemented in sub-classes
