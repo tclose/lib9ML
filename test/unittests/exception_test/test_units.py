@@ -24,14 +24,14 @@ class TestDimensionExceptions(unittest.TestCase):
 
 class TestUnitExceptions(unittest.TestCase):
 
-    def test_to_SI_units_str_exception(self):
+    def test_to_si_units_str_exception(self):
         """
         line #: 306
         message: Cannot convert to SI units string as offset is not zero ({})
         """
         self.assertRaises(
             Exception,
-            un.degC.to_SI_units_str)
+            un.degC.to_si_units_str)
 
     def test___mul___ninemlruntimeerror(self):
         """

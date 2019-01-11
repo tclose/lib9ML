@@ -4,10 +4,7 @@ from itertools import chain
 from copy import copy
 from collections import deque, OrderedDict
 import bisect
-import math
-import numpy as np
 import sympy as sp
-import time
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 
@@ -41,13 +38,13 @@ class Dynamics(object):
                                   for sv in initial_state.variables)
         self._t = start_t
         # Initialise ports
-        self.event_send_ports = {}
-        self.analog_send_ports = {}
-        self.event_receive_ports = {}
-        self.analog_receive_ports = {}
-        self.analog_reduce_ports = {}
+        self.event_send_ports = OrderedDict()
+        self.analog_send_ports = OrderedDict()
+        self.event_receive_ports = OrderedDict()
+        self.analog_receive_ports = OrderedDict()
+        self.analog_reduce_ports = OrderedDict()
         for port_defn in self.defn.event_send_ports:
-            self.event_send_ports[port_defn.name] = AnalogSendPort(
+            self.event_send_ports[port_defn.name] = EventSendPort(
                 port_defn, self)
         for port_defn in self.defn.analog_send_ports:
             self.analog_send_ports[port_defn.name] = AnalogSendPort(
@@ -77,6 +74,7 @@ class Dynamics(object):
 
     def simulate(self, stop_t):
         stop_t = float(stop_t.in_units(un.s))
+        self._update_buffers()
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
@@ -86,49 +84,12 @@ class Dynamics(object):
             except RegimeTransition as transition:
                 self.current_regime = self.regimes[transition.target]
 
-    def eval(self, expr, state=None, t=None):
-        """
-        Evaluates the given expression given the values of the state
-        and ports of the Dynamics object. Returns a dictionary mapping variable
-        (parameter| port) names to their current values.
-
-        Parameters
-        ----------
-        expr : sympy.Expression
-            The expression to evaluate
-        state : numpy.array
-            The value of the state. If None the current state is used
-        t : float
-            The value of the time. If None the current time is used
-
-        Returns
-        -------
-        value : float
-            The value of the expression
-        """
-        if state is None:
-            state = self.state
-        if t is None:
-            t = self.t
-        # Add special symbols
-        values = {'t': t, 'pi': math.pi}
-        values.update(state)
-        values.update((n, p.value(t))
-                      for n, p in chain(self.analog_receive_ports.items(),
-                                        self.analog_reduce_ports.items()))
-        values.update(self.parameters.items())
-        try:
-            value = values[expr]  # For simple exprs, which are just a var name
-        except KeyError:
-            try:
-                value = float(expr.evalf(subs=values))
-            except TypeError:
-                value = bool(expr.subs(values))
-        return value
-
     def update_state(self, new_state, new_t):
         self._state = new_state
         self._t = new_t
+        self._update_buffers()
+
+    def _update_buffers(self):
         for port in chain(self.analog_send_ports.values(),
                           self.event_receive_ports.values()):
             port.update_buffer()
@@ -136,6 +97,33 @@ class Dynamics(object):
     @property
     def parameters(self):
         return self._parameters
+
+    @property
+    def all_symbols(self):
+        "Returns a list of all symbols used in the Dynamics class"
+        return list(sp.symbols(chain(
+            self.state.keys(),
+            self.defn.analog_receive_port_names,
+            self.defn.analog_reduce_port_names,
+            self.parameters.keys(),
+            ['t'])))
+
+    def all_values(self, state=None, t=None):
+        if state is None:
+            state = self.state
+        if t is None:
+            t = self.t
+        return list(chain(
+            state.values(),
+            (p.value(t) for p in chain(
+                self.analog_receive_ports.values(),
+                self.analog_reduce_ports.values())),
+            self.parameters.values(),
+            [t]))
+
+    def lambdify(self, expr):
+        "Lambdifies a sympy expression, substituting in all values"
+        return sp.lambdify(self.all_symbols, expr, 'math')
 
     @property
     def t(self):
@@ -181,8 +169,6 @@ class Regime(object):
             The time to run the simulation until
         """
         transition = None
-        count = 0
-        start_real_time = time.time()
         while self.parent.t < stop_t:
             # If new state has been assigned by a transition in a previous
             # iteration then we don't do an ODE step to allow for multiple
@@ -231,14 +217,6 @@ class Regime(object):
             # transition and the update of the state/time
             if new_regime is not None:
                 raise RegimeTransition(new_regime)
-            count += 1
-            if count > 10:
-                end_real_time = time.time()
-                real_duration = end_real_time - start_real_time
-                print("Simulated until {} in {} seconds".format(self.parent.t,
-                                                                real_duration))
-                count = 0
-                start_real_time = time.time()
 
     def step_odes(self, max_dt=None):
         # Implemented in sub-classes
@@ -271,9 +249,10 @@ class OnCondition(Transition):
 
     def __init__(self, defn, parent):
         Transition.__init__(self, defn, parent)
-        self.trigger_expr = self.defn.trigger.rhs
+        dynamics = self.parent.parent
+        self.trigger_expr = dynamics.lambdify(self.defn.trigger.rhs)
         if self.defn.trigger.crossing_time_expr is not None:
-            self.trigger_time_expr = (
+            self.trigger_time_expr = dynamics.lambdify(
                 self.defn.trigger.crossing_time_expr.rhs)
         else:
             self.trigger_time_expr = None
@@ -298,10 +277,12 @@ class OnCondition(Transition):
             triggered then it returns 'inf'
         """
         dynamics = self.parent.parent
-        if not dynamics.eval(self.trigger_expr) and dynamics.eval(
-                self.trigger_expr, state=proposed_state, t=proposed_t):
+        values = dynamics.all_values()
+        proposed_values = dynamics.all_values(state=proposed_state,
+                                              t=proposed_t)
+        if not self.trigger_expr(*values) and self.trigger_expr(*proposed_values):  # @IgnorePep8
             if self.trigger_time_expr is not None:
-                trigger_time = dynamics.eval(self.trigger_time_expr)
+                trigger_time = self.trigger_time_expr(*values)
             else:
                 # Default to proposed time if we can't solve trigger expression
                 trigger_time = proposed_t
@@ -370,14 +351,15 @@ class AnalogSendPort(Port):
         self.receivers = []
         # A list that saves the value of the send port in a buffer at
         self.buffer = deque()
+        dynamics = self.parent
         # Get the expression that defines the value of the port
         try:
-            self.expr = self.parent.defn.alias(self.name).rhs.subs(
-                self.parent.parent.parameters)
+            expr = dynamics.defn.alias(self.name).rhs
         except NineMLNameError:
-            self.expr = self.name
+            expr = sp.Symbol(self.name)
+        self.expr = dynamics.lambdify(expr)
 
-    def values(self, times):
+    def value(self, t):
         """
         Returns value of the buffer linearly interpolated to the requested
         time
@@ -389,12 +371,33 @@ class AnalogSendPort(Port):
 
         Returns
         -------
-        values : np.array(float)
+        value : np.array(float)
             The values of the state-variable/alias that the send port
             references interpolated to the given time points
         """
-        rec_times, values = np.array(self.buffer).T
-        return np.interp(times, rec_times, values)
+        # Get buffer value immediately before requested time
+        try:
+            i, (t1, v1) = next(x for x in enumerate(reversed(self.buffer))
+                               if x[1][0] <= t)
+        except StopIteration:
+            raise NineMLUsageError(
+                "Requested time {} s is before beginning of the buffer for "
+                "{} ({} s)".format(t, self._location, self.buffer[0][0]))
+        # For exact time matches return the value
+        if t1 == t:
+            return v1
+        try:
+            t2, v2 = self.buffer[len(self.buffer) - i]
+        except IndexError:
+            raise NineMLUsageError(
+                "Requested time {} s is after end of the buffer for  ({} s)"
+                .format(t, self._location, self.buffer[-1][0]))
+        # Linearly interpolate the point between the buffer
+        return v1 + (v2 - v1) * (t - t1) / (t2 - t1)
+
+    @property
+    def _location(self):
+        return "'{}' port in {}".format(self.name, self.parent)
 
     def connect_to(self, receive_port, delay):
         # Register the sending port with the receiving port so it can retrieve
@@ -408,7 +411,8 @@ class AnalogSendPort(Port):
         Buffers the value of the port for reference by receivers
         """
         if self.receivers:
-            self.buffer.append((self.parent.t, self.parent.eval(self.expr)))
+            self.buffer.append((self.parent.t,
+                                self.expr(*self.parent.all_values())))
 
     def clear_buffer(self, min_t):
         while self.buffer[0][0] < min_t:
@@ -425,20 +429,22 @@ class AnalogReceivePort(Port):
     def connect_from(self, send_port, delay):
         if self.sender is not None:
             raise NineMLUsageError(
-                "Cannot connect analog receive port '{}' in {} to multiple "
-                "receive ports")
+                "Cannot connect {} to multiple receive ports".format(
+                    self._location))
         self.sender = send_port
         self.delay = float(delay.in_units(un.s))
 
     def value(self, t):
-        return self.values([t])[0]
-
-    def values(self, times):
-        if self.sender is None:
+        try:
+            return self.sender.value(t - self.delay)
+        except AttributeError:
             raise NineMLUsageError(
-                "Analog receive port '{}' in {} has not been connected"
-                .format(self.name, self.parent))
-        return self.sender.values(t - self.delay for t in times)
+                "{} has not been connected".format(self._location))
+
+    @property
+    def _location(self):
+        return "analog receive port '{}' in {}".format(self.name,
+                                                       self.parent)
 
 
 class AnalogReducePort(Port):
@@ -455,61 +461,54 @@ class AnalogReducePort(Port):
         self.senders.append((send_port, float(delay.in_units(un.s))))
 
     def value(self, t):
-        return self.values([t])[0]
-
-    def values(self, times):
-        return reduce(self.operator, (sender.values([t - delay for t in times])
+        return reduce(self.operator, (sender.value(t - delay)
                                       for sender, delay in self.senders))
 
 
-class AnalogSource(object):
+class AnalogSource(AnalogSendPort):
     """
     An input source that can be connected to an AnalogReceivePort or
     AnalogSendPort
     """
 
-    def __init__(self, signal):
-        self.buffer = list(signal)
+    def __init__(self, name, signal):
+        self._name = name
+        self.buffer = [(float(t.in_units(un.s)), float(a.in_si_units()))
+                       for t, a in signal]
+
+    @property
+    def name(self):
+        return self._name
 
     def connect_to(self, receive_port, delay):
         receive_port.connect_from(self, delay)
 
-    def value(self, t):
-        return self.values([t])[0]
+    @property
+    def _location(self):
+        return "anlog source '{}'".format(self.name)
+
+
+class AnalogSink(AnalogReceivePort):
+
+    def __init__(self, name):
+        self._name = name
+        self.sender = None
+        self.delay = None
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def _location(self):
+        return "analog sink '{}'".format(self.name)
 
     def values(self, times):
-        """
-        Returns value of the buffer linearly interpolated to the requested
-        time
+        return [self.value(t.in_units(un.s)) for t in times]
 
-        Parameters
-        ----------
-        times : np.array(float)
-            The times (in seconds) to return the value of the send port at
-
-        Returns
-        -------
-        values : np.array(float)
-            The values of the state-variable/alias that the send port
-            references interpolated to the given time points
-        """
-        rec_times, values = np.array(self.buffer).T
-        return np.interp(times, rec_times, values)
-
-    @classmethod
-    def step(cls, amplitude, start_time, duration, dt, delay):
-        start_time = float(start_time.in_units(un.s))
-        duration = float(duration.in_units(un.s))
-        dt = float(dt.in_units(un.s))
-        delay = float(delay.in_units(un.s))
-        start_minus_delay = start_time - delay
-        num_preceding = int(np.floor(start_minus_delay / dt))
-        num_remaining = int(np.ceil((duration - start_minus_delay) / dt))
-        amplitude = amplitude.in_si_units()
-        signal = np.concatenate((np.zeros(num_preceding),
-                                 (np.ones(num_remaining) * float(amplitude))))
-        times = np.arange(start_time, start_time + duration, dt)
-        return AnalogSource(zip(times, signal))
+    @property
+    def dimension(self):
+        return self.sender.defn.dimension
 
 
 class EventSource(object):
@@ -589,7 +588,7 @@ class LinearRegime(Regime):
             self.b = sp.ImmutableMatrix(
                 [solution[s] for s in active_vars]).transpose()
 
-            self.default_update_exprs = self._update_exprs(self.dt)
+            self.default_updates = self._update_exprs(self.dt)
 
     def _update_exprs(self, dt):
 
@@ -603,7 +602,7 @@ class LinearRegime(Regime):
         updates = A * _S + C.transpose()
         updates = updates.as_explicit()
 
-        update_exprs = {}
+        updates = {}
 
         for td_var, update in zip(self.defn.time_derivative_variables,
                                   updates):
@@ -612,21 +611,22 @@ class LinearRegime(Regime):
                 raise SolverNotValidForRegimeException
             for i, state_var in enumerate(self.defn.time_derivative_variables):
                 expr = expr.subs(_S[i, 0], state_var)
-            update_exprs[td_var] = expr
-        return update_exprs
+            updates[td_var] = self.parent.lambify(expr)
+        return updates
 
     def step_odes(self, max_dt=None):  # @UnusedVariable
         if max_dt < self.dt:
-            update_exprs = (self.update_exprs(max_dt)
-                            if self.default_update_exprs is not None else None)
+            updates = (self._update_exprs(max_dt)
+                            if self.default_updates is not None else None)
             proposed_t = self.parent.t + max_dt
         else:
-            update_exprs = self.default_update_exprs
+            updates = self.default_updates
             proposed_t = self.parent.t + self.dt
-        if update_exprs is not None:
+        if updates is not None:
             proposed_state = copy(self.parent.state)
-            proposed_state.update(
-                (n, self.parent.eval(e)) for n, e in update_exprs.items())
+            values = self.parent.all_values()
+            for var_name, update in updates.items():
+                proposed_state[var_name] = update(*values)
         else:
             proposed_state = self.parent.state
         return proposed_state, proposed_t

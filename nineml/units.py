@@ -64,7 +64,7 @@ class Dimension(AnnotatedNineMLObject, DocumentLevelObject):
     def power(self, name):
         return self._dims[self.dimension_symbols.index(name)]
 
-    def to_SI_units_str(self):
+    def to_si_units_str(self):
         numer = '*'.join('({}**{})'.format(si, p) if p > 1 else si
                          for si, p in zip(self.SI_units, self._dims) if p > 0)
         denom = '*'.join('({}**{})'.format(si, p) if p < -1 else si
@@ -296,11 +296,11 @@ class Unit(AnnotatedNineMLObject, DocumentLevelObject):
     def __str__(self):
         return self.name
 
-    def to_SI_units_str(self):
+    def to_si_units_str(self):
         if self.offset != 0.0:
             raise Exception("Cannot convert to SI units string as offset is "
                             "not zero ({})".format(self.offset))
-        return (self.dimension.to_SI_units_str() +
+        return (self.dimension.to_si_units_str() +
                 ' * 10**({})'.format(self.power) if self.power else '')
 
     @property

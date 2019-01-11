@@ -18,10 +18,10 @@ Dimensions and units
 --------------------
 
 .. autoclass:: Dimension
-   :members: power, to_SI_units_str, amount, current, length, luminous_intensity, temperature, time, i, j, k, l, m, n, t, origin
+   :members: power, to_si_units_str, amount, current, length, luminous_intensity, temperature, time, i, j, k, l, m, n, t, origin
 
 .. autoclass:: Unit
-   :members: to_SI_units_str, dimension, name, offset, power, symbol
+   :members: to_si_units_str, dimension, name, offset, power, symbol
 
 
 A number of :class:`Dimension`\s and :class:`Unit`\ have been pre-defined,
