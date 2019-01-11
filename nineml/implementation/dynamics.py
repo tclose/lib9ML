@@ -513,12 +513,27 @@ class AnalogSink(AnalogReceivePort):
 
 class EventSource(object):
 
-    def __init__(self, events):
+    def __init__(self, name, events):
+        self.name = name
         self.events = list(events)
 
     def connect_to(self, receive_port, delay):
         for event_t in self.events:
             receive_port.receive(event_t + delay)
+
+
+class EventSink(Port):
+
+    def __init__(self, name):
+        self._name = name
+        self.events = []
+
+    @property
+    def name(self):
+        return self._name
+
+    def receive(self, t):
+        bisect.insort(self.events, t)
 
 
 class LinearRegime(Regime):
