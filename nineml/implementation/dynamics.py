@@ -65,8 +65,10 @@ class Dynamics(object):
         # Initialise regimes
         self.regimes = {}
         for regime_def in self.defn.regimes:
-            if regime_kwargs is not None:
-                kwgs = regime_kwargs[regime_def.name]
+            if regime_kwargs is not None and regime_def.name in regime_kwargs:
+                # Add regime specific kwargs to general kwargs
+                kwgs = copy(kwargs)
+                kwgs.update(regime_kwargs[regime_def.name])
             else:
                 kwgs = kwargs
             try:
@@ -334,7 +336,7 @@ class EventSendPort(Port):
             receiver.receive(t + delay)
 
     def connect_to(self, receive_port, delay):
-        self.receivers.append((receive_port, delay))
+        self.receivers.append((receive_port, float(delay.in_si_units())))
 
 
 class EventReceivePort(Port):
@@ -644,7 +646,6 @@ class LinearRegime(Regime):
                 for i, state_var in enumerate(
                         self.defn.time_derivative_variables):
                     update_expr = update_expr.subs(_S[i, 0], state_var)
-                print('{}: {}'.format(td_var, update_expr))
                 self.updates[td_var] = self.parent.lambdify(update_expr)
 
     def step_odes(self, max_dt):  # @UnusedVariable
