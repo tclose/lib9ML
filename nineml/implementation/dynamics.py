@@ -7,6 +7,10 @@ import bisect
 import sympy as sp
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 
 class Dynamics(object):
@@ -106,20 +110,23 @@ class Dynamics(object):
             self.defn.analog_receive_port_names,
             self.defn.analog_reduce_port_names,
             self.parameters.keys(),
-            ['t'])))
+            ['t', 'dt'])))
 
-    def all_values(self, state=None, t=None):
+    def all_values(self, dt=None, state=None, t=None):
+        if dt is None:
+            dt = self.current_regime.dt
         if state is None:
             state = self.state
         if t is None:
             t = self.t
-        return list(chain(
+        all_values = list(chain(
             state.values(),
             (p.value(t) for p in chain(
                 self.analog_receive_ports.values(),
                 self.analog_reduce_ports.values())),
             self.parameters.values(),
-            [t]))
+            [t, dt]))
+        return all_values
 
     def lambdify(self, expr):
         "Lambdifies a sympy expression, substituting in all values"
@@ -181,7 +188,7 @@ class Regime(object):
                 # approximated by linear intersections.
                 max_dt = (min(self.time_of_next_handled_event, stop_t) -
                           self.parent.t)
-                proposed_state, proposed_t = self.step_odes(max_dt=max_dt)
+                proposed_state, proposed_t = self.step_odes(max_dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
@@ -201,15 +208,16 @@ class Regime(object):
             new_regime = None
             if transition is not None:
                 # Action the transition assignments and output events
-                if transition.has_state_assignments():
-                    proposed_state = transition.assign_states(self.state_array)
+                if transition.defn.num_state_assignments:
                     # If the state has been assigned mid-step, we rewind the
                     # simulation to the time of the assignment
                     proposed_t = transition_t
-                for port_name in transition.output_event_names:
-                    self.parent.event_send_port[port_name].send(transition_t)
-                if transition.target_regime_name != self.name:
-                    new_regime = transition.target_regime_name
+                    # Assign states
+                    proposed_state = transition.assign_states(t=proposed_t)
+                for port_name in transition.defn.output_event_keys:
+                    self.parent.event_send_ports[port_name].send(transition_t)
+                if transition.defn.target_regime.name != self.name:
+                    new_regime = transition.defn.target_regime.name
             # Update the state and buffers
             self.parent.update_state(proposed_state, proposed_t)
             # Transition to new regime if specified in the active transition.
@@ -239,10 +247,15 @@ class Transition(object):
     def __init__(self, defn, parent):
         self.defn = defn
         self.parent = parent
+        self._assigns = {sa.name: self.parent.parent.lambdify(sa.rhs)
+                         for sa in self.defn.state_assignments}
 
-    @property
-    def output_event_names(self):
-        return self.defn.output_event_names
+    def assign_states(self, t):
+        state = copy(self.parent.parent.state)
+        dynamics = self.parent.parent
+        for var_name, assign in self._assigns.items():
+            state[var_name] = assign(*dynamics.all_values(t=t))
+        return state
 
 
 class OnCondition(Transition):
@@ -504,11 +517,22 @@ class AnalogSink(AnalogReceivePort):
         return "analog sink '{}'".format(self.name)
 
     def values(self, times):
-        return [self.value(t.in_units(un.s)) for t in times]
+        return [self.value(float(t.in_units(un.s))) for t in times]
 
     @property
     def dimension(self):
         return self.sender.defn.dimension
+
+    def plot(self, times):
+        if plt is None:
+            raise Exception("Cannot plot as matplotlib is not installed")
+        plt.figure()
+        plt.plot([float(t.in_si_units()) for t in times],
+                 self.values(times))
+        plt.title(self.name)
+        plt.ylabel('{}'.format(self.dimension.origin.units.name))
+        plt.xlabel('time (s)')
+        plt.show()
 
 
 class EventSource(object):
@@ -561,9 +585,8 @@ class LinearRegime(Regime):
         active_vars = [
             sp.Symbol(n) for n in self.defn.time_derivative_variables]
 
-        if not active_vars:
-            self.default_update_exprs = None
-        else:
+        self.updates = {}
+        if active_vars:
 
             # Get coefficient matrix
             self.coeffs = sp.zeros(len(active_vars))
@@ -603,47 +626,37 @@ class LinearRegime(Regime):
             self.b = sp.ImmutableMatrix(
                 [solution[s] for s in active_vars]).transpose()
 
-            self.default_updates = self._update_exprs(self.dt)
-
-    def _update_exprs(self, dt):
-
-        # Solve the system
-        try:
-            A = (self.coeffs * dt).exp()
-        except NotImplementedError:
-            raise SolverNotValidForRegimeException
-        C = sp.ImmutableMatrix([A.dot(self.b)]) - self.b
-        _S = sp.MatrixSymbol('_S', self.defn.num_time_derivatives, 1)
-        updates = A * _S + C.transpose()
-        updates = updates.as_explicit()
-
-        updates = {}
-
-        for td_var, update in zip(self.defn.time_derivative_variables,
-                                  updates):
-            expr = update
-            if len(expr.atoms(sp.I)) > 0:
+            # Solve the system
+            try:
+                A = (self.coeffs * sp.Symbol('dt')).exp()
+            except NotImplementedError:
                 raise SolverNotValidForRegimeException
-            for i, state_var in enumerate(self.defn.time_derivative_variables):
-                expr = expr.subs(_S[i, 0], state_var)
-            updates[td_var] = self.parent.lambify(expr)
-        return updates
+            C = sp.ImmutableMatrix([A.dot(self.b)]) - self.b
+            _S = sp.MatrixSymbol('_S', self.defn.num_time_derivatives, 1)
+            update_exprs = A * _S + C.transpose()
+            update_exprs = update_exprs.as_explicit()
 
-    def step_odes(self, max_dt=None):  # @UnusedVariable
-        if max_dt < self.dt:
-            updates = (self._update_exprs(max_dt)
-                            if self.default_updates is not None else None)
-            proposed_t = self.parent.t + max_dt
-        else:
-            updates = self.default_updates
-            proposed_t = self.parent.t + self.dt
-        if updates is not None:
+            # Convert Sympy expressions into lambda functions of variables
+            for td_var, update_expr in zip(self.defn.time_derivative_variables,
+                                           update_exprs):
+                if len(update_expr.atoms(sp.I)) > 0:
+                    raise SolverNotValidForRegimeException
+                for i, state_var in enumerate(
+                        self.defn.time_derivative_variables):
+                    update_expr = update_expr.subs(_S[i, 0], state_var)
+                print('{}: {}'.format(td_var, update_expr))
+                self.updates[td_var] = self.parent.lambdify(update_expr)
+
+    def step_odes(self, max_dt):  # @UnusedVariable
+        dt = min(self.dt, max_dt)
+        if self.updates:
             proposed_state = copy(self.parent.state)
-            values = self.parent.all_values()
-            for var_name, update in updates.items():
+            values = self.parent.all_values(dt=dt)
+            for var_name, update in self.updates.items():
                 proposed_state[var_name] = update(*values)
         else:
             proposed_state = self.parent.state
+        proposed_t = self.parent.t + dt
         return proposed_state, proposed_t
 
 
