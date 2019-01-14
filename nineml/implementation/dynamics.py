@@ -1,9 +1,10 @@
 from functools import reduce  # Required for Python 3
 from operator import itemgetter
 from itertools import chain
-from pprint import pformat
 from copy import copy
-from collections import deque, OrderedDict
+from collections import deque, OrderedDict, defaultdict
+import random
+import numpy.random
 import bisect
 import sympy as sp
 import nineml.units as un
@@ -113,6 +114,7 @@ class Dynamics(object):
             self.defn.analog_receive_port_names,
             self.defn.analog_reduce_port_names,
             self.parameters.keys(),
+            self.defn.constant_names,
             ['t', 'dt_'])))
 
     def all_values(self, dt=None, state=None, t=None):
@@ -128,12 +130,15 @@ class Dynamics(object):
                 self.analog_receive_ports.values(),
                 self.analog_reduce_ports.values())),
             self.parameters.values(),
+            [float(c.quantity.in_si_units()) for c in self.defn.constants],
             [t, dt]))
         return all_values
 
-    def lambdify(self, expr):
+    def lambdify(self, expr, extra_symbols=()):
         "Lambdifies a sympy expression, substituting in all values"
-        return sp.lambdify(self.all_symbols, expr, 'math')
+        symbols = self.all_symbols
+        symbols.extend(extra_symbols)
+        return sp.lambdify(symbols, expr, 'math')
 
     @property
     def t(self):
@@ -272,17 +277,47 @@ class Regime(object):
 
 class Transition(object):
 
+    random_funcs = {'random_uniform_': random.uniform,
+                    'random_binomial_': numpy.random.binomial,
+                    'random_poisson_': numpy.random.poisson,
+                    'random_exponential_': random.expovariate,
+                    'random_normal_': random.normalvariate}
+
     def __init__(self, defn, parent):
         self.defn = defn
         self.parent = parent
-        self._assigns = {sa.name: self.parent.parent.lambdify(sa.rhs)
-                         for sa in self.defn.state_assignments}
+        self._assigns = {}
+        for assign in self.defn.state_assignments:
+            expr = assign.rhs
+            # NB: once https://github.com/INCF/nineml-spec/issues/31 is
+            # implemented it be necessary to do these substitutions
+            rand_vars = {}
+            for rand_func_name in self.random_funcs:
+                # NB: this falls down if there are two random function calls
+                # with the same args in the same expression (but #31 will avoid
+                # the need to handle this so I am leaving that for now)
+                func_wildcard = sp.Function(rand_func_name)(sp.Wild('x'))
+                for i, func_call in enumerate(expr.find(func_wildcard)):
+                    value_name = '{}{}'.format(rand_func_name, i)
+                    args_lambdas = [self.parent.parent.lambdify(a)
+                                    for a in func_call.args]
+                    rand_vars[value_name] = (self.random_funcs[rand_func_name],
+                                             args_lambdas)
+                    expr = expr.subs(func_call, value_name)
+            self._assigns[assign.name] = (
+                self.parent.parent.lambdify(expr,
+                                            extra_symbols=rand_vars.keys()),
+                rand_vars)
 
     def assign_states(self, t):
         state = copy(self.parent.parent.state)
-        dynamics = self.parent.parent
-        for var_name, assign in self._assigns.items():
-            state[var_name] = assign(*dynamics.all_values(t=t))
+        all_values = self.parent.parent.all_values(t=t)
+        for var_name, (assign, rand_vars) in self._assigns.items():
+            rand_values = {}
+            for rv_name, (rand_func, args_lambdas) in rand_vars.items():
+                args = [al(*all_values) for al in args_lambdas]
+                rand_values[rv_name] = rand_func(*args)
+            state[var_name] = assign(*all_values, **rand_values)
         return state
 
 

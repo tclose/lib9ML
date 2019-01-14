@@ -221,7 +221,7 @@ if __name__ == '__main__':
     import numpy as np
     dt = 0.001 * un.ms
     duration = 100.0 * un.ms
-    model = 'hodgkin_huxley'
+    model = 'poisson'
     start = time.time()
     tester = TestDynamics()
     sink = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration)

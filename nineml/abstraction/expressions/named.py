@@ -148,6 +148,10 @@ class Constant(BaseALObject, ExpressionSymbol):
     def units(self):
         return self._units
 
+    @property
+    def quantity(self):
+        return Quantity(self.value, self.units)
+
     def __repr__(self):
         return ("Constant(name={}, value={}, units={})"
                 .format(self.name, self.value, self.units))
