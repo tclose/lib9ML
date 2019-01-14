@@ -548,7 +548,8 @@ class AnalogSink(AnalogReceivePort):
 
     def plot(self, times):
         if plt is None:
-            raise Exception("Cannot plot as matplotlib is not installed")
+            raise ImportError(
+                "Cannot plot as matplotlib is not installed")
         plt.figure()
         plt.plot([float(t.in_si_units()) for t in times],
                  self.values(times))
@@ -672,7 +673,7 @@ class NonlinearRegime(Regime):
 
     def __init__(self, defn, parent, dt, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
         Regime.__init__(self, defn, parent)
-        self.dt = dt
+        self.dt = float(dt.in_si_units())
         if integration_method not in self.VALID_METHODS:
             raise NineMLUsageError(
                 "'{}' is not a valid integration method ('{}')"
@@ -683,28 +684,28 @@ class NonlinearRegime(Regime):
         x = sp.MatrixSymbol('_x', self.defn.num_time_derivatives, 1)
         # Vectorize time derivative expressions in terms of 'x' state variable
         # vector
-        f = sp.ImmutableMatrix(
-            [sp.Lambda(x, td.rhs.subs(
+        f = sp.Lambda(x, sp.ImmutableMatrix(
+            [td.rhs.subs(
                 {sv: x[i, 0]
-                 for i, sv in enumerate(self.defn.time_derivative_variables)}))
-             for td in self.defn.time_derivatives])
-        h = sp.symbols('_h')  # Step size
+                 for i, sv in enumerate(self.defn.time_derivative_variables)})
+             for td in self.defn.time_derivatives]))
+        dt_sym = sp.symbols('dt')  # Step size
         if self.integration_method == 'euler':
-            update_exprs = x + h * f(x)
+            update_exprs = x + dt_sym * f(x)
         elif self.integration_method == 'rk2':
-            k = h * f
-            update_exprs = x + h * f(x + k / 2)
-        elif self.integration_method == 'rk3':
-            k1 = h * f(x)
-            k2 = h * f(x + k1 / 2)
-            k3 = h * f(x + k2 / 2)
-            k4 = h * f(x + k3)
+            k = dt_sym * f
+            update_exprs = x + dt_sym * f(x + k / 2)
+        elif self.integration_method == 'rk4':
+            k1 = dt_sym * f(x)
+            k2 = dt_sym * f(x + k1 / 2)
+            k3 = dt_sym * f(x + k2 / 2)
+            k4 = dt_sym * f(x + k3)
             update_exprs = x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
         else:
-            assert False  # Should never get here
+            assert False, "Unrecognised method '{}'"  # Should never get here
         # Create lambda functions to evaluate the subsitution
         # of state and parameter variables
-        self.updates = self._lambdify_exprs(update_exprs, x)
+        self.updates = self._lambdify_exprs(update_exprs.as_explicit(), x)
 
 
 class RegimeTransition(Exception):

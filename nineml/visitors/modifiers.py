@@ -15,7 +15,7 @@ class ToSIUnitsConvertor(BaseVisitor):
         try:
             si_unit = self.si_units[dim]
         except KeyError:
-            si_unit = Unit(self.name + 'SIUnit', dim, power=0)
+            si_unit = Unit(dim.name + 'SIUnit', dim, power=0)
             self.si_units[dim] = si_unit
         quantity.set_units(si_unit)
 
