@@ -166,6 +166,7 @@ class Regime(object):
         self.on_events = []
         for oe_def in self.defn.on_events:
             self.on_events.append(OnEvent(oe_def, self))
+        self.updates = {}
 
     def simulate(self, stop_t):
         """
@@ -228,10 +229,6 @@ class Regime(object):
             if new_regime is not None:
                 raise RegimeTransition(new_regime)
 
-    def step_odes(self, max_dt=None):
-        # Implemented in sub-classes
-        raise NotImplementedError
-
     @property
     def time_of_next_handled_event(self):
         try:
@@ -242,6 +239,30 @@ class Regime(object):
     @property
     def name(self):
         return self.defn.name
+
+    def step_odes(self, max_dt):  # @UnusedVariable
+        dt = min(self.dt, max_dt)
+        if self.updates:
+            proposed_state = copy(self.parent.state)
+            values = self.parent.all_values(dt=dt)
+            for var_name, update in self.updates.items():
+                proposed_state[var_name] = update(*values)
+        else:
+            # No time derivatives in regime so state stays the same
+            proposed_state = self.parent.state
+        proposed_t = self.parent.t + dt
+        return proposed_state, proposed_t
+
+    def _lambdify_exprs(self, update_exprs, state_vector):
+        updates = {}
+        # Convert Sympy expressions into lambda functions of variables
+        for td_var, update_expr in zip(self.defn.time_derivative_variables,
+                                       update_exprs):
+            update_expr = update_expr.subs({
+                state_vector[i, 0]: sv
+                for i, sv in enumerate(self.defn.time_derivative_variables)})
+            updates[td_var] = self.parent.lambdify(update_expr)
+        return updates
 
 
 class Transition(object):
@@ -532,7 +553,8 @@ class AnalogSink(AnalogReceivePort):
         plt.plot([float(t.in_si_units()) for t in times],
                  self.values(times))
         plt.title(self.name)
-        plt.ylabel('{}'.format(self.dimension.origin.units.name))
+        plt.ylabel('{} ({})'.format(self.dimension.name,
+                                    self.dimension.origin.units.name))
         plt.xlabel('time (s)')
         plt.show()
 
@@ -587,9 +609,7 @@ class LinearRegime(Regime):
         active_vars = [
             sp.Symbol(n) for n in self.defn.time_derivative_variables]
 
-        self.updates = {}
         if active_vars:
-
             # Get coefficient matrix
             self.coeffs = sp.zeros(len(active_vars))
             constants = sp.zeros(len(active_vars), 1)
@@ -634,37 +654,57 @@ class LinearRegime(Regime):
             except NotImplementedError:
                 raise SolverNotValidForRegimeException
             C = sp.ImmutableMatrix([A.dot(self.b)]) - self.b
-            _S = sp.MatrixSymbol('_S', self.defn.num_time_derivatives, 1)
-            update_exprs = A * _S + C.transpose()
+            x = sp.MatrixSymbol('_x', self.defn.num_time_derivatives, 1)
+            update_exprs = A * x + C.transpose()
             update_exprs = update_exprs.as_explicit()
+            # Check for complex values
+            if any(len(e.atoms(sp.I)) for e in update_exprs):
+                raise SolverNotValidForRegimeException
 
-            # Convert Sympy expressions into lambda functions of variables
-            for td_var, update_expr in zip(self.defn.time_derivative_variables,
-                                           update_exprs):
-                if len(update_expr.atoms(sp.I)) > 0:
-                    raise SolverNotValidForRegimeException
-                for i, state_var in enumerate(
-                        self.defn.time_derivative_variables):
-                    update_expr = update_expr.subs(_S[i, 0], state_var)
-                self.updates[td_var] = self.parent.lambdify(update_expr)
-
-    def step_odes(self, max_dt):  # @UnusedVariable
-        dt = min(self.dt, max_dt)
-        if self.updates:
-            proposed_state = copy(self.parent.state)
-            values = self.parent.all_values(dt=dt)
-            for var_name, update in self.updates.items():
-                proposed_state[var_name] = update(*values)
-        else:
-            proposed_state = self.parent.state
-        proposed_t = self.parent.t + dt
-        return proposed_state, proposed_t
+            # Create lambda functions to evaluate the subsitution
+            # of state and parameter variables
+            self.updates = self._lambdify_exprs(update_exprs, x)
 
 
 class NonlinearRegime(Regime):
 
-    def __init__(self, defn, parent, dt, **kwargs):  # @UnusedVariable
+    VALID_METHODS = ['rk2', 'rk4', 'euler']
+
+    def __init__(self, defn, parent, dt, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
         Regime.__init__(self, defn, parent)
+        self.dt = dt
+        if integration_method not in self.VALID_METHODS:
+            raise NineMLUsageError(
+                "'{}' is not a valid integration method ('{}')"
+                .format(integration_method, "', '".join(self.VALID_METHODS)))
+        self.integration_method = integration_method
+        # NB: time derivatives are sorted by variable name so we can be sure
+        #     of their order
+        x = sp.MatrixSymbol('_x', self.defn.num_time_derivatives, 1)
+        # Vectorize time derivative expressions in terms of 'x' state variable
+        # vector
+        f = sp.ImmutableMatrix(
+            [sp.Lambda(x, td.rhs.subs(
+                {sv: x[i, 0]
+                 for i, sv in enumerate(self.defn.time_derivative_variables)}))
+             for td in self.defn.time_derivatives])
+        h = sp.symbols('_h')  # Step size
+        if self.integration_method == 'euler':
+            update_exprs = x + h * f(x)
+        elif self.integration_method == 'rk2':
+            k = h * f
+            update_exprs = x + h * f(x + k / 2)
+        elif self.integration_method == 'rk3':
+            k1 = h * f(x)
+            k2 = h * f(x + k1 / 2)
+            k3 = h * f(x + k2 / 2)
+            k4 = h * f(x + k3)
+            update_exprs = x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+        else:
+            assert False  # Should never get here
+        # Create lambda functions to evaluate the subsitution
+        # of state and parameter variables
+        self.updates = self._lambdify_exprs(update_exprs, x)
 
 
 class RegimeTransition(Exception):
@@ -685,4 +725,3 @@ class SolverNotValidForRegimeException(Exception):
     Raised when the selected solver isn't appropriate for the given ODE
     system
     """
-    pass

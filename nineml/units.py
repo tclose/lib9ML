@@ -263,7 +263,12 @@ class Dimension(AnnotatedNineMLObject, DocumentLevelObject):
     @property
     def origin(self):
         """Returns a Quantity that equal to the origin of this dimension"""
-        return Quantity(0.0, Unit(self.name + 'SIUnit', self, power=0))
+        try:
+            unit = next(u for u in common_units
+                        if u.dimension == self and u.power == 0)
+        except StopIteration:
+            unit = Unit(self.name + 'SIUnit', self, power=0)
+        return Quantity(0.0, unit)
 
 
 class Unit(AnnotatedNineMLObject, DocumentLevelObject):

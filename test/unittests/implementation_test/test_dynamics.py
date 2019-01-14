@@ -60,12 +60,16 @@ class TestDynamics(TestCase):
         return v_out
 
 
-# import time
-# start = time.time()
-# sink = TestDynamics().test_liaf()
-# end = time.time()
-# elapsed = end - start
-# print("Simulated {} at {} resolution in {} seconds".format(duration, dt,
-#                                                            elapsed))
-# sink.plot([t * un.ms for t in np.arange(0, 100, 0.1)])
-# print("Plotted results")
+if __name__ == '__main__':
+    import time
+    import numpy as np
+    dt = 0.001 * un.ms
+    duration = 100.0 * un.ms
+    start = time.time()
+    sink = TestDynamics().test_liaf(dt=dt, duration=duration)
+    end = time.time()
+    elapsed = end - start
+    print("Simulated {} at {} resolution in {} seconds".format(duration, dt,
+                                                               elapsed))
+    sink.plot([t * un.ms for t in np.arange(0, 100, 0.1)])
+    print("Plotted results")
