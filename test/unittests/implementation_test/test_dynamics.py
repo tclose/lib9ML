@@ -198,7 +198,7 @@ class TestDynamics(TestCase):
         return v_out
 
 
-    def test_poisson(self, duration=100 * un.ms, dt=0.1, **kwargs):  # @UnusedVariable @IgnorePep8
+    def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms, **kwargs):  # @UnusedVariable @IgnorePep8
 
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')
         properties = DynamicsProperties9ML('PoissonProps',
