@@ -277,11 +277,11 @@ class Regime(object):
 
 class Transition(object):
 
-    random_funcs = {'random_uniform_': random.uniform,
+    random_funcs = {'random_uniform_': numpy.random.uniform,
                     'random_binomial_': numpy.random.binomial,
                     'random_poisson_': numpy.random.poisson,
-                    'random_exponential_': random.expovariate,
-                    'random_normal_': random.normalvariate}
+                    'random_exponential_': lambda x: numpy.random.exponential(1.0 / x),
+                    'random_normal_': numpy.random.normal}
 
     def __init__(self, defn, parent):
         self.defn = defn

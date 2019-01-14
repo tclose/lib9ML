@@ -1,5 +1,6 @@
 from collections import namedtuple
 import ninemlcatalog
+import numpy.random
 from collections import OrderedDict
 from nineml import units as un
 from nineml.user import (DynamicsProperties as DynamicsProperties9ML,
@@ -209,11 +210,13 @@ class TestDynamics(TestCase):
                             start_t=0.0 * un.s, dt=dt)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
+        # Set to fixed seed
+        numpy.random.seed(12345)
         dynamics.simulate(duration)
-        print(spike_out.events)
-#         self.assertEqual([round(t, 3) for t in spike_out.events],
-#                          [0.054, 0.057, 0.061, 0.065, 0.068, 0.072, 0.076,
-#                           0.08, 0.083, 0.087, 0.091, 0.095, 0.098])
+        self.assertEqual([round(t, 3) for t in spike_out.events],
+                         [0.0, 0.027, 0.03, 0.032, 0.035, 0.043, 0.052, 0.085,
+                          0.096])
+        return spike_out
 
 
 if __name__ == '__main__':
@@ -229,9 +232,12 @@ if __name__ == '__main__':
     elapsed = end - start
     print("Simulated {} model for {} with {} resolution in {} (real-world) "
           "seconds".format(model, duration, dt, elapsed))
-    try:
-        sink.plot([t * un.ms for t in np.arange(0, duration.in_units(un.ms),
-                                                0.1)])
-        print("Plotted results")
-    except ImportError:
-        print("Could not plot results as matplotlib is not installed")
+    if isinstance(sink, AnalogSink):
+        try:
+            sink.plot([t * un.ms
+                       for t in np.arange(0, duration.in_units(un.ms), 0.1)])
+            print("Plotted results")
+        except ImportError:
+            print("Could not plot results as matplotlib is not installed")
+    else:
+        print([round(t, 3) for t in sink.events])
