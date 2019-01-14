@@ -2,8 +2,7 @@ from functools import reduce  # Required for Python 3
 from operator import itemgetter
 from itertools import chain
 from copy import copy
-from collections import deque, OrderedDict, defaultdict
-import random
+from collections import deque, OrderedDict
 import numpy.random
 import bisect
 import sympy as sp
