@@ -1,6 +1,7 @@
 from functools import reduce  # Required for Python 3
 from operator import itemgetter
 from itertools import chain
+from pprint import pformat
 from copy import copy
 from collections import deque, OrderedDict
 import bisect
@@ -112,7 +113,7 @@ class Dynamics(object):
             self.defn.analog_receive_port_names,
             self.defn.analog_reduce_port_names,
             self.parameters.keys(),
-            ['t', 'dt'])))
+            ['t', 'dt_'])))
 
     def all_values(self, dt=None, state=None, t=None):
         if dt is None:
@@ -191,7 +192,7 @@ class Regime(object):
                 # approximated by linear intersections.
                 max_dt = (min(self.time_of_next_handled_event, stop_t) -
                           self.parent.t)
-                proposed_state, proposed_t = self.step_odes(max_dt)
+                proposed_state, proposed_t = self.step_ode(max_dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
@@ -232,7 +233,7 @@ class Regime(object):
     @property
     def time_of_next_handled_event(self):
         try:
-            return min(oe.port.next_event for oe in self.on_events)
+            return min(oe.port.time_of_next_event for oe in self.on_events)
         except ValueError:
             return float('inf')
 
@@ -240,8 +241,11 @@ class Regime(object):
     def name(self):
         return self.defn.name
 
-    def step_odes(self, max_dt):  # @UnusedVariable
+    def step_ode(self, max_dt):  # @UnusedVariable
         dt = min(self.dt, max_dt)
+        # self.updates should be constructed in the regime __init__ and consist
+        # of a dictionaries of functions to update each state, which take the
+        # output of self.parent.all_values() as input args
         if self.updates:
             proposed_state = copy(self.parent.state)
             values = self.parent.all_values(dt=dt)
@@ -254,6 +258,7 @@ class Regime(object):
         return proposed_state, proposed_t
 
     def _lambdify_exprs(self, update_exprs, state_vector):
+        update_exprs = update_exprs.as_explicit()
         updates = {}
         # Convert Sympy expressions into lambda functions of variables
         for td_var, update_expr in zip(self.defn.time_derivative_variables,
@@ -332,7 +337,7 @@ class OnEvent(Transition):
     def __init__(self, defn, parent):
         Transition.__init__(self, defn, parent)
         self.port = self.parent.parent.event_receive_ports[
-            self.defn.name]
+            self.defn.src_port_name]
 
 
 class Port(object):
@@ -370,7 +375,7 @@ class EventReceivePort(Port):
         bisect.insort(self.events, t)
 
     def update_buffer(self):
-        self.events = bisect.bisect(self.events, self.parent.t)
+        self.events = self.events[bisect.bisect(self.events, self.parent.t):]
 
     @property
     def time_of_next_event(self):
@@ -568,7 +573,7 @@ class EventSource(object):
 
     def connect_to(self, receive_port, delay):
         for event_t in self.events:
-            receive_port.receive(event_t + delay)
+            receive_port.receive(float((event_t + delay).in_si_units()))
 
 
 class EventSink(Port):
@@ -643,20 +648,20 @@ class LinearRegime(Regime):
 
             solution = sp.solve_linear_system(self.coeffs.row_join(constants),
                                               *active_vars)
-            if solution is None or sorted(solution.keys()) != active_vars:
+            if solution is None or sorted(solution.keys(),
+                                          key=lambda x: str(x)) != active_vars:
                 raise SolverNotValidForRegimeException
 
-            self.b = sp.ImmutableMatrix(
-                [solution[s] for s in active_vars]).transpose()
+            b = sp.ImmutableMatrix([solution[s] for s in active_vars])
 
             # Solve the system
             try:
-                A = (self.coeffs * sp.Symbol('dt')).exp()
+                A = (self.coeffs * sp.Symbol('dt_')).exp()
             except NotImplementedError:
                 raise SolverNotValidForRegimeException
-            C = sp.ImmutableMatrix([A.dot(self.b)]) - self.b
-            x = sp.MatrixSymbol('_x', self.defn.num_time_derivatives, 1)
-            update_exprs = A * x + C.transpose()
+            C = sp.ImmutableMatrix([A * b]) - b
+            x = sp.MatrixSymbol('x_', self.defn.num_time_derivatives, 1)
+            update_exprs = A * x + C
             update_exprs = update_exprs.as_explicit()
             # Check for complex values
             if any(len(e.atoms(sp.I)) for e in update_exprs):
@@ -679,9 +684,10 @@ class NonlinearRegime(Regime):
                 "'{}' is not a valid integration method ('{}')"
                 .format(integration_method, "', '".join(self.VALID_METHODS)))
         self.integration_method = integration_method
+        # Create vector to represent the state of the regime.
         # NB: time derivatives are sorted by variable name so we can be sure
-        #     of their order
-        x = sp.MatrixSymbol('_x', self.defn.num_time_derivatives, 1)
+        # of their order when reinterpreting as state updates.
+        x = sp.MatrixSymbol('x_', self.defn.num_time_derivatives, 1)
         # Vectorize time derivative expressions in terms of 'x' state variable
         # vector
         f = sp.Lambda(x, sp.ImmutableMatrix(
@@ -689,23 +695,23 @@ class NonlinearRegime(Regime):
                 {sv: x[i, 0]
                  for i, sv in enumerate(self.defn.time_derivative_variables)})
              for td in self.defn.time_derivatives]))
-        dt_sym = sp.symbols('dt')  # Step size
+        h = sp.symbols('dt_')  # Step size
         if self.integration_method == 'euler':
-            update_exprs = x + dt_sym * f(x)
+            update_exprs = x + h * f(x)
         elif self.integration_method == 'rk2':
-            k = dt_sym * f
-            update_exprs = x + dt_sym * f(x + k / 2)
+            k = h * f
+            update_exprs = x + h * f(x + k / 2)
         elif self.integration_method == 'rk4':
-            k1 = dt_sym * f(x)
-            k2 = dt_sym * f(x + k1 / 2)
-            k3 = dt_sym * f(x + k2 / 2)
-            k4 = dt_sym * f(x + k3)
+            k1 = h * f(x)
+            k2 = h * f(x + k1 / 2)
+            k3 = h * f(x + k2 / 2)
+            k4 = h * f(x + k3)
             update_exprs = x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
         else:
             assert False, "Unrecognised method '{}'"  # Should never get here
         # Create lambda functions to evaluate the subsitution
         # of state and parameter variables
-        self.updates = self._lambdify_exprs(update_exprs.as_explicit(), x)
+        self.updates = self._lambdify_exprs(update_exprs, x)
 
 
 class RegimeTransition(Exception):
