@@ -18,6 +18,9 @@ class Network(object):
                  (conn_group.destination, c[1]),
                  {'delay': d})
                 for c, d in zip(conn_group.connections, conn_group.delay))
+        # A reduced graph with all nodes connected without delay combined
+        # into multi-dynamics 
+        reduced_graph = nx.Graph()
 
     def simulate(self, stop_t):
         pass

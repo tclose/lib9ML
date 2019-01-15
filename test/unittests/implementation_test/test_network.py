@@ -3,6 +3,7 @@ import math
 from nineml import units as un
 from nineml.user import Property as Property9ML
 from nineml.implementation import Network, EventSink
+import unittest
 if __name__ == '__main__':
     class TestCase(object):
 
@@ -15,6 +16,7 @@ else:
 
 class TestNetwork(TestCase):
 
+    @unittest.skip
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms):
         model = self._reduced_brunel_9ml(case, order)
