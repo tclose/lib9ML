@@ -13,7 +13,7 @@ install:
   - pip install .
   - pip install coveralls
   - pip install numpy
-  - pip install ninemlcatalog
+  - pip install git+https://github.com/INCF/ninemlcatalog
 script:
   nosetests test/unittests --with-coverage --cover-package=nineml
 after_success:

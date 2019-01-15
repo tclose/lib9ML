@@ -5,8 +5,7 @@ from collections import OrderedDict
 from nineml import units as un
 from nineml.user import (DynamicsProperties as DynamicsProperties9ML,
                          MultiDynamicsProperties as MultiDynamicsProperties9ML)
-
-from nineml.implementation.dynamics import (
+from nineml.implementation import (
     Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
 if __name__ == '__main__':
     class TestCase(object):
@@ -41,16 +40,6 @@ class SimpleState(object):
 
 class TestDynamics(TestCase):
 
-    def analog_source(self, name, amplitude, start_t=50 * un.ms,
-                      stop_t=100 * un.ms, rise_time=0.01 * un.ms):
-        off = amplitude.units.dimension.origin
-        return AnalogSource(
-            name,
-            [(0 * un.s, off),
-             (start_t - rise_time, off),
-             (start_t, amplitude),
-             (stop_t, amplitude)])
-
     def test_liaf(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         definition = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
@@ -60,7 +49,7 @@ class TestDynamics(TestCase):
         initial_state = SimpleState(
             {'v': -65.0 * un.mV, 'end_refractory': 0.0 * un.s},
             'subthreshold', definition)
-        isyn_in = self.analog_source('isyn', 1 * un.nA)
+        isyn_in = AnalogSource.step('isyn', 1 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(definition, properties, initial_state,
@@ -83,7 +72,7 @@ class TestDynamics(TestCase):
         initial_state = SimpleState(
             {'V': -65.0 * un.mV, 'U': -14.0 * un.mV / un.ms},
             'subthreshold_regime', definition)
-        isyn_in = self.analog_source('isyn_in', 0.02 * un.nA)
+        isyn_in = AnalogSource.step('isyn_in', 0.02 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(definition, properties, initial_state,
@@ -107,7 +96,7 @@ class TestDynamics(TestCase):
                                         'SampleIzhikevichFastSpiking')
         initial_state = SimpleState(
             {'V': -65.0 * un.mV, 'U': -1.625 * un.pA}, 'subVb', definition)
-        isyn_in = self.analog_source('isyn_in', 100 * un.pA)
+        isyn_in = AnalogSource.step('isyn_in', 100 * un.pA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(definition, properties, initial_state,
@@ -132,7 +121,7 @@ class TestDynamics(TestCase):
             {'v': -65.0 * un.mV, 'm': 0.0 * un.unitless,
              'h': 1.0 * un.unitless, 'n': 0.0 * un.unitless},
             'sole', definition)
-        isyn_in = self.analog_source('isyn', 0.5 * un.nA)
+        isyn_in = AnalogSource.step('isyn', 0.5 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(definition, properties, initial_state,

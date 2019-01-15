@@ -8,10 +8,6 @@ import bisect
 import sympy as sp
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
 
 
 class Dynamics(object):
@@ -279,7 +275,8 @@ class Transition(object):
     random_funcs = {'random_uniform_': numpy.random.uniform,
                     'random_binomial_': numpy.random.binomial,
                     'random_poisson_': numpy.random.poisson,
-                    'random_exponential_': lambda x: numpy.random.exponential(1.0 / x),
+                    'random_exponential_': lambda x: numpy.random.exponential(
+                        1.0 / x),
                     'random_normal_': numpy.random.normal}
 
     def __init__(self, defn, parent):
@@ -538,90 +535,6 @@ class AnalogReducePort(Port):
     def value(self, t):
         return reduce(self.operator, (sender.value(t - delay)
                                       for sender, delay in self.senders))
-
-
-class AnalogSource(AnalogSendPort):
-    """
-    An input source that can be connected to an AnalogReceivePort or
-    AnalogSendPort
-    """
-
-    def __init__(self, name, signal):
-        self._name = name
-        self.buffer = [(float(t.in_units(un.s)), float(a.in_si_units()))
-                       for t, a in signal]
-
-    @property
-    def name(self):
-        return self._name
-
-    def connect_to(self, receive_port, delay):
-        receive_port.connect_from(self, delay)
-
-    @property
-    def _location(self):
-        return "anlog source '{}'".format(self.name)
-
-
-class AnalogSink(AnalogReceivePort):
-
-    def __init__(self, name):
-        self._name = name
-        self.sender = None
-        self.delay = None
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def _location(self):
-        return "analog sink '{}'".format(self.name)
-
-    def values(self, times):
-        return [self.value(float(t.in_units(un.s))) for t in times]
-
-    @property
-    def dimension(self):
-        return self.sender.defn.dimension
-
-    def plot(self, times):
-        if plt is None:
-            raise ImportError(
-                "Cannot plot as matplotlib is not installed")
-        plt.figure()
-        plt.plot([float(t.in_si_units()) for t in times],
-                 self.values(times))
-        plt.title(self.name)
-        plt.ylabel('{} ({})'.format(self.dimension.name,
-                                    self.dimension.origin.units.name))
-        plt.xlabel('time (s)')
-        plt.show()
-
-
-class EventSource(object):
-
-    def __init__(self, name, events):
-        self.name = name
-        self.events = list(events)
-
-    def connect_to(self, receive_port, delay):
-        for event_t in self.events:
-            receive_port.receive(float((event_t + delay).in_si_units()))
-
-
-class EventSink(Port):
-
-    def __init__(self, name):
-        self._name = name
-        self.events = []
-
-    @property
-    def name(self):
-        return self._name
-
-    def receive(self, t):
-        bisect.insort(self.events, t)
 
 
 class LinearRegime(Regime):
