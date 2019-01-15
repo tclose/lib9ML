@@ -94,6 +94,9 @@ class Property(BaseULObject):
     def units(self):
         return self.quantity.units
 
+    def single(self, index):
+        return Property(self.name, self.quantity.single(index))
+
     def __repr__(self):
         units = self.units.name
         if u"µ" in units:
@@ -161,7 +164,7 @@ class Component(with_metaclass(
 
     # initial_values is temporary, the idea longer-term is to use a separate
     # library such as SEDML
-    def __init__(self, name, definition, properties={}):
+    def __init__(self, name, definition, properties=()):
         """
         Create a new component_class with the given name, definition and
         properties, or create a prototype to another component_class that will
@@ -238,6 +241,10 @@ class Component(with_metaclass(
         while isinstance(defn, Prototype):
             defn = defn.component.definition
         return defn.component_class
+
+    def single(self, index):
+        return type(self)('{}_{}'.format(self.name, index), self.definition,
+                          properties=[p.single() for p in self.properties])
 
     def is_base_component(self):
         return isinstance(self.definition, Prototype)

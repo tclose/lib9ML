@@ -35,6 +35,9 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
     def size(self, size):
         self._size = int(size)
 
+    def __len__(self):
+        return self.size
+
     @property
     def dynamics_properties(self):
         return self._dynamics_properties

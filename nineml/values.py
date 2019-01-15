@@ -116,6 +116,23 @@ class SingleValue(BaseValue):
     def is_single(self):
         return True
 
+    def single(self, index):  # @UnusedVariable
+        """
+        Returns the single-value corresponding to the index, which in the case
+        of SingleValues is just itself
+
+        Parameters
+        ----------
+        index : int
+            The index of the value to return
+
+        Returns
+        -------
+        value : SingleValue
+            The single value corresponding to the index
+        """
+        return self
+
     def __iter__(self):
         """Infinitely iterate the same value"""
         return itertools.repeat(self._value)
@@ -266,6 +283,23 @@ class ArrayValue(BaseValue):
     @property
     def values(self):
         return self._values
+
+    def single(self, index):
+        """
+        Returns the single-value corresponding to the index, which in the case
+        of SingleValues is just itself
+
+        Parameters
+        ----------
+        index : int
+            The index of the value to return
+
+        Returns
+        -------
+        value : SingleValue
+            The single value corresponding to the index
+        """
+        return SingleValue(self.values[index])
 
     @property
     def key(self):
@@ -515,6 +549,23 @@ class RandomDistributionValue(BaseValue):
     def key(self):
         # FIXME: This should include a hash of the properties
         return self._distribution.name
+
+    def single(self, index):  # @UnusedVariable
+        """
+        Returns the single-value corresponding to the index, which in the case
+        of SingleValues is just itself
+
+        Parameters
+        ----------
+        index : int
+            The index of the value to return
+
+        Returns
+        -------
+        value : SingleValue
+            The single value corresponding to the index
+        """
+        return SingleValue(next(self._generator()))
 
     def is_random(self):
         return True
