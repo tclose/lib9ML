@@ -3,8 +3,7 @@ import ninemlcatalog
 import numpy.random
 from collections import OrderedDict
 from nineml import units as un
-from nineml.user import (DynamicsProperties as DynamicsProperties9ML,
-                         MultiDynamicsProperties as MultiDynamicsProperties9ML)
+from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
     Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
 if __name__ == '__main__':
@@ -144,13 +143,13 @@ class TestDynamics(TestCase):
             'postsynapticresponse/Alpha', 'SamplePyNNAlphaProperties')
         static = ninemlcatalog.load(
             'plasticity/Static', 'Static')
-        static_props = DynamicsProperties9ML(
+        static_props = DynamicsProperties(
             'static_props', static, {'weight': 5 * un.nA})
-        properties = MultiDynamicsProperties9ML(
+        properties = MultiDynamicsProperties(
             name='IafAlpha_sans_synapses',
             sub_components={
                 'cell': liaf,
-                'syn': MultiDynamicsProperties9ML(
+                'syn': MultiDynamicsProperties(
                     name="IafAlaphSyn",
                     sub_components={'psr': alpha,
                                     'pls': static_props},
@@ -190,7 +189,7 @@ class TestDynamics(TestCase):
     def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms, **kwargs):  # @UnusedVariable @IgnorePep8
 
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')
-        properties = DynamicsProperties9ML('PoissonProps',
+        properties = DynamicsProperties('PoissonProps',
                                            definition, {'rate': 100 * un.Hz})
         initial_state = SimpleState(
             {'t_next': 0.0 * un.ms}, 'default', definition)

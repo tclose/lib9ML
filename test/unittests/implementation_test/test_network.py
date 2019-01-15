@@ -1,7 +1,7 @@
 import ninemlcatalog
 import math
 from nineml import units as un
-from nineml.user import Property as Property9ML
+from nineml.user import Property as Property
 from nineml.implementation import Network, EventSink
 import unittest
 if __name__ == '__main__':
@@ -41,7 +41,7 @@ class TestNetwork(TestCase):
                      model.projection('Inhibition')):
             props = proj.connectivity.rule_properties
             number = props.property('number')
-            props.set(Property9ML(
+            props.set(Property(
                 number.name,
                 int(math.ceil(float(number.value) * scale)) * un.unitless))
         return model
