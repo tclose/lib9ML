@@ -5,7 +5,7 @@ from collections import OrderedDict
 from nineml import units as un
 from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
-    Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
+    Dynamics, SimpleState, AnalogSource, AnalogSink, EventSink, EventSource)
 if __name__ == '__main__':
     class TestCase(object):
 
@@ -14,27 +14,6 @@ if __name__ == '__main__':
 
 else:
     from unittest import TestCase
-
-
-class SimpleState(object):
-    """
-    A placeholder until states are included in 9ML specification
-    """
-
-    StateVariable = namedtuple('StateVariable', 'name value')
-
-    def __init__(self, state, regime, component_class):
-        self.component_class = component_class
-        self.state = OrderedDict((k, float(state[k].in_si_units()))
-                                 for k in sorted(state))
-        self.regime = regime
-
-    def in_si_units(self):
-        return self
-
-    @property
-    def variables(self):
-        return (self.StateVariable(*i) for i in self.state.items())
 
 
 class TestDynamics(TestCase):

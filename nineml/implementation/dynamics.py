@@ -1,4 +1,5 @@
 from functools import reduce  # Required for Python 3
+from collections import namedtuple
 from operator import itemgetter
 from itertools import chain
 from copy import copy
@@ -44,21 +45,22 @@ class Dynamics(object):
         self.event_receive_ports = OrderedDict()
         self.analog_receive_ports = OrderedDict()
         self.analog_reduce_ports = OrderedDict()
-        for port_defn in self.defn.event_send_ports:
-            self.event_send_ports[port_defn.name] = EventSendPort(
-                port_defn, self)
-        for port_defn in self.defn.analog_send_ports:
-            self.analog_send_ports[port_defn.name] = AnalogSendPort(
-                port_defn, self)
-        for port_defn in self.defn.event_receive_ports:
-            self.event_receive_ports[port_defn.name] = EventReceivePort(
-                port_defn, self)
-        for port_defn in self.defn.analog_receive_ports:
-            self.analog_receive_ports[port_defn.name] = AnalogReceivePort(
-                port_defn, self)
-        for port_defn in self.defn.analog_reduce_ports:
-            self.analog_reduce_ports[port_defn.name] = AnalogReducePort(
-                port_defn, self)
+        self.ports = {}
+        for pdef in self.defn.event_send_ports:
+            self.ports[pdef.name] = self.event_send_ports[pdef.name] = (
+                EventSendPort(pdef, self))
+        for pdef in self.defn.analog_send_ports:
+            self.ports[pdef.name] = self.analog_send_ports[pdef.name] = (
+                AnalogSendPort(pdef, self))
+        for pdef in self.defn.event_receive_ports:
+            self.ports[pdef.name] = self.event_receive_ports[pdef.name] = (
+                EventReceivePort(pdef, self))
+        for pdef in self.defn.analog_receive_ports:
+            self.ports[pdef.name] = self.analog_receive_ports[pdef.name] = (
+                AnalogReceivePort(pdef, self))
+        for pdef in self.defn.analog_reduce_ports:
+            self.ports[pdef.name] = self.analog_reduce_ports[pdef.name] = (
+                AnalogReducePort(pdef, self))
         # Initialise regimes
         self.regimes = {}
         for regime_def in self.defn.regimes:
@@ -679,3 +681,24 @@ class SolverNotValidForRegimeException(Exception):
     Raised when the selected solver isn't appropriate for the given ODE
     system
     """
+
+
+class SimpleState(object):
+    """
+    A placeholder until states are included in 9ML specification
+    """
+
+    StateVariable = namedtuple('StateVariable', 'name value')
+
+    def __init__(self, state, regime, component_class):
+        self.component_class = component_class
+        self.state = OrderedDict((k, float(state[k].in_si_units()))
+                                 for k in sorted(state))
+        self.regime = regime
+
+    def in_si_units(self):
+        return self
+
+    @property
+    def variables(self):
+        return (self.StateVariable(*i) for i in self.state.items())
