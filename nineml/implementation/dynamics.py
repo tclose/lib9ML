@@ -16,8 +16,8 @@ class Dynamics(object):
     Representation of a Dynamics object
     """
 
-    def __init__(self, component_class, properties, initial_state, start_t,
-                 regime_kwargs=None, **kwargs):
+    def __init__(self, component_class, properties, start_t,
+                 initial_state=None, regime_kwargs=None, **kwargs):
         if properties.component_class != component_class:
             raise NineMLUsageError(
                 "Provided properties do not match defn ({} and {})"

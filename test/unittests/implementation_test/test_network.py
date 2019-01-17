@@ -20,8 +20,7 @@ class TestNetwork(TestCase):
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms):
         model = self._reduced_brunel_9ml(case, order)
-        network = Network(model, initial_states, start_t=0 * un.s,
-                          dt=dt)
+        network = Network(model, start_t=0 * un.s, dt=dt)
         event_sinks = {}
         network.simulate(duration)
         self.assertEqual([len(s) for s in event_sinks],
