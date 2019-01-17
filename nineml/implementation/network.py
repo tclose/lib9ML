@@ -5,8 +5,7 @@ import networkx as nx
 import nineml.units as un
 from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection)
-from nineml.user.multi.namespace import make_regime_name
-from .dynamics import Dynamics, SimpleState
+from .dynamics import Dynamics
 
 # Required to use the 'make_regime_name' function in
 # '
@@ -49,15 +48,19 @@ class Network(object):
                 node_data['initial_state'],
                 start_t, dt=dt)
         # Make all connections between dynamics components
+        self.min_delay = float('inf')
         for node in self.graph.nodes():
             from_dyn = self.graph.nodes[node]['dynamics']
             for successor in self.graph.successors(node):
                 to_dyn = self.graph.nodes[successor]['dynamics']
                 for conn_data in self.graph.get_edge_data(successor):
+                    delay = conn_data['delay']
                     from_dyn.ports[conn_data['source_port']].connect_to(
                         to_dyn.analog_receive_ports[
                             conn_data['destination_port']],
-                        delay=conn_data['delay'])
+                        delay=delay)
+                    if delay < self.min_delay:
+                        self.min_delay = delay
 
         def _merge_nodes_connected_with_no_delay(self):
             for node in list(self.graph.nodes()):
@@ -98,24 +101,11 @@ class Network(object):
                         multi_name,
                         sub_components=sub_comp_props,
                         port_connections=port_connections)
-                    # This will be handled more elegantly alongside the other
-                    # multi-dynamics functionality once the state-layer is
-                    # designed
-                    combined_state = {}
-                    for sc_name, sc_state in sub_comp_states.items():
-                        combined_state.update({'{}__{}'.format(k, sc_name): v
-                                               for k, v in sc_state.items()})
-                    multi_state = SimpleState(
-                        state=combined_state,
-                        regime=make_regime_name({k: FakeSubRegime(v.regime)
-                                                 for k, v in sub_comp_states}),
-                        component_class=multi_props.component_class)
                     # Add new combined multi-dynamics node
                     multi_node = (centre_node[0] + '_multi', centre_node[1])
                     self._graph.add_node(
                         multi_node,
-                        properties=multi_props,
-                        initial_state=multi_state)
+                        properties=multi_props)
                     # Redirect edges into/from merged nodes to multi-node
                     for sub_comp_node in to_merge:
                         for pcessor in self.graph.predecessors(sub_comp_node):

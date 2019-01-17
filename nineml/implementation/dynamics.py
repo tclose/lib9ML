@@ -1,5 +1,4 @@
 from functools import reduce  # Required for Python 3
-from collections import namedtuple
 from operator import itemgetter
 from itertools import chain
 from copy import copy
@@ -7,35 +6,40 @@ from collections import deque, OrderedDict
 import numpy.random
 import bisect
 import sympy as sp
-from sympy.utilities.lambdify import lambdastr
+# from sympy.utilities.lambdify import lambdastr
 import nineml
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
+from progressbar import ProgressBar
 
 
 # Set common symbol used to denote step size
-dt_symbol = sp.Symbol('dt_')
+dt_symbol = 'dt_'
 
 
 class Dynamics(object):
 
     def __init__(self, component_class, properties, start_t, dt,
-                 initial_regime, initial_state=None):
+                 initial_state=None, initial_regime=None):
         if isinstance(component_class, nineml.abstraction.Dynamics):
             component_class = DynamicsClass(component_class)
         self.component_class = component_class
-        if properties.component_class != component_class:
+        self.defn = component_class.defn
+        if properties.component_class != self.defn:
             raise NineMLUsageError(
                 "Provided properties do not match defn ({} and {})"
                 .format(properties, component_class))
         # Initialise state information converting all quantities to SI units
         # for simplicity
-        self._properties = {p.name: float(p.value.in_si_units())
+        self.properties = {p.name: float(p.quantity.in_si_units())
                             for p in properties.properties}
-        self._state = OrderedDict((sv.name, float(sv.value.in_si_units()))
-                                  for sv in properties.initial_states)
+        self._state = OrderedDict((sv.name, float(sv.quantity.in_si_units()))
+                                  for sv in properties.initial_values)
         if initial_state is not None:
-            self._state.update(initial_state)
+            self._state.update({k: float(v.in_si_units())
+                                for k, v in initial_state.items()})
+        if initial_regime is None:
+            initial_regime = properties.initial_regime
         self.regime = component_class.regimes[initial_regime]
         # Time and simulation step size
         self._t = float(start_t.in_si_units())
@@ -73,7 +77,7 @@ class Dynamics(object):
     def dt(self):
         try:
             dt = self._dt[self.regime.name]
-        except AttributeError:
+        except TypeError:
             dt = self._dt
         return dt
 
@@ -87,36 +91,34 @@ class Dynamics(object):
                           self.event_receive_ports.values()):
             port.update_buffer()
 
-    @property
-    def parameters(self):
-        return self._parameters
-
-    def simulate(self, stop_t):
+    def simulate(self, stop_t, progress_bar=True):
         stop_t = float(stop_t.in_units(un.s))
+        if progress_bar is True:
+            progress_bar = ProgressBar(self.t, stop_t)
         self._update_buffers()
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
             # transition to a new regime
             try:
-                self.regime.update(self, stop_t, self.dt)
+                self.regime.update(self, stop_t, self.dt,
+                                   progress_bar=progress_bar)
             except RegimeTransition as transition:
                 self.regime = self.component_class.regimes[transition.target]
+        if progress_bar is not None:
+            progress_bar.finish()
 
     def all_values(self, dt=None, state=None, t=None):
-        if dt is None:
-            dt = self.current_regime.dt
         if state is None:
             state = self.state
         if t is None:
             t = self.t
         all_values = list(chain(
             state.values(),
-            (p.value(t) for p in chain(
-                self.analog_receive_ports.values(),
-                self.analog_reduce_ports.values())),
-            self.parameters.values(),
-            [float(c.quantity.in_si_units()) for c in self.defn.constants],
+            (p.value(t) for p in chain(self.analog_receive_ports.values(),
+                                       self.analog_reduce_ports.values())),
+            self.properties.values(),
+            self.component_class.constants.values(),
             [t, dt]))
         return all_values
 
@@ -142,6 +144,9 @@ class DynamicsClass(object):
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
         self.defn = component_class.substitute_aliases()
+        self.constants = OrderedDict(
+            (c.name, float(c.quantity.in_si_units()))
+            for c in self.defn.constants)
         # Initialise regimes
         self.regimes = {}
         for regime_def in self.defn.regimes:
@@ -165,19 +170,20 @@ class DynamicsClass(object):
             self.defn.analog_receive_port_names,
             self.defn.analog_reduce_port_names,
             self.defn.parameter_names,
-            self.defn.constant_names,
+            self.constants.keys(),
             ['t', dt_symbol])))
 
     def lambdify(self, expr, extra_symbols=()):
         "Lambdifies a sympy expression, substituting in all values"
         symbols = self.all_symbols
         symbols.extend(extra_symbols)
-        # Convert expression into a string representation of a lambda function
-        lstr = lambdastr(symbols, expr, 'math')
-        lfunc = eval(lstr)
-        # Save lambda string for pickling/unpickling
-        lfunc.str = lstr
-        return lfunc
+        return sp.lambdify(symbols, expr, 'math')
+#         # Convert expression into a string representation of a lambda function
+#         lstr = lambdastr(symbols, expr, 'math')
+#         lfunc = eval(lstr)
+#         # Save lambda string for pickling/unpickling
+#         lfunc.str = lstr
+#         return lfunc
 
 
 class Regime(object):
@@ -201,7 +207,7 @@ class Regime(object):
             self.on_events.append(OnEvent(oe_def, self))
         self.updates = {}
 
-    def update(self, dynamics, stop_t, dt):
+    def update(self, dynamics, stop_t, dt, progress_bar=None):
         """
         Simulate the regime for the given duration unless an event is
         raised.
@@ -228,7 +234,8 @@ class Regime(object):
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
-            transitions = [(oc, oc.time_of_trigger(proposed_state, proposed_t))
+            transitions = [(oc, oc.time_of_trigger(dynamics, proposed_state,
+                                                   proposed_t))
                            for oc in self.on_conditions]
             transitions.extend((oe, oe.port.time_of_next_event)
                                for oe in self.on_events)
@@ -257,6 +264,8 @@ class Regime(object):
                     new_regime = transition.defn.target_regime.name
             # Update the state and buffers
             dynamics.update_state(proposed_state, proposed_t)
+            if progress_bar is not None:
+                progress_bar.update(proposed_t)
             # Transition to new regime if specified in the active transition.
             # NB: that this transition occurs after all other elements of the
             # transition and the update of the state/time
@@ -361,7 +370,7 @@ class OnCondition(Transition):
         else:
             self.trigger_time_expr = None
 
-    def time_of_trigger(self, proposed_state, proposed_t):
+    def time_of_trigger(self, dynamics, proposed_state, proposed_t):
         """
         Checks to see if the condition will be triggered by the proposed
         state and time
@@ -380,7 +389,6 @@ class OnCondition(Transition):
             time that the condition was triggered. If the condition was not
             triggered then it returns 'inf'
         """
-        dynamics = self.parent.parent
         values = dynamics.all_values()
         proposed_values = dynamics.all_values(state=proposed_state,
                                               t=proposed_t)
@@ -461,7 +469,7 @@ class AnalogSendPort(Port):
             expr = dynamics.defn.alias(self.name).rhs
         except NineMLNameError:
             expr = sp.Symbol(self.name)
-        self.expr = dynamics.lambdify(expr)
+        self.expr = dynamics.component_class.lambdify(expr)
 
     def value(self, t):
         """
@@ -586,9 +594,8 @@ class LinearRegime(Regime):
         The default step size for the ODE updates
     """
 
-    def __init__(self, defn, parent, dt, **kwargs):  # @UnusedVariable
+    def __init__(self, defn, parent, **kwargs):  # @UnusedVariable
         Regime.__init__(self, defn, parent)
-        self.dt = float(dt.in_units(un.s))
 
         # Convert state variable names into Sympy symbols
         active_vars = [
@@ -635,7 +642,7 @@ class LinearRegime(Regime):
 
             # Solve the system
             try:
-                A = (self.coeffs * dt_symbol).exp()
+                A = (self.coeffs * sp.Symbol(dt_symbol)).exp()
             except NotImplementedError:
                 raise SolverNotValidForRegimeException
             C = sp.ImmutableMatrix([A * b]) - b
@@ -655,9 +662,8 @@ class NonlinearRegime(Regime):
 
     VALID_METHODS = ['rk2', 'rk4', 'euler']
 
-    def __init__(self, defn, parent, dt, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
+    def __init__(self, defn, parent, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
         Regime.__init__(self, defn, parent)
-        self.dt = float(dt.in_si_units())
         if integration_method not in self.VALID_METHODS:
             raise NineMLUsageError(
                 "'{}' is not a valid integration method ('{}')"
@@ -674,7 +680,7 @@ class NonlinearRegime(Regime):
                 {sv: x[i, 0]
                  for i, sv in enumerate(self.defn.time_derivative_variables)})
              for td in self.defn.time_derivatives]))
-        h = dt_symbol  # Step size
+        h = sp.Symbol(dt_symbol)  # Step size
         if self.integration_method == 'euler':
             update_exprs = x + h * f(x)
         elif self.integration_method == 'rk2':
@@ -711,24 +717,3 @@ class SolverNotValidForRegimeException(Exception):
     Raised when the selected solver isn't appropriate for the given ODE
     system
     """
-
-
-class SimpleState(object):
-    """
-    A placeholder until states are included in 9ML specification
-    """
-
-    StateVariable = namedtuple('StateVariable', 'name value')
-
-    def __init__(self, state, regime, component_class):
-        self.component_class = component_class
-        self.state = OrderedDict((k, float(state[k].in_si_units()))
-                                 for k in sorted(state))
-        self.regime = regime
-
-    def in_si_units(self):
-        return self
-
-    @property
-    def variables(self):
-        return (self.StateVariable(*i) for i in self.state.items())

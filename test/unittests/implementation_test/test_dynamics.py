@@ -5,7 +5,7 @@ from collections import OrderedDict
 from nineml import units as un
 from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
-    Dynamics, SimpleState, AnalogSource, AnalogSink, EventSink, EventSource)
+    Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
 if __name__ == '__main__':
     class TestCase(object):
 
@@ -24,13 +24,14 @@ class TestDynamics(TestCase):
                                         'PyNNLeakyIntegrateAndFire')
         properties = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
                                         'PyNNLeakyIntegrateAndFireProperties')
-        initial_state = SimpleState(
-            {'v': -65.0 * un.mV, 'end_refractory': 0.0 * un.s},
-            'subthreshold', definition)
+        initial_state = {'v': -65.0 * un.mV, 'end_refractory': 0.0 * un.s}
+        initial_regime = 'subthreshold'
         isyn_in = AnalogSource.step('isyn', 1 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         isyn_in.connect_to(dynamics.analog_reduce_ports['i_synaptic'],
                                  delay=0 * un.s)
@@ -47,13 +48,14 @@ class TestDynamics(TestCase):
         definition = ninemlcatalog.load('neuron/Izhikevich', 'Izhikevich')
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevich')
-        initial_state = SimpleState(
-            {'V': -65.0 * un.mV, 'U': -14.0 * un.mV / un.ms},
-            'subthreshold_regime', definition)
+        initial_state = {'V': -65.0 * un.mV, 'U': -14.0 * un.mV / un.ms}
+        initial_regime = 'subthreshold_regime'
         isyn_in = AnalogSource.step('isyn_in', 0.02 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         isyn_in.connect_to(dynamics.analog_reduce_ports['Isyn'],
                            delay=0 * un.s)
@@ -72,12 +74,14 @@ class TestDynamics(TestCase):
                                         'IzhikevichFastSpiking')
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevichFastSpiking')
-        initial_state = SimpleState(
-            {'V': -65.0 * un.mV, 'U': -1.625 * un.pA}, 'subVb', definition)
+        initial_state = {'V': -65.0 * un.mV, 'U': -1.625 * un.pA}
+        initial_regime = 'subVb'
         isyn_in = AnalogSource.step('isyn_in', 100 * un.pA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         isyn_in.connect_to(dynamics.analog_reduce_ports['iSyn'],
                            delay=0 * un.s)
@@ -95,14 +99,15 @@ class TestDynamics(TestCase):
                                         'PyNNHodgkinHuxley')
         properties = ninemlcatalog.load('neuron/HodgkinHuxley',
                                         'PyNNHodgkinHuxleyProperties')
-        initial_state = SimpleState(
-            {'v': -65.0 * un.mV, 'm': 0.0 * un.unitless,
-             'h': 1.0 * un.unitless, 'n': 0.0 * un.unitless},
-            'sole', definition)
+        initial_state = {'v': -65.0 * un.mV, 'm': 0.0 * un.unitless,
+                         'h': 1.0 * un.unitless, 'n': 0.0 * un.unitless}
+        initial_regime = 'sole'
         isyn_in = AnalogSource.step('isyn', 0.5 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         isyn_in.connect_to(dynamics.analog_reduce_ports['iExt'],
                            delay=0 * un.s)
@@ -142,17 +147,18 @@ class TestDynamics(TestCase):
                             ('cell', 'v', 'v'),
                             ('cell', 'spike_output', 'spike_out')])
         definition = properties.component_class
-        initial_state = SimpleState(
-            {'v__cell': -65.0 * un.mV,
-             'end_refractory__cell': 0.0 * un.ms,
-             'a__psr__syn': 0.0 * un.nA,
-             'b__psr__syn': 0.0 * un.nA},
-            'subthreshold___sole_____sole', definition)
+        initial_state = {'v__cell': -65.0 * un.mV,
+                         'end_refractory__cell': 0.0 * un.ms,
+                         'a__psr__syn': 0.0 * un.nA,
+                         'b__psr__syn': 0.0 * un.nA}
+        initial_regime = 'subthreshold___sole_____sole'
         spike_in = EventSource('spike_in', [t * un.ms for t in [
             50, 65, 70, 72.5, 71, 73, 72, 70.5, 90]])
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         spike_in.connect_to(dynamics.event_receive_ports['spike_in'],
                             delay=0 * un.s)
@@ -170,10 +176,12 @@ class TestDynamics(TestCase):
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')
         properties = DynamicsProperties('PoissonProps',
                                            definition, {'rate': 100 * un.Hz})
-        initial_state = SimpleState(
-            {'t_next': 0.0 * un.ms}, 'default', definition)
+        initial_state = {'t_next': 0.0 * un.ms}
+        initial_regime = 'default'
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties, initial_state,
+        dynamics = Dynamics(definition, properties,
+                            initial_state=initial_state,
+                            initial_regime=initial_regime,
                             start_t=0.0 * un.s, dt=dt)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
@@ -191,7 +199,7 @@ if __name__ == '__main__':
     import numpy as np
     dt = 0.001 * un.ms
     duration = 100.0 * un.ms
-    model = 'poisson'
+    model = 'liaf'
     start = time.time()
     tester = TestDynamics()
     sink = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration)

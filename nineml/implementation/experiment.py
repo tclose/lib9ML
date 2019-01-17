@@ -70,7 +70,7 @@ class AnalogSink(AnalogReceivePort):
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
         fig = plt.figure()
-        ax = fig.get_gca()
+        ax = fig.gca()
         self._plot_trace(ax, times)
         plt.title(self.name)
         plt.ylabel('{} ({})'.format(self.dimension.name,
@@ -85,7 +85,7 @@ class AnalogSink(AnalogReceivePort):
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
         fig = plt.figure()
-        ax = fig.get_gca()
+        ax = fig.gca()
         for sink in sinks:
             sink._plot_trace(ax, times)
         plt.title(op.commonpath(s.name for s in sinks))
