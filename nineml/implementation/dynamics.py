@@ -7,38 +7,45 @@ from collections import deque, OrderedDict
 import numpy.random
 import bisect
 import sympy as sp
+from sympy.utilities.lambdify import lambdastr
+import nineml
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 
 
-class Dynamics(object):
-    """
-    Representation of a Dynamics object
-    """
+# Set common symbol used to denote step size
+dt_symbol = sp.Symbol('dt_')
 
-    def __init__(self, component_class, properties, start_t,
-                 initial_state=None, regime_kwargs=None, **kwargs):
+
+class Dynamics(object):
+
+    def __init__(self, component_class, properties, start_t, dt,
+                 initial_regime, initial_state=None):
+        if isinstance(component_class, nineml.abstraction.Dynamics):
+            component_class = DynamicsClass(component_class)
+        self.component_class = component_class
         if properties.component_class != component_class:
             raise NineMLUsageError(
                 "Provided properties do not match defn ({} and {})"
                 .format(properties, component_class))
-        if initial_state.component_class != component_class:
-            raise NineMLUsageError(
-                "Provided state does not match defn ({} and {})"
-                .format(initial_state, component_class))
-        # Recursively substitute and remove all aliases that are not referenced
-        # in analog-send-ports
-        self.defn = component_class.substitute_aliases()
-        # Convert all quantities to SI units for simplicity
-        properties = properties.in_si_units()
-        initial_state = initial_state.in_si_units()
-        start_t = float(start_t.in_units(un.s))
-        # Initialise state information
-        self._parameters = {p.name: float(p.value)
+        # Initialise state information converting all quantities to SI units
+        # for simplicity
+        self._properties = {p.name: float(p.value.in_si_units())
                             for p in properties.properties}
-        self._state = OrderedDict((sv.name, float(sv.value))
-                                  for sv in initial_state.variables)
-        self._t = start_t
+        self._state = OrderedDict((sv.name, float(sv.value.in_si_units()))
+                                  for sv in properties.initial_states)
+        if initial_state is not None:
+            self._state.update(initial_state)
+        self.regime = component_class.regimes[initial_regime]
+        # Time and simulation step size
+        self._t = float(start_t.in_si_units())
+        if isinstance(dt, dict):
+            # Set regime-specific dts
+            self._dts = {r.name: float(dt[r.name].in_si_units())
+                               for r in component_class.regimes}
+        else:
+            # Set the same dt for all regimes
+            self._dt = float(dt.in_si_units())
         # Initialise ports
         self.event_send_ports = OrderedDict()
         self.analog_send_ports = OrderedDict()
@@ -61,33 +68,14 @@ class Dynamics(object):
         for pdef in self.defn.analog_reduce_ports:
             self.ports[pdef.name] = self.analog_reduce_ports[pdef.name] = (
                 AnalogReducePort(pdef, self))
-        # Initialise regimes
-        self.regimes = {}
-        for regime_def in self.defn.regimes:
-            if regime_kwargs is not None and regime_def.name in regime_kwargs:
-                # Add regime specific kwargs to general kwargs
-                kwgs = copy(kwargs)
-                kwgs.update(regime_kwargs[regime_def.name])
-            else:
-                kwgs = kwargs
-            try:
-                regime = LinearRegime(regime_def, self, **kwgs)
-            except SolverNotValidForRegimeException:
-                regime = NonlinearRegime(regime_def, self, **kwgs)
-            self.regimes[regime_def.name] = regime
-        self.current_regime = self.regimes[initial_state.regime]
 
-    def simulate(self, stop_t):
-        stop_t = float(stop_t.in_units(un.s))
-        self._update_buffers()
-        # Update the simulation until stop_t
-        while self.t < stop_t:
-            # Simulte the current regime until t > stop_t or there is a
-            # transition to a new regime
-            try:
-                self.current_regime.simulate(stop_t)
-            except RegimeTransition as transition:
-                self.current_regime = self.regimes[transition.target]
+    @property
+    def dt(self):
+        try:
+            dt = self._dt[self.regime.name]
+        except AttributeError:
+            dt = self._dt
+        return dt
 
     def update_state(self, new_state, new_t):
         self._state = new_state
@@ -103,16 +91,17 @@ class Dynamics(object):
     def parameters(self):
         return self._parameters
 
-    @property
-    def all_symbols(self):
-        "Returns a list of all symbols used in the Dynamics class"
-        return list(sp.symbols(chain(
-            self.state.keys(),
-            self.defn.analog_receive_port_names,
-            self.defn.analog_reduce_port_names,
-            self.parameters.keys(),
-            self.defn.constant_names,
-            ['t', 'dt_'])))
+    def simulate(self, stop_t):
+        stop_t = float(stop_t.in_units(un.s))
+        self._update_buffers()
+        # Update the simulation until stop_t
+        while self.t < stop_t:
+            # Simulte the current regime until t > stop_t or there is a
+            # transition to a new regime
+            try:
+                self.regime.update(self, stop_t, self.dt)
+            except RegimeTransition as transition:
+                self.regime = self.component_class.regimes[transition.target]
 
     def all_values(self, dt=None, state=None, t=None):
         if dt is None:
@@ -131,12 +120,6 @@ class Dynamics(object):
             [t, dt]))
         return all_values
 
-    def lambdify(self, expr, extra_symbols=()):
-        "Lambdifies a sympy expression, substituting in all values"
-        symbols = self.all_symbols
-        symbols.extend(extra_symbols)
-        return sp.lambdify(symbols, expr, 'math')
-
     @property
     def t(self):
         return self._t
@@ -148,6 +131,53 @@ class Dynamics(object):
     def clear_buffers(self, min_t):
         for port in self.analog_send_ports:
             port.clear_buffer(min_t)
+
+
+class DynamicsClass(object):
+    """
+    Representation of a Dynamics object
+    """
+
+    def __init__(self, component_class, regime_kwargs=None, **kwargs):
+        # Recursively substitute and remove all aliases that are not referenced
+        # in analog-send-ports
+        self.defn = component_class.substitute_aliases()
+        # Initialise regimes
+        self.regimes = {}
+        for regime_def in self.defn.regimes:
+            if regime_kwargs is not None and regime_def.name in regime_kwargs:
+                # Add regime specific kwargs to general kwargs
+                kwgs = copy(kwargs)
+                kwgs.update(regime_kwargs[regime_def.name])
+            else:
+                kwgs = kwargs
+            try:
+                regime = LinearRegime(regime_def, self, **kwgs)
+            except SolverNotValidForRegimeException:
+                regime = NonlinearRegime(regime_def, self, **kwgs)
+            self.regimes[regime_def.name] = regime
+
+    @property
+    def all_symbols(self):
+        "Returns a list of all symbols used in the Dynamics class"
+        return list(sp.symbols(chain(
+            self.defn.state_variable_names,
+            self.defn.analog_receive_port_names,
+            self.defn.analog_reduce_port_names,
+            self.defn.parameter_names,
+            self.defn.constant_names,
+            ['t', dt_symbol])))
+
+    def lambdify(self, expr, extra_symbols=()):
+        "Lambdifies a sympy expression, substituting in all values"
+        symbols = self.all_symbols
+        symbols.extend(extra_symbols)
+        # Convert expression into a string representation of a lambda function
+        lstr = lambdastr(symbols, expr, 'math')
+        lfunc = eval(lstr)
+        # Save lambda string for pickling/unpickling
+        lfunc.str = lstr
+        return lfunc
 
 
 class Regime(object):
@@ -171,7 +201,7 @@ class Regime(object):
             self.on_events.append(OnEvent(oe_def, self))
         self.updates = {}
 
-    def simulate(self, stop_t):
+    def update(self, dynamics, stop_t, dt):
         """
         Simulate the regime for the given duration unless an event is
         raised.
@@ -182,7 +212,7 @@ class Regime(object):
             The time to run the simulation until
         """
         transition = None
-        while self.parent.t < stop_t:
+        while dynamics.t < stop_t:
             # If new state has been assigned by a transition in a previous
             # iteration then we don't do an ODE step to allow for multiple
             # transitions at the same time-point
@@ -192,9 +222,9 @@ class Regime(object):
                 # the solver should be small enough for acceptable levels of
                 # accuracy and so that the time of trigger-activations can be
                 # approximated by linear intersections.
-                max_dt = (min(self.time_of_next_handled_event, stop_t) -
-                          self.parent.t)
-                proposed_state, proposed_t = self.step_ode(max_dt)
+                dt = min(min(self.time_of_next_handled_event, stop_t) -
+                             dynamics.t, dt)
+                proposed_state, proposed_t = self.step(dynamics, dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
@@ -208,8 +238,8 @@ class Regime(object):
                 transition = None  # If there are no transitions in the regime
             else:
                 if transition_t > proposed_t:
-                    # The next transition doesn't occur before the end of the
-                    # current step so can be ignored
+                    # The next transition doesn't occur until after the end of
+                    # the current step so can be ignored
                     transition = None
             new_regime = None
             if transition is not None:
@@ -219,13 +249,14 @@ class Regime(object):
                     # simulation to the time of the assignment
                     proposed_t = transition_t
                     # Assign states
-                    proposed_state = transition.assign_states(t=proposed_t)
+                    proposed_state = transition.assign_states(
+                        dynamics, t=proposed_t)
                 for port_name in transition.defn.output_event_keys:
-                    self.parent.event_send_ports[port_name].send(transition_t)
+                    dynamics.event_send_ports[port_name].send(transition_t)
                 if transition.defn.target_regime.name != self.name:
                     new_regime = transition.defn.target_regime.name
             # Update the state and buffers
-            self.parent.update_state(proposed_state, proposed_t)
+            dynamics.update_state(proposed_state, proposed_t)
             # Transition to new regime if specified in the active transition.
             # NB: that this transition occurs after all other elements of the
             # transition and the update of the state/time
@@ -243,23 +274,22 @@ class Regime(object):
     def name(self):
         return self.defn.name
 
-    def step_ode(self, max_dt):  # @UnusedVariable
-        dt = min(self.dt, max_dt)
+    def step(self, dynamics, dt):  # @UnusedVariable
         # self.updates should be constructed in the regime __init__ and consist
         # of a dictionaries of functions to update each state, which take the
         # output of self.parent.all_values() as input args
         if self.updates:
-            proposed_state = copy(self.parent.state)
-            values = self.parent.all_values(dt=dt)
+            proposed_state = copy(dynamics.state)
+            values = dynamics.all_values(dt=dt)
             for var_name, update in self.updates.items():
                 proposed_state[var_name] = update(*values)
         else:
             # No time derivatives in regime so state stays the same
             proposed_state = self.parent.state
-        proposed_t = self.parent.t + dt
+        proposed_t = dynamics.t + dt
         return proposed_state, proposed_t
 
-    def _lambdify_exprs(self, update_exprs, state_vector):
+    def _lambdify_update_exprs(self, update_exprs, state_vector):
         update_exprs = update_exprs.as_explicit()
         updates = {}
         # Convert Sympy expressions into lambda functions of variables
@@ -307,9 +337,9 @@ class Transition(object):
                                             extra_symbols=rand_vars.keys()),
                 rand_vars)
 
-    def assign_states(self, t):
-        state = copy(self.parent.parent.state)
-        all_values = self.parent.parent.all_values(t=t)
+    def assign_states(self, dynamics, t):
+        state = copy(dynamics.state)
+        all_values = dynamics.all_values(t=t)
         for var_name, (assign, rand_vars) in self._assigns.items():
             rand_values = {}
             for rv_name, (rand_func, args_lambdas) in rand_vars.items():
@@ -605,7 +635,7 @@ class LinearRegime(Regime):
 
             # Solve the system
             try:
-                A = (self.coeffs * sp.Symbol('dt_')).exp()
+                A = (self.coeffs * dt_symbol).exp()
             except NotImplementedError:
                 raise SolverNotValidForRegimeException
             C = sp.ImmutableMatrix([A * b]) - b
@@ -618,7 +648,7 @@ class LinearRegime(Regime):
 
             # Create lambda functions to evaluate the subsitution
             # of state and parameter variables
-            self.updates = self._lambdify_exprs(update_exprs, x)
+            self.updates = self._lambdify_update_exprs(update_exprs, x)
 
 
 class NonlinearRegime(Regime):
@@ -644,7 +674,7 @@ class NonlinearRegime(Regime):
                 {sv: x[i, 0]
                  for i, sv in enumerate(self.defn.time_derivative_variables)})
              for td in self.defn.time_derivatives]))
-        h = sp.symbols('dt_')  # Step size
+        h = dt_symbol  # Step size
         if self.integration_method == 'euler':
             update_exprs = x + h * f(x)
         elif self.integration_method == 'rk2':
@@ -660,7 +690,7 @@ class NonlinearRegime(Regime):
             assert False, "Unrecognised method '{}'"  # Should never get here
         # Create lambda functions to evaluate the subsitution
         # of state and parameter variables
-        self.updates = self._lambdify_exprs(update_exprs, x)
+        self.updates = self._lambdify_update_exprs(update_exprs, x)
 
 
 class RegimeTransition(Exception):
