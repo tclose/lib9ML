@@ -447,8 +447,8 @@ class Quantity(AnnotatedNineMLObject):
     def key(self):
         return self._value.key + '_' + self._units.name
 
-    def single(self, index):
-        return Quantity(self.value.single(index), self.units)
+    def sample(self, index):
+        return Quantity(self.value.sample(index), self.units)
 
     def __iter__(self):
         """For conveniently expanding quantities like a tuple"""

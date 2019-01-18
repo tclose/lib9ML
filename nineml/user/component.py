@@ -94,8 +94,8 @@ class Property(BaseULObject):
     def units(self):
         return self.quantity.units
 
-    def single(self, index):
-        return Property(self.name, self.quantity.single(index))
+    def sample(self, index):
+        return Property(self.name, self.quantity.sample(index))
 
     def __repr__(self):
         units = self.units.name
@@ -242,9 +242,10 @@ class Component(with_metaclass(
             defn = defn.component.definition
         return defn.component_class
 
-    def single(self, index):
+    def sample(self, index):
         return type(self)('{}_{}'.format(self.name, index), self.definition,
-                          properties=[p.single() for p in self.properties])
+                          properties=[p.sample(index)
+                                      for p in self.properties])
 
     def is_base_component(self):
         return isinstance(self.definition, Prototype)

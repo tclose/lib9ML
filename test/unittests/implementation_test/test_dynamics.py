@@ -30,13 +30,13 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         isyn_in.connect_to(dynamics.analog_reduce_ports['i_synaptic'],
                                  delay=0 * un.s)
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.055, 0.061, 0.068, 0.075, 0.081, 0.088, 0.095])
         return v_out
@@ -54,13 +54,13 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         isyn_in.connect_to(dynamics.analog_reduce_ports['Isyn'],
                            delay=0 * un.s)
         dynamics.analog_send_ports['V'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike'].connect_to(spike_out,
                                                              0 * un.s)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.054, 0.057, 0.061, 0.065, 0.068, 0.072, 0.076,
                           0.08, 0.083, 0.087, 0.091, 0.095, 0.098])
@@ -80,13 +80,13 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         isyn_in.connect_to(dynamics.analog_reduce_ports['iSyn'],
                            delay=0 * un.s)
         dynamics.analog_send_ports['V'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spikeOutput'].connect_to(spike_out,
                                                             0 * un.s)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.058, 0.081])
         return v_out
@@ -106,13 +106,13 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         isyn_in.connect_to(dynamics.analog_reduce_ports['iExt'],
                            delay=0 * un.s)
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['outgoingSpike'].connect_to(spike_out,
                                                               0 * un.s)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.038, 0.058, 0.07, 0.082, 0.094])
         return v_out
@@ -157,13 +157,13 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         spike_in.connect_to(dynamics.event_receive_ports['spike_in'],
                             delay=0 * un.s)
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike_out'].connect_to(spike_out,
                                                           0 * un.s)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.071])
         return v_out
@@ -180,12 +180,12 @@ class TestDynamics(TestCase):
         dynamics = Dynamics(definition, properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
-                            start_t=0.0 * un.s, dt=dt)
+                            start_t=0.0 * un.s)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
         # Set to fixed seed
         numpy.random.seed(12345)
-        dynamics.simulate(duration)
+        dynamics.simulate(duration, dt=dt)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.0, 0.027, 0.03, 0.032, 0.035, 0.043, 0.052, 0.085,
                           0.096])

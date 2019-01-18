@@ -116,7 +116,7 @@ class SingleValue(BaseValue):
     def is_single(self):
         return True
 
-    def single(self, index):  # @UnusedVariable
+    def sample(self, index):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -284,7 +284,7 @@ class ArrayValue(BaseValue):
     def values(self):
         return self._values
 
-    def single(self, index):
+    def sample(self, index):
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -550,7 +550,7 @@ class RandomDistributionValue(BaseValue):
         # FIXME: This should include a hash of the properties
         return self._distribution.name
 
-    def single(self, index):  # @UnusedVariable
+    def sample(self, index):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself

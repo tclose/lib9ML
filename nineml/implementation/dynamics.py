@@ -4,13 +4,12 @@ from itertools import chain
 from copy import copy
 from collections import deque, OrderedDict
 import numpy.random
-import math
 import bisect
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
 import nineml.units as un
+from .utils import create_progress_bar
 from nineml.exceptions import NineMLUsageError, NineMLNameError
-from progressbar import ProgressBar
 
 
 # Set common symbol used to denote step size
@@ -19,7 +18,7 @@ dt_symbol = 'dt_'
 
 class Dynamics(object):
 
-    def __init__(self, model, start_t, dt, initial_state=None,
+    def __init__(self, model, start_t, initial_state=None,
                  initial_regime=None, component_class=None):
         if component_class is None:
             component_class = DynamicsClass(model.component_class)
@@ -46,18 +45,8 @@ class Dynamics(object):
         if initial_regime is None:
             initial_regime = model.initial_regime
         self.regime = component_class.regimes[initial_regime]
-        # Time and simulation step size
+        # Time
         self._t = float(start_t.in_si_units())
-        if isinstance(dt, dict):
-            # Set regime-specific dts
-            self._dt = {r.name: float(dt[r.name].in_si_units())
-                        for r in component_class.regimes}
-            self.min_dt = min(self._dt.values())
-        else:
-            # Set the same dt for all regimes
-            self._dt = float(dt.in_si_units())
-            self.min_dt = self._dt
-        self.progress_bar_res = -int(math.floor(math.log10(self.min_dt)))
         # Initialise ports
         self.event_send_ports = OrderedDict()
         self.analog_send_ports = OrderedDict()
@@ -99,18 +88,19 @@ class Dynamics(object):
                           self.event_receive_ports.values()):
             port.update_buffer()
 
-    def simulate(self, stop_t, progress_bar=True):
+    def simulate(self, stop_t, dt, progress_bar=True):
+        # Convert time values to SI units
         stop_t = float(stop_t.in_units(un.s))
+        dt = float(dt.in_si_units())
         if progress_bar is True:
-            progress_bar = ProgressBar(self.t, stop_t)
+            progress_bar = create_progress_bar(self.t, stop_t, dt)
         self._update_buffers()
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
             # transition to a new regime
             try:
-                self.regime.update(self, stop_t, self.dt,
-                                   progress_bar=progress_bar)
+                self.regime.update(self, stop_t, dt, progress_bar=progress_bar)
             except RegimeTransition as transition:
                 self.regime = self.component_class.regimes[transition.target]
         if progress_bar is not None:
@@ -193,7 +183,7 @@ class DynamicsClass(object):
         symbols = self.all_symbols
         symbols.extend(extra_symbols)
         return sp.lambdify(symbols, expr, 'math')
-#         # Convert expression into a string representation of a lambda function
+        # Convert expression into a string representation of a lambda function
 #         lstr = lambdastr(symbols, expr, 'math')
 #         lfunc = eval(lstr)
 #         # Save lambda string for pickling/unpickling
@@ -281,8 +271,11 @@ class Regime(object):
             # Update the state and buffers
             dynamics.update_state(proposed_state, proposed_t)
             if progress_bar is not None:
-                progress_bar.update(round(proposed_t,
-                                          ndigits=dynamics.progress_bar_res))
+                try:
+                    res = progress_bar.res
+                except AttributeError:
+                    res = None
+                progress_bar.update(round(proposed_t, ndigits=res))
             # Transition to new regime if specified in the active transition.
             # NB: that this transition occurs after all other elements of the
             # transition and the update of the state/time

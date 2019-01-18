@@ -16,13 +16,13 @@ else:
 
 class TestNetwork(TestCase):
 
-    @unittest.skip
+#     @unittest.skip
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms):
         model = self._reduced_brunel_9ml(case, order)
-        network = Network(model, start_t=0 * un.s, dt=dt)
+        network = Network(model, start_t=0 * un.s)
         event_sinks = {}
-        network.simulate(duration)
+        network.simulate(duration, dt=dt)
         self.assertEqual([len(s) for s in event_sinks],
                          [])
         return event_sinks
@@ -47,19 +47,15 @@ class TestNetwork(TestCase):
 
 
 if __name__ == '__main__':
-    import time
     dt = 0.01 * un.ms
     case = 'AI'
     order = 10
     duration = 20.0 * un.ms
     model = 'brunel'
-    start = time.time()
+    print("Simulating {} model for {} with {} resolution".format(
+        model, duration, dt))
     tester = TestNetwork()
     sinks = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration,
                                                      case=case, order=order)
-    end = time.time()
-    elapsed = end - start
-    print("Simulated {} model for {} with {} resolution in {} (real-world) "
-          "seconds".format(model, duration, dt, elapsed))
     for pop_sinks in sinks.values():
         EventSink.combined_plot(pop_sinks)
