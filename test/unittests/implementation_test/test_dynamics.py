@@ -18,8 +18,6 @@ class TestDynamics(TestCase):
 
     def test_liaf(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
-        definition = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
-                                        'PyNNLeakyIntegrateAndFire')
         properties = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
                                         'PyNNLeakyIntegrateAndFireProperties')
         initial_state = {'v': -65.0 * un.mV, 'end_refractory': 0.0 * un.s}
@@ -27,7 +25,7 @@ class TestDynamics(TestCase):
         isyn_in = AnalogSource.step('isyn', 1 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -43,7 +41,6 @@ class TestDynamics(TestCase):
 
     def test_izhikevich(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
-        definition = ninemlcatalog.load('neuron/Izhikevich', 'Izhikevich')
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevich')
         initial_state = {'V': -65.0 * un.mV, 'U': -14.0 * un.mV / un.ms}
@@ -51,7 +48,7 @@ class TestDynamics(TestCase):
         isyn_in = AnalogSource.step('isyn_in', 0.02 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -68,8 +65,6 @@ class TestDynamics(TestCase):
 
     def test_izhikevich_fs(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
-        definition = ninemlcatalog.load('neuron/Izhikevich',
-                                        'IzhikevichFastSpiking')
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevichFastSpiking')
         initial_state = {'V': -65.0 * un.mV, 'U': -1.625 * un.pA}
@@ -77,7 +72,7 @@ class TestDynamics(TestCase):
         isyn_in = AnalogSource.step('isyn_in', 100 * un.pA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -93,8 +88,6 @@ class TestDynamics(TestCase):
 
     def test_hodgkin_huxley(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
-        definition = ninemlcatalog.load('neuron/HodgkinHuxley',
-                                        'PyNNHodgkinHuxley')
         properties = ninemlcatalog.load('neuron/HodgkinHuxley',
                                         'PyNNHodgkinHuxleyProperties')
         initial_state = {'v': -65.0 * un.mV, 'm': 0.0 * un.unitless,
@@ -103,7 +96,7 @@ class TestDynamics(TestCase):
         isyn_in = AnalogSource.step('isyn', 0.5 * un.nA)
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -144,7 +137,6 @@ class TestDynamics(TestCase):
             port_exposures=[('syn', 'spike__psr', 'spike_in'),
                             ('cell', 'v', 'v'),
                             ('cell', 'spike_output', 'spike_out')])
-        definition = properties.component_class
         initial_state = {'v__cell': -65.0 * un.mV,
                          'end_refractory__cell': 0.0 * un.ms,
                          'a__psr__syn': 0.0 * un.nA,
@@ -154,7 +146,7 @@ class TestDynamics(TestCase):
             50, 65, 70, 72.5, 71, 73, 72, 70.5, 90]])
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -172,12 +164,12 @@ class TestDynamics(TestCase):
     def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms, **kwargs):  # @UnusedVariable @IgnorePep8
 
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')
-        properties = DynamicsProperties('PoissonProps',
-                                           definition, {'rate': 100 * un.Hz})
+        properties = DynamicsProperties('PoissonProps', definition,
+                                        {'rate': 100 * un.Hz})
         initial_state = {'t_next': 0.0 * un.ms}
         initial_regime = 'default'
         spike_out = EventSink('spike')
-        dynamics = Dynamics(definition, properties,
+        dynamics = Dynamics(properties,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)

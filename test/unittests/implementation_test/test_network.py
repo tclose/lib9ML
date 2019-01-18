@@ -16,7 +16,7 @@ else:
 
 class TestNetwork(TestCase):
 
-#     @unittest.skip
+    @unittest.skip
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms):
         model = self._reduced_brunel_9ml(case, order)
@@ -43,6 +43,8 @@ class TestNetwork(TestCase):
             props.set(Property(
                 number.name,
                 int(math.ceil(float(number.value) * scale)) * un.unitless))
+            proj.connectivity._source_size = proj.pre.size
+            proj.connectivity._destination_size = proj.post.size
         return model
 
 
