@@ -1,11 +1,14 @@
 from operator import itemgetter
 from collections import defaultdict
-from itertools import chain
+from itertools import chain, repeat
 import numpy as np
 import networkx as nx
 import nineml.units as un
+from pprint import pprint
 from nineml.user import (
-    MultiDynamicsProperties, AnalogPortConnection, EventPortConnection)
+    MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
+    EventSendPortExposure, AnalogSendPortExposure, AnalogReceivePortExposure,
+    AnalogReducePortExposure, EventReceivePortExposure)
 from .dynamics import Dynamics, DynamicsClass
 from .utils import create_progress_bar
 
@@ -25,17 +28,23 @@ class Network(object):
                                     properties=props.sample(i))
         # Add connections between components from connection groups
         for conn_group in connection_groups:
+            delay_qty = conn_group.delay
+            if delay_qty is None:
+                delays = repeat(0.0)
+            else:
+                delays = (float(d) for d in delay_qty.in_si_units())
             self.graph.add_edges_from(
-                ((conn_group.source, c[0]),
-                 (conn_group.destination, c[1]),
+                ((conn_group.source.name, int(src_i)),
+                 (conn_group.destination.name, int(dest_i)),
                  {'communicates': conn_group.communicates,
-                  'delay': d,
-                  'source_port': conn_group.source_port,
-                  'destination_port': conn_group.destination_port})
-                for c, d in zip(conn_group.connections, conn_group.delay))
+                  'delay': delay,
+                  'src_port': conn_group.source_port,
+                  'dest_port': conn_group.destination_port})
+                for (src_i, dest_i), delay in zip(conn_group.connections,
+                                                  delays))
         # Merge dynamics definitions for nodes connected with zero delay
         # connections into multi-dynamics definitions
-        self._merge_nodes_connected_with_no_delay()
+        self._merge_nodes_connected_without_delay()
         # Initialise all dynamics components in graph
         dyn_class_cache = {}  # Cache for storing previously analysed classes
         self.components = []
@@ -62,30 +71,34 @@ class Network(object):
                 to_dyn = self.graph.nodes[successor]['dynamics']
                 for conn_data in self.graph.get_edge_data(successor):
                     delay = conn_data['delay']
-                    from_dyn.ports[conn_data['source_port']].connect_to(
+                    from_dyn.ports[conn_data['src_port']].connect_to(
                         to_dyn.analog_receive_ports[
-                            conn_data['destination_port']],
+                            conn_data['dest_port']],
                         delay=delay)
                     if delay < self.min_delay:
                         self.min_delay = delay
 
-    def _merge_nodes_connected_with_no_delay(self):
+    def _merge_nodes_connected_without_delay(self):
         for node in list(self.graph.nodes()):
             if node not in self.graph:
                 continue  # If it has already been merged
-            to_merge = self._neighbours_to_merge(node, set())
+            to_merge = set()
+            self._neighbours_to_merge(node, to_merge)
             if to_merge:
-                to_merge.add(node)
                 sub_graph = self.graph.subgraph(to_merge)
                 # Get node with highest degree in order to name the new
                 # merge multi-dynamics object
                 centre_node = max(sub_graph.degree(), key=itemgetter(1))[0]
-                # Get dictionary of all sub-components to merge
+                # Add new combined multi-dynamics node
+                multi_node = (centre_node[0] + '_multi', centre_node[1])
+                self.graph.add_node(multi_node)
+                # Combine dynamics from all components to merge into a single
+                # multi-dynamics object
                 sub_comp_names = {}
                 sub_comp_props = {}
                 counters = defaultdict(lambda: 0)  # For gen. unique names
                 for sub_comp_node in to_merge:
-                    node_data = sub_graph[sub_comp_node]
+                    node_data = sub_graph.nodes[sub_comp_node]
                     # Get a uniuqe name for the sub-component based on the
                     # component array it comes from
                     comp_array_name = sub_comp_node[0]
@@ -98,53 +111,68 @@ class Network(object):
                 # Map graph edges to internal port connections within
                 # the new multi-dynamics object
                 port_connections = []
-                for conn in sub_graph.edges():
-                    conn_data = sub_graph.get_edge_data(conn)
-                    if conn_data['communicates'] == 'analog':
-                        PortConnectionClass = AnalogPortConnection
-                    else:
-                        PortConnectionClass = EventPortConnection
-                    port_connections.append(PortConnectionClass(
-                        send_port_name=conn_data['source_port'],
-                        receive_port_name=conn_data['destination_port'],
-                        sender_name='{}{}'.format(*conn[0]),
-                        receiver_name='{}{}'.format(*conn[1])))
-                multi_name = (sub_graph[centre_node]['properties'].name +
+                for edge in sub_graph.edges():
+                    for conn in sub_graph.get_edge_data(*edge).values():
+                        if conn['communicates'] == 'analog':
+                            PortConnectionClass = AnalogPortConnection
+                        else:
+                            PortConnectionClass = EventPortConnection
+                        port_connections.append(PortConnectionClass(
+                            send_port_name=conn['src_port'],
+                            receive_port_name=conn['dest_port'],
+                            sender_name=sub_comp_names[edge[0]],
+                            receiver_name=sub_comp_names[edge[1]]))
+                port_exposures = set()
+                # Redirect edges into/from merged nodes to multi-node
+                for sub_comp_node in to_merge:
+                    sub_comp_class = sub_comp_props[
+                        sub_comp_names[sub_comp_node]].component_class
+                    for pcessor in self.graph.predecessors(sub_comp_node):
+                        if pcessor not in to_merge:
+                            for conn in self.graph.get_edge_data(
+                                    pcessor, sub_comp_node).values():
+                                if conn['communicates'] == 'analog':
+                                    if sub_comp_class.port(
+                                            conn['dest_port']).mode == 'reduce':  # @IgnorePep8
+                                        ExpClass = AnalogReducePortExposure
+                                    else:
+                                        ExpClass = AnalogReceivePortExposure
+                                else:
+                                    ExpClass = EventReceivePortExposure
+                                exposure = ExpClass(
+                                    sub_comp_names[sub_comp_node],
+                                    conn['dest_port'])
+                                conn['dest_port'] = exposure.name
+                                self.graph.add_edge(
+                                    pcessor,
+                                    multi_node,
+                                    **conn)
+                                port_exposures.add(exposure)
+                    for scessor in self.graph.successors(sub_comp_node):
+                        if scessor not in to_merge:
+                            for conn in self.graph.get_edge_data(
+                                    sub_comp_node, scessor).values():
+                                if conn['communicates'] == 'analog':
+                                    ExpClass = AnalogSendPortExposure
+                                else:
+                                    ExpClass = EventSendPortExposure
+                                exposure = ExpClass(
+                                    sub_comp_names[sub_comp_node],
+                                    conn['src_port'])
+                                conn['src_port'] = exposure.name
+                                self.graph.add_edge(
+                                    pcessor,
+                                    multi_node,
+                                    **conn)
+                                port_exposures.add(exposure)
+                multi_name = (sub_graph.nodes[centre_node]['properties'].name +
                               '__multi')
                 multi_props = MultiDynamicsProperties(
                     multi_name,
                     sub_components=sub_comp_props,
-                    port_connections=port_connections)
-                # Add new combined multi-dynamics node
-                multi_node = (centre_node[0] + '_multi', centre_node[1])
-                self._graph.add_node(
-                    multi_node,
-                    properties=multi_props)
-                # Redirect edges into/from merged nodes to multi-node
-                for sub_comp_node in to_merge:
-                    for pcessor in self.graph.predecessors(sub_comp_node):
-                        if pcessor not in to_merge:
-                            for conn_data in self.graph.get_edge_data(
-                                    pcessor, sub_comp_node):
-                                conn_data['destination_port'] = (
-                                    '{}__{}'.format(
-                                        conn_data['destination_port'],
-                                        sub_comp_names[sub_comp_node]))
-                                self.graph.add_edge(
-                                    pcessor,
-                                    multi_node,
-                                    conn_data)
-                    for scessor in self.graph.successors(sub_comp_node):
-                        if scessor not in to_merge:
-                            for conn_data in self.graph.get_edge_data(
-                                    sub_comp_node, scessor):
-                                conn_data['source_port'] = '{}__{}'.format(
-                                    conn_data['source_port'],
-                                    sub_comp_names[sub_comp_node])
-                                self.graph.add_edge(
-                                    pcessor,
-                                    multi_node,
-                                    conn_data)
+                    port_connections=port_connections,
+                    port_exposures=port_exposures)
+                self.graph.nodes[multi_node]['properties'] = multi_props
                 # Remove merged nodes
                 self.graph.remove_nodes_from(to_merge)
 
@@ -156,8 +184,11 @@ class Network(object):
         for neighbour in chain(self.graph.predecessors(node),
                                self.graph.successors(node)):
             if neighbour not in to_merge:
-                for conn_data in self.graph.get_edge_data(node, neighbour):
-                    if conn_data['delay'] == 0.0 * un.ms:
+                conns = self.graph.get_edge_data(node, neighbour)
+                if conns is None:
+                    conns = self.graph.get_edge_data(neighbour, node)
+                for conn in conns.values():
+                    if not conn['delay']:
                         to_merge.add(neighbour)
                         self._neighbours_to_merge(neighbour, to_merge)
 

@@ -176,21 +176,31 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         connection_groups : list(ConnectionGroup)
             List of connection groups the projections have been flattened to
         """
-        component_arrays = dict((ca.name, ca) for ca in chain(
-            (ComponentArray(p.name + ComponentArray.suffix['post'], len(p),
-                            p.cell.flatten())
-             for p in self.populations),
-            (ComponentArray(p.name + ComponentArray.suffix['response'], len(p),
-                            p.response.flatten())
-             for p in self.projections),
-            (ComponentArray(p.name + ComponentArray.suffix['plasticity'],
-                            len(p), p.plasticity.flatten())
-             for p in self.projections if p.plasticity is not None)))
-        connection_groups = list(chain(*(
-            (BaseConnectionGroup.from_port_connection(pc, p, component_arrays)
-             for pc in p.port_connections)
-            for p in self.projections)))
-        return list(component_arrays.values()), connection_groups
+        component_arrays = []
+        for population in self.populations:
+            component_arrays.append(ComponentArray(
+                population.name + ComponentArray.suffix['post'],
+                len(population),
+                population.cell))
+        for projection in self.projections:
+            component_arrays.append(ComponentArray(
+                projection.name + ComponentArray.suffix['response'],
+                len(projection),
+                projection.response))
+            if projection.plasticity is not None:
+                component_arrays.append(ComponentArray(
+                    projection.name + ComponentArray.suffix['plasticity'],
+                    len(projection),
+                    projection.plasticity))
+        comp_array_dict = {c.name: c for c in component_arrays}
+        connection_groups = []
+        for projection in self.projections:
+            for port_connection in projection.port_connections:
+                connection_groups.append(
+                    BaseConnectionGroup.from_port_connection(port_connection,
+                                                             projection,
+                                                             comp_array_dict))
+        return component_arrays, connection_groups
 
     def scale(self, scale):
         """

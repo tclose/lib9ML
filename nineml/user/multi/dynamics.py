@@ -606,7 +606,8 @@ class MultiDynamics(Dynamics):
         # Yield the aliases used to make local analog port connections
         connected_ports = defaultdict(list)
         for port_conn in self.analog_port_connections:
-            connected_ports[port_conn.receive_port.id].append(port_conn)
+            connected_ports[(port_conn.receiver.id,
+                             port_conn.receive_port.id)].append(port_conn)
         connected_exposures = []  # Do not need to create a separate alias for
         for port_conns in connected_ports.values():
             port = port_conns[0].receive_port

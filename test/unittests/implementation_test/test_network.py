@@ -4,6 +4,7 @@ from nineml import units as un
 from nineml.user import Property as Property
 from nineml.implementation import Network, EventSink
 import unittest
+from nineml.exceptions import NineMLNameError
 if __name__ == '__main__':
     class TestCase(object):
 
@@ -16,7 +17,7 @@ else:
 
 class TestNetwork(TestCase):
 
-    @unittest.skip
+#     @unittest.skip
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms):
         model = self._reduced_brunel_9ml(case, order)
@@ -36,15 +37,18 @@ class TestNetwork(TestCase):
         # rescale populations
         for pop in model.populations:
             pop.size = int(math.ceil(pop.size * scale))
-        for proj in (model.projection('Excitation'),
-                     model.projection('Inhibition')):
+        for proj in model.projections:
             props = proj.connectivity.rule_properties
-            number = props.property('number')
-            props.set(Property(
-                number.name,
-                int(math.ceil(float(number.value) * scale)) * un.unitless))
             proj.connectivity._source_size = proj.pre.size
             proj.connectivity._destination_size = proj.post.size
+            try:
+                number = props.property('number')
+                props.set(Property(
+                    number.name,
+                    int(math.ceil(float(number.value) * scale)) * un.unitless))
+            except NineMLNameError:
+                pass
+
         return model
 
 

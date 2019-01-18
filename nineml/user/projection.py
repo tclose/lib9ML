@@ -211,7 +211,7 @@ class Projection(BaseULObject, ContainerObject, DocumentLevelObject):
                 'analog_port_connections=[{}])'
                 .format(self.name, repr(self.pre), repr(self.post),
                         repr(self.connectivity), repr(self.response),
-                        ('plasticity={}'.format(repr(self.plasticity))
+                        (', plasticity={}'.format(repr(self.plasticity))
                          if self.plasticity else ''), repr(self.delay),
                         ', '.join(str(pc)
                                   for pc in self.event_port_connections),

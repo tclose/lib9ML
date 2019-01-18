@@ -88,9 +88,9 @@ class BaseConnectionGroup(
     @classmethod
     def from_port_connection(self, port_conn, projection, component_arrays):
         if isinstance(port_conn, EventPortConnection):
-            cls = AnalogConnectionGroup
-        else:
             cls = EventConnectionGroup
+        else:
+            cls = AnalogConnectionGroup
         name = '__'.join((
             projection.name, port_conn.sender_role,
             port_conn.send_port_name, port_conn.receiver_role,

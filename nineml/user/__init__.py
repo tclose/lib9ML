@@ -7,7 +7,10 @@ from .population import Population
 from .dynamics import Initial, DynamicsProperties
 from .connectionrule import (
     ConnectionRuleProperties, Connectivity, InverseConnectivity)
-from .multi import MultiDynamics, MultiDynamicsProperties, append_namespace
+from .multi import (
+    MultiDynamics, MultiDynamicsProperties, append_namespace,
+    AnalogReceivePortExposure, AnalogReducePortExposure, BasePortExposure,
+    EventReceivePortExposure, AnalogSendPortExposure, EventSendPortExposure)
 from .port_connections import (
     AnalogPortConnection, EventPortConnection)
 from .component_array import ComponentArray
