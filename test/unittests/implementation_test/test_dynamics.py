@@ -1,7 +1,5 @@
-from collections import namedtuple
 import ninemlcatalog
 import numpy.random
-from collections import OrderedDict
 from nineml import units as un
 from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
@@ -195,18 +193,14 @@ class TestDynamics(TestCase):
 
 
 if __name__ == '__main__':
-    import time
     import numpy as np
     dt = 0.001 * un.ms
     duration = 100.0 * un.ms
-    model = 'liaf'
-    start = time.time()
+    model = 'hodgkin_huxley'
+    print("Simulating {} model for {} with {} resolution".format(model,
+                                                                 duration, dt))
     tester = TestDynamics()
     sink = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration)
-    end = time.time()
-    elapsed = end - start
-    print("Simulated {} model for {} with {} resolution in {} (real-world) "
-          "seconds".format(model, duration, dt, elapsed))
     if isinstance(sink, AnalogSink):
         try:
             sink.plot([t * un.ms

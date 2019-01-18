@@ -90,6 +90,8 @@ class BaseNineMLObject(object):
         return id_
 
     def equals(self, other, **kwargs):
+        if self is other:
+            return True  # Short-circuit potentially expensive tests
         checker = EqualityChecker(**kwargs)
         return checker.check(self, other, **kwargs)
 

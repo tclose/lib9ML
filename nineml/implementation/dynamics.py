@@ -4,10 +4,10 @@ from itertools import chain
 from copy import copy
 from collections import deque, OrderedDict
 import numpy.random
+import math
 import bisect
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
-import nineml
 import nineml.units as un
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from progressbar import ProgressBar
@@ -19,37 +19,45 @@ dt_symbol = 'dt_'
 
 class Dynamics(object):
 
-    def __init__(self, component_class, properties, start_t, dt,
-                 initial_state=None, initial_regime=None):
-        if isinstance(component_class, nineml.abstraction.Dynamics):
-            component_class = DynamicsClass(component_class)
+    def __init__(self, model, start_t, dt, initial_state=None,
+                 initial_regime=None, component_class=None):
+        if component_class is None:
+            component_class = DynamicsClass(model.component_class)
         self.component_class = component_class
         self.defn = component_class.defn
-        if properties.component_class != self.defn:
-            raise NineMLUsageError(
-                "Provided properties do not match defn ({} and {})"
-                .format(properties, component_class))
         # Initialise state information converting all quantities to SI units
         # for simplicity
         self.properties = {p.name: float(p.quantity.in_si_units())
-                            for p in properties.properties}
-        self._state = OrderedDict((sv.name, float(sv.quantity.in_si_units()))
-                                  for sv in properties.initial_values)
-        if initial_state is not None:
-            self._state.update({k: float(v.in_si_units())
-                                for k, v in initial_state.items()})
+                           for p in model.properties}
+        # Ensure initial state is ordered by var names so it matches up with
+        # order in 'component_class.all_symbols'
+        self._state = OrderedDict()
+        for sv_name in self.defn.state_variable_names:
+            try:
+                qty = initial_state[sv_name]
+            except KeyError:
+                try:
+                    qty = model.initial_value(sv_name)
+                except NineMLNameError:
+                    raise NineMLUsageError(
+                        "No initial value provided for '{}'"
+                        .format(sv_name))
+            self._state[sv_name] = float(qty.in_si_units())
         if initial_regime is None:
-            initial_regime = properties.initial_regime
+            initial_regime = model.initial_regime
         self.regime = component_class.regimes[initial_regime]
         # Time and simulation step size
         self._t = float(start_t.in_si_units())
         if isinstance(dt, dict):
             # Set regime-specific dts
-            self._dts = {r.name: float(dt[r.name].in_si_units())
-                               for r in component_class.regimes}
+            self._dt = {r.name: float(dt[r.name].in_si_units())
+                        for r in component_class.regimes}
+            self.min_dt = min(self._dt.values())
         else:
             # Set the same dt for all regimes
             self._dt = float(dt.in_si_units())
+            self.min_dt = self._dt
+        self.progress_bar_res = -int(math.floor(math.log10(self.min_dt)))
         # Initialise ports
         self.event_send_ports = OrderedDict()
         self.analog_send_ports = OrderedDict()
@@ -140,10 +148,10 @@ class DynamicsClass(object):
     Representation of a Dynamics object
     """
 
-    def __init__(self, component_class, regime_kwargs=None, **kwargs):
+    def __init__(self, model, regime_kwargs=None, **kwargs):
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
-        self.defn = component_class.substitute_aliases()
+        self.defn = model.substitute_aliases()
         self.constants = OrderedDict(
             (c.name, float(c.quantity.in_si_units()))
             for c in self.defn.constants)
@@ -161,6 +169,13 @@ class DynamicsClass(object):
             except SolverNotValidForRegimeException:
                 regime = NonlinearRegime(regime_def, self, **kwgs)
             self.regimes[regime_def.name] = regime
+        self.port_aliases = {}
+        for port in self.defn.analog_send_ports:
+            try:
+                expr = self.defn.alias(port.name).rhs
+            except NineMLNameError:
+                expr = sp.Symbol(port.name)
+            self.port_aliases[port.name] = self.lambdify(expr)
 
     @property
     def all_symbols(self):
@@ -228,16 +243,17 @@ class Regime(object):
                 # the solver should be small enough for acceptable levels of
                 # accuracy and so that the time of trigger-activations can be
                 # approximated by linear intersections.
-                dt = min(min(self.time_of_next_handled_event, stop_t) -
-                             dynamics.t, dt)
-                proposed_state, proposed_t = self.step(dynamics, dt)
+                step_dt = min(
+                    min(self.time_of_next_handled_event(dynamics), stop_t) -
+                    dynamics.t, dt)
+                proposed_state, proposed_t = self.step(dynamics, step_dt)
             # Find next transition that will occur (on-conditions that aren't
             # triggered or ports with no upcoming events are set to a time of
             # 'inf').
             transitions = [(oc, oc.time_of_trigger(dynamics, proposed_state,
                                                    proposed_t))
                            for oc in self.on_conditions]
-            transitions.extend((oe, oe.port.time_of_next_event)
+            transitions.extend((oe, oe.time_of_next_event(dynamics))
                                for oe in self.on_events)
             try:
                 transition, transition_t = min(transitions, key=itemgetter(1))
@@ -265,17 +281,18 @@ class Regime(object):
             # Update the state and buffers
             dynamics.update_state(proposed_state, proposed_t)
             if progress_bar is not None:
-                progress_bar.update(proposed_t)
+                progress_bar.update(round(proposed_t,
+                                          ndigits=dynamics.progress_bar_res))
             # Transition to new regime if specified in the active transition.
             # NB: that this transition occurs after all other elements of the
             # transition and the update of the state/time
             if new_regime is not None:
                 raise RegimeTransition(new_regime)
 
-    @property
-    def time_of_next_handled_event(self):
+    def time_of_next_handled_event(self, dynamics):
         try:
-            return min(oe.port.time_of_next_event for oe in self.on_events)
+            return min(oe.time_of_next_event(dynamics)
+                       for oe in self.on_events)
         except ValueError:
             return float('inf')
 
@@ -294,7 +311,7 @@ class Regime(object):
                 proposed_state[var_name] = update(*values)
         else:
             # No time derivatives in regime so state stays the same
-            proposed_state = self.parent.state
+            proposed_state = dynamics.state
         proposed_t = dynamics.t + dt
         return proposed_state, proposed_t
 
@@ -407,8 +424,10 @@ class OnEvent(Transition):
 
     def __init__(self, defn, parent):
         Transition.__init__(self, defn, parent)
-        self.port = self.parent.parent.event_receive_ports[
-            self.defn.src_port_name]
+
+    def time_of_next_event(self, dynamics):
+        return dynamics.event_receive_ports[
+            self.defn.src_port_name].time_of_next_event
 
 
 class Port(object):
@@ -465,11 +484,7 @@ class AnalogSendPort(Port):
         self.buffer = deque()
         dynamics = self.parent
         # Get the expression that defines the value of the port
-        try:
-            expr = dynamics.defn.alias(self.name).rhs
-        except NineMLNameError:
-            expr = sp.Symbol(self.name)
-        self.expr = dynamics.component_class.lambdify(expr)
+        self.expr = dynamics.component_class.port_aliases[defn.name]
 
     def value(self, t):
         """
