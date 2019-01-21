@@ -116,7 +116,7 @@ class SingleValue(BaseValue):
     def is_single(self):
         return True
 
-    def sample(self, index):  # @UnusedVariable
+    def sample(self, index=None):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -131,7 +131,7 @@ class SingleValue(BaseValue):
         value : SingleValue
             The single value corresponding to the index
         """
-        return self
+        return self._value
 
     def __iter__(self):
         """Infinitely iterate the same value"""
@@ -284,7 +284,7 @@ class ArrayValue(BaseValue):
     def values(self):
         return self._values
 
-    def sample(self, index):
+    def sample(self, index=None):
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -299,7 +299,10 @@ class ArrayValue(BaseValue):
         value : SingleValue
             The single value corresponding to the index
         """
-        return SingleValue(self.values[index])
+        if index is None:
+            raise NineMLUsageError(
+                "Must provide an index in order to sample from a value array")
+        return SingleValue(self._values[index])
 
     @property
     def key(self):
@@ -550,7 +553,7 @@ class RandomDistributionValue(BaseValue):
         # FIXME: This should include a hash of the properties
         return self._distribution.name
 
-    def sample(self, index):  # @UnusedVariable
+    def sample(self, index=None):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself

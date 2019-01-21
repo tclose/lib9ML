@@ -10,7 +10,9 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
     nineml_attr = ('name', 'size',)
     nineml_child = {'dynamics_properties': DynamicsProperties}
 
-    suffix = {'pre': '__cell', 'post': '__cell', 'response': '__psr',
+    suffix = {'pre': '__cell',
+              'post': '__cell',
+              'response': '__psr',
               'plasticity': '__pls'}
 
     def __init__(self, name, size, dynamics_properties):

@@ -196,7 +196,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         connection_groups = []
         for projection in self.projections:
             for port_connection in projection.port_connections:
-                connection_groups.append(
+                connection_groups.extend(
                     BaseConnectionGroup.from_port_connection(port_connection,
                                                              projection,
                                                              comp_array_dict))

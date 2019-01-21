@@ -1,5 +1,6 @@
 import ninemlcatalog
 import math
+import random
 from nineml import units as un
 from nineml.user import Property as Property
 from nineml.implementation import Network, EventSink
@@ -14,13 +15,16 @@ if __name__ == '__main__':
 else:
     from unittest import TestCase
 
+LARGE_INT = 2 ** 31 - 1
+
 
 class TestNetwork(TestCase):
 
 #     @unittest.skip
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
-                    dt=0.01 * un.ms):
-        model = self._reduced_brunel_9ml(case, order)
+                    dt=0.01 * un.ms, random_seed=None):
+        random.seed(random_seed)
+        model = self._reduced_brunel_9ml(case, order, random_seed=random_seed)
         network = Network(model, start_t=0 * un.s)
         event_sinks = {}
         network.simulate(duration, dt=dt)
@@ -28,11 +32,14 @@ class TestNetwork(TestCase):
                          [])
         return event_sinks
 
-    def _reduced_brunel_9ml(self, case, order):
+    def _reduced_brunel_9ml(self, case, order, random_seed=None):
 
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         model = model.clone()
+        if random_seed is not None:
+            for projection in model.projections:
+                projection.connectivity.seed = random.randint(0, LARGE_INT)
         scale = order / model.population('Inh').size
         # rescale populations
         for pop in model.populations:
@@ -61,7 +68,8 @@ if __name__ == '__main__':
     print("Simulating {} model for {} with {} resolution".format(
         model, duration, dt))
     tester = TestNetwork()
-    sinks = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration,
-                                                     case=case, order=order)
+    test = getattr(tester, 'test_{}'.format(model))
+    sinks = test(dt=dt, duration=duration, case=case, order=order,
+                 random_seed=12345)
     for pop_sinks in sinks.values():
         EventSink.combined_plot(pop_sinks)

@@ -18,18 +18,19 @@ dt_symbol = 'dt_'
 
 class Dynamics(object):
 
-    def __init__(self, model, start_t, initial_state=None,
-                 initial_regime=None, component_class=None):
-        if component_class is None:
-            component_class = DynamicsClass(model.component_class)
-        self.component_class = component_class
-        self.defn = component_class.defn
+    def __init__(self, model, start_t, initial_state=None, array_index=None,
+                 initial_regime=None, dynamics_class=None):
+        if dynamics_class is None:
+            dynamics_class = DynamicsClass(model.dynamics_class)
+        self.dynamics_class = dynamics_class
+        self.defn = dynamics_class.defn
         # Initialise state information converting all quantities to SI units
         # for simplicity
-        self.properties = {p.name: float(p.quantity.in_si_units())
-                           for p in model.properties}
+        self.properties = {
+            p.name: float(p.quantity.in_si_units().sample(array_index))
+            for p in model.properties}
         # Ensure initial state is ordered by var names so it matches up with
-        # order in 'component_class.all_symbols'
+        # order in 'dynamics_class.all_symbols'
         self._state = OrderedDict()
         for sv_name in self.defn.state_variable_names:
             try:
@@ -41,10 +42,10 @@ class Dynamics(object):
                     raise NineMLUsageError(
                         "No initial value provided for '{}'"
                         .format(sv_name))
-            self._state[sv_name] = float(qty.in_si_units())
+            self._state[sv_name] = float(qty.in_si_units().sample(array_index))
         if initial_regime is None:
             initial_regime = model.initial_regime
-        self.regime = component_class.regimes[initial_regime]
+        self.regime = dynamics_class.regimes[initial_regime]
         # Time
         self._t = float(start_t.in_si_units())
         # Initialise ports
@@ -102,7 +103,7 @@ class Dynamics(object):
             try:
                 self.regime.update(self, stop_t, dt, progress_bar=progress_bar)
             except RegimeTransition as transition:
-                self.regime = self.component_class.regimes[transition.target]
+                self.regime = self.dynamics_class.regimes[transition.target]
         if progress_bar is not None:
             progress_bar.finish()
 
@@ -116,7 +117,7 @@ class Dynamics(object):
             (p.value(t) for p in chain(self.analog_receive_ports.values(),
                                        self.analog_reduce_ports.values())),
             self.properties.values(),
-            self.component_class.constants.values(),
+            self.dynamics_class.constants.values(),
             [t, dt]))
         return all_values
 
@@ -477,7 +478,7 @@ class AnalogSendPort(Port):
         self.buffer = deque()
         dynamics = self.parent
         # Get the expression that defines the value of the port
-        self.expr = dynamics.component_class.port_aliases[defn.name]
+        self.expr = dynamics.dynamics_class.port_aliases[defn.name]
 
     def value(self, t):
         """

@@ -1,4 +1,4 @@
-from builtins import zip
+from itertools import product
 from abc import ABCMeta, abstractmethod
 from . import BaseULObject
 from nineml.abstraction.connectionrule import (
@@ -97,52 +97,115 @@ class BaseConnectionGroup(
             port_conn.receive_port_name))
         if (port_conn.sender_role in ('response', 'plasticity') and
                 port_conn.receiver_role in ('response', 'plasticity')):
+            # This should be able to be dropped after move to merged synapse
+            # components in v2
             conn_props = ConnectionRuleProperties(
                 name=name + '_connectivity',
                 definition=one_to_one_connection_rule)
+            return [cls(
+                name,
+                component_arrays[projection.name +
+                                 ComponentArray.suffix[port_conn.sender_role]],
+                component_arrays[
+                    projection.name +
+                    ComponentArray.suffix[port_conn.receiver_role]],
+                source_port=port_conn.send_port_name,
+                destination_port=port_conn.receive_port_name,
+                connection_rule_properties=conn_props, delay=None)]
         else:
             if (port_conn.sender_role == 'pre' and
                     port_conn.receiver_role == 'post'):
-                source_inds, dest_inds = list(zip(*projection.connections()))
+                conns = projection.connections()
             elif (port_conn.sender_role == 'post' and
                   port_conn.receiver_role == 'pre'):
-                source_inds, dest_inds = list(zip(*(
-                    (d, s) for s, d in projection.connections())))
+                conns = [
+                    (d, s) for s, d in projection.connections()]
             elif port_conn.sender_role == 'pre':
-                source_inds, dest_inds = list(zip(*(
-                    (s, i) for i, (s, _) in enumerate(
-                        sorted(projection.connections())))))
+                conns = [
+                    (s, i) for i, (s, _) in enumerate(sorted(
+                        projection.connections()))]
             elif port_conn.receiver_role == 'post':
-                source_inds, dest_inds = list(zip(*(
-                    (i, d) for i, (_, d) in enumerate(
-                        sorted(projection.connections())))))
+                conns = [
+                    (i, d)
+                    for i, (_, d) in enumerate(sorted(
+                        projection.connections()))]
             else:
                 assert False
-            conn_props = ConnectionRuleProperties(
-                name=name + '_connectivity',
-                definition=explicit_connection_rule,
-                properties={'sourceIndices': source_inds,
-                            'destinationIndices': dest_inds})
-        # FIXME: This will need to change in version 2, when each connection
-        #        has its own delay
-        if port_conn.sender_role == 'pre':
-            delay = projection.delay
-        else:
-            delay = None
-        source = component_arrays[
-            (projection.pre.name
-             if port_conn.sender_role in ('pre', 'post')
-             else projection.name) +
-            ComponentArray.suffix[port_conn.sender_role]]
-        destination = component_arrays[
-            (projection.pre.name
-             if port_conn.receiver_role in ('pre', 'post')
-             else projection.name) +
-            ComponentArray.suffix[port_conn.receiver_role]]
-        return cls(name, source, destination,
-                   source_port=port_conn.send_port_name,
-                   destination_port=port_conn.receive_port_name,
-                   connection_rule_properties=conn_props, delay=delay)
+            # FIXME: This will need to change in version 2, when each connection
+            #        has its own delay
+            if port_conn.sender_role == 'pre':
+                delay = projection.delay
+            else:
+                delay = None
+            # Get source and destination component arrays
+            if port_conn.sender_role == 'pre':
+                source_pop = projection.pre
+            elif port_conn.sender_role == 'post':
+                source_pop = projection.post
+            else:
+                source_pop = projection  # The source comp-array is from syn.
+            if port_conn.receiver_role == 'pre':
+                dest_pop = projection.pre
+            elif port_conn.receiver_role == 'post':
+                dest_pop = projection.post
+            else:
+                dest_pop = projection
+            if source_pop.nineml_type == 'Selection':
+                sources = []
+                start_i = 0
+                for pop in source_pop.populations:
+                    end_i = start_i + len(pop)
+                    sources.append((pop, start_i, end_i))
+                    start_i = end_i
+            else:
+                sources = [(source_pop, 0, len(source_pop))]
+            if dest_pop.nineml_type == 'Selection':
+                destinations = []
+                start_i = 0
+                for pop in dest_pop.populations:
+                    end_i = start_i + pop.size
+                    destinations.append((pop, start_i, end_i))
+                    start_i = end_i
+            else:
+                destinations = [(dest_pop, 0, len(dest_pop))]
+            # Return separate connection groups between all combinations of
+            # source and destination populations/synapses
+            conn_groups = []
+            for i, ((source_pop, src_start, src_end),
+                    (dest_pop, dest_start, dest_end)) in enumerate(product(
+                        sources, destinations)):
+                # Get source and destination component arrays
+                source_array = component_arrays[
+                    source_pop.name +
+                    ComponentArray.suffix[port_conn.sender_role]]
+                dest_array = component_arrays[
+                    dest_pop.name +
+                    ComponentArray.suffix[port_conn.receiver_role]]
+                if len(sources) == 1 and len(destinations) == 1:
+                    # There is only one conn_group generated from this port
+                    # connection
+                    conn_group_name = name
+                    conn_group_conns = conns
+                else:
+                    conn_group_name = name + str(i)
+                    # Determine connections that are relevant for the arrays
+                    # in this connection group
+                    conn_group_conns = [
+                        (s - src_start, d - dest_start) for s, d in conns
+                        if (s >= src_start and s < src_end and
+                            d >= dest_start and d < dest_end)]
+                source_inds, dest_inds = zip(*conn_group_conns)
+                conn_props = ConnectionRuleProperties(
+                    name=conn_group_name + '_connectivity',
+                    definition=explicit_connection_rule,
+                    properties={'sourceIndices': source_inds,
+                                'destinationIndices': dest_inds})
+                conn_groups.append(
+                    cls(conn_group_name, source_array, dest_array,
+                        source_port=port_conn.send_port_name,
+                        destination_port=port_conn.receive_port_name,
+                        connection_rule_properties=conn_props, delay=delay))
+            return conn_groups
 
     @abstractmethod
     def _check_ports(self, source_port, destination_port):

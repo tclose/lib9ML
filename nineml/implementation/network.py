@@ -25,7 +25,8 @@ class Network(object):
             props = comp_array.dynamics_properties
             for i in range(comp_array.size):
                 self.graph.add_node((comp_array.name, i),
-                                    properties=props.sample(i))
+                                    properties=props,
+                                    array_index=i)
         # Add connections between components from connection groups
         for conn_group in connection_groups:
             delay_qty = conn_group.delay
@@ -33,16 +34,15 @@ class Network(object):
                 delays = repeat(0.0)
             else:
                 delays = (float(d) for d in delay_qty.in_si_units())
-            self.graph.add_edges_from(
-                ((conn_group.source.name, int(src_i)),
-                 (conn_group.destination.name, int(dest_i)),
-                 {'communicates': conn_group.communicates,
-                  'delay': delay,
-                  'src_port': conn_group.source_port,
-                  'dest_port': conn_group.destination_port})
-                for (src_i, dest_i), delay in zip(conn_group.connections,
-                                                  delays))
-        # Merge dynamics definitions for nodes connected with zero delay
+            for (src_i, dest_i), delay in zip(conn_group.connections, delays):
+                self.graph.add_edge(
+                    (conn_group.source.name, int(src_i)),
+                    (conn_group.destination.name, int(dest_i)),
+                    communicates=conn_group.communicates,
+                    delay=delay,
+                    src_port=conn_group.source_port,
+                    dest_port=conn_group.destination_port)
+        # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions
         self._merge_nodes_connected_without_delay()
         # Initialise all dynamics components in graph
@@ -52,7 +52,7 @@ class Network(object):
             node_data = self.graph.nodes[node]
             # Attempt to reuse DynamicsClass objects between Dynamics objects
             # to save reanalysing their equations
-            cc = node_data['properties'].component_class
+            cc = node_data['properties'].dynamics_class
             try:
                 dyn_class = dyn_class_cache[cc]
             except KeyError:
@@ -60,8 +60,9 @@ class Network(object):
                 dyn_class_cache[cc] = dyn_class
             # Create dynamics object
             node_data['dynamics'] = dynamics = Dynamics(
-                dyn_class,
-                node_data['properties'], start_t)
+                node_data['properties'], start_t,
+                array_index=node_data['array_index'],
+                dynamics_class=dyn_class)
             self.components.append(dynamics)
         # Make all connections between dynamics components
         self.min_delay = float('inf')
@@ -86,11 +87,19 @@ class Network(object):
             self._neighbours_to_merge(node, to_merge)
             if to_merge:
                 sub_graph = self.graph.subgraph(to_merge)
-                # Get node with highest degree in order to name the new
-                # merge multi-dynamics object
-                centre_node = max(sub_graph.degree(), key=itemgetter(1))[0]
+                # Get node with highest in-degree and lowest out-degree in the
+                # sub-graph to merge in order to name the new merge multi-
+                # dynamics object (likely to be the cell object, which is
+                # usually the most intuitive, but if not, no matter as it is
+                # just a name)
+                max_in_degree = max(sub_graph.in_degree(),
+                                    key=itemgetter(1))[1]
+                candidates = [n for n, d in sub_graph.in_degree()
+                              if d == max_in_degree]
+                main_node = min(sub_graph.out_degree(candidates),
+                                key=itemgetter(1))[0]
                 # Add new combined multi-dynamics node
-                multi_node = (centre_node[0] + '_multi', centre_node[1])
+                multi_node = (main_node[0] + '__merged', main_node[1])
                 self.graph.add_node(multi_node)
                 # Combine dynamics from all components to merge into a single
                 # multi-dynamics object
@@ -102,9 +111,12 @@ class Network(object):
                     # Get a uniuqe name for the sub-component based on the
                     # component array it comes from
                     comp_array_name = sub_comp_node[0]
-                    sub_comp_name = '{}{}'.format(
-                        comp_array_name, counters[comp_array_name])
-                    counters[comp_array_name] += 1
+                    if sub_comp_node == main_node:
+                        sub_comp_name = comp_array_name
+                    else:
+                        sub_comp_name = '{}{}'.format(
+                            comp_array_name, counters[comp_array_name])
+                        counters[comp_array_name] += 1
                     sub_comp_names[sub_comp_node] = sub_comp_name
                     # Add properties to list of components
                     sub_comp_props[sub_comp_name] = node_data['properties']
@@ -161,12 +173,12 @@ class Network(object):
                                     conn['src_port'])
                                 conn['src_port'] = exposure.name
                                 self.graph.add_edge(
-                                    pcessor,
                                     multi_node,
+                                    scessor,
                                     **conn)
                                 port_exposures.add(exposure)
-                multi_name = (sub_graph.nodes[centre_node]['properties'].name +
-                              '__multi')
+                multi_name = (sub_graph.nodes[main_node]['properties'].name +
+                              '__merged')
                 multi_props = MultiDynamicsProperties(
                     multi_name,
                     sub_components=sub_comp_props,
