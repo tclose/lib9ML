@@ -13,7 +13,8 @@ from nineml.utils import validate_identifier
 from .component_array import ComponentArray
 from .connection_group import BaseConnectionGroup
 from nineml.values import RandomDistributionValue
-from nineml.exceptions import NineMLRandomDistributionDelayException
+from nineml.exceptions import (NineMLRandomDistributionDelayException,
+                               NineMLUsageError)
 
 
 class Network(BaseULObject, DocumentLevelObject, ContainerObject):
@@ -163,10 +164,21 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     _conn_group_name_re = re.compile(
         r'(\w+)__(\w+)_(\w+)__(\w+)_(\w+)__connection_group')
 
-    def flatten(self):
+    def flatten(self, combine_cell_and_synapses=False,
+                merge_linear_synapses=False):
         """
         Flattens the populations and projections of the network into
         component arrays and connection groups (i.e. core 9ML objects)
+
+        Parameters
+        ----------
+        combine_cell_and_synapses : bool
+            Flag whether to combine a cell with the synapses connected to it
+            into a single multi-dynamics
+        merge_linear_synapses : bool
+            Flag whether to merge synapses with equivalent linear dynamics into
+            a single set of state variables (keeping separate transitions from
+            full model. Only valid if combine_cell_and_synapses is True.
 
         Returns
         -------
@@ -176,6 +188,10 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         connection_groups : list(ConnectionGroup)
             List of connection groups the projections have been flattened to
         """
+        if merge_linear_synapses and not combine_cell_and_synapses:
+            raise NineMLUsageError(
+                "'merge_linear_synapses' does not make sense without "
+                "'combine_cell_and_synapses' option")
         component_arrays = []
         for population in self.populations:
             component_arrays.append(ComponentArray(
