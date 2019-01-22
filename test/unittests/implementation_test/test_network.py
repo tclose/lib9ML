@@ -4,23 +4,31 @@ import random
 from nineml import units as un
 from nineml.user import Property as Property
 from nineml.implementation import Network, EventSink
-import unittest
 from nineml.exceptions import NineMLNameError
 if __name__ == '__main__':
+
     class TestCase(object):
 
         def assertEqual(self, *args, **kwargs):
             pass
 
+    def skip(reason):
+        """Dummy skip that just returns original function"""
+        def decorator(test):  # @UnusedVariable
+            return test
+#             def error_message(*args, **kwargs):
+#                 raise Exception(reason)
+
+
 else:
-    from unittest import TestCase
+    from unittest import TestCase, skip
 
 LARGE_INT = 2 ** 31 - 1
 
 
 class TestNetwork(TestCase):
 
-#     @unittest.skip
+    @skip("Network test isn't ready yet")
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms, random_seed=None):
         random.seed(random_seed)

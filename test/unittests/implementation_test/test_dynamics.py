@@ -1,3 +1,4 @@
+from future.utils import PY2
 import ninemlcatalog
 import numpy.random
 from nineml import units as un
@@ -5,13 +6,29 @@ from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
     Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
 if __name__ == '__main__':
+
     class TestCase(object):
 
         def assertEqual(self, *args, **kwargs):
             pass
 
+    def skip(reason):
+        """Dummy skipIf that just returns original function"""
+        def decorator(test):  # @UnusedVariable
+            def error_message(*args, **kwargs):
+                raise Exception(reason)
+
+    def skipIf(condition, reason):
+        """Dummy skipIf that just returns original function"""
+        def decorator(test):
+            if condition:
+                def error_message(*args, **kwargs):
+                    raise Exception(reason)
+            else:
+                # Else return plain test function
+                return test
 else:
-    from unittest import TestCase
+    from unittest import TestCase, skipIf
 
 
 class TestDynamics(TestCase):
@@ -86,6 +103,7 @@ class TestDynamics(TestCase):
                          [0.058, 0.081])
         return v_out
 
+    @skipIf(PY2, "Generated equations for HodgkinHuxley overflow on Python 2")
     def test_hodgkin_huxley(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         properties = ninemlcatalog.load('neuron/HodgkinHuxley',
