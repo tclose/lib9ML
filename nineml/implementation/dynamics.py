@@ -21,7 +21,7 @@ class Dynamics(object):
     def __init__(self, model, start_t, initial_state=None, array_index=None,
                  initial_regime=None, dynamics_class=None):
         if dynamics_class is None:
-            dynamics_class = DynamicsClass(model.dynamics_class)
+            dynamics_class = DynamicsClass(model.component_class)
         self.dynamics_class = dynamics_class
         self.defn = dynamics_class.defn
         # Initialise state information converting all quantities to SI units

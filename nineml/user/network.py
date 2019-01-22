@@ -192,30 +192,32 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
             raise NineMLUsageError(
                 "'merge_linear_synapses' does not make sense without "
                 "'combine_cell_and_synapses' option")
-        component_arrays = []
-        for population in self.populations:
-            component_arrays.append(ComponentArray(
-                population.name + ComponentArray.suffix['post'],
-                len(population),
-                population.cell))
-        for projection in self.projections:
-            component_arrays.append(ComponentArray(
-                projection.name + ComponentArray.suffix['response'],
-                len(projection),
-                projection.response))
-            if projection.plasticity is not None:
+        if combine_cell_and_synapses:
+            raise NotImplementedError
+        else:
+            component_arrays = []
+            for population in self.populations:
                 component_arrays.append(ComponentArray(
-                    projection.name + ComponentArray.suffix['plasticity'],
+                    population.name + ComponentArray.suffix['post'],
+                    len(population),
+                    population.cell))
+            for projection in self.projections:
+                component_arrays.append(ComponentArray(
+                    projection.name + ComponentArray.suffix['response'],
                     len(projection),
-                    projection.plasticity))
-        comp_array_dict = {c.name: c for c in component_arrays}
-        connection_groups = []
-        for projection in self.projections:
-            for port_connection in projection.port_connections:
-                connection_groups.extend(
-                    BaseConnectionGroup.from_port_connection(port_connection,
-                                                             projection,
-                                                             comp_array_dict))
+                    projection.response))
+                if projection.plasticity is not None:
+                    component_arrays.append(ComponentArray(
+                        projection.name + ComponentArray.suffix['plasticity'],
+                        len(projection),
+                        projection.plasticity))
+            comp_array_dict = {c.name: c for c in component_arrays}
+            connection_groups = []
+            for projection in self.projections:
+                for port_connection in projection.port_connections:
+                    connection_groups.extend(
+                        BaseConnectionGroup.from_port_connection(
+                            port_connection, projection, comp_array_dict))
         return component_arrays, connection_groups
 
     def scale(self, scale):
