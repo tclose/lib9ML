@@ -71,6 +71,14 @@ class Population(BaseULObject, DocumentLevelObject, DynamicPortsObject):
         """
         return iter([self.component_class])
 
+    @property
+    def populations(self):
+        """
+        Returns the population wrapped in an iterator for duck typing with
+        Selection objects
+        """
+        return iter([self])
+
     def all_components(self):
         """
         Return a list of all components used by the population.

@@ -1,5 +1,6 @@
 import re
 import math
+from collections import defaultdict
 from itertools import chain
 from .component import Property
 import nineml.units as un
@@ -164,7 +165,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     _conn_group_name_re = re.compile(
         r'(\w+)__(\w+)_(\w+)__(\w+)_(\w+)__connection_group')
 
-    def flatten(self, combine_cell_and_synapses=False,
+    def flatten(self, combine_cell_with_synapses=False,
                 merge_linear_synapses=False):
         """
         Flattens the populations and projections of the network into
@@ -182,43 +183,80 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
 
         Returns
         -------
-        component_arrays : list(ComponentArray)
+        comp_arrays : list(ComponentArray)
             List of component arrays the populations and projection synapses
             have been flattened to
-        connection_groups : list(ConnectionGroup)
+        conn_groups : list(ConnectionGroup)
             List of connection groups the projections have been flattened to
         """
-        if merge_linear_synapses and not combine_cell_and_synapses:
+        if merge_linear_synapses and not combine_cell_with_synapses:
             raise NineMLUsageError(
-                "'merge_linear_synapses' does not make sense without "
-                "'combine_cell_and_synapses' option")
-        if combine_cell_and_synapses:
-            raise NotImplementedError
+                "'merge_linear_synapses' does not make sense when "
+                "'combine_cell_and_synapses' is false")
+        if combine_cell_with_synapses:
+            # Get all incoming connections for each population, flattening out
+            # projections to/from selections
+            incoming = defaultdict(list)
+            for proj in self.projections:
+                conns = proj.connections()
+                start_i = end_i = 0
+                for pre_pop in proj.pre.populations:
+                    end_i += pre_pop.size
+                    start_j = end_j = 0
+                    for post_pop in proj.post.populations:
+                        end_j += post_pop.size
+                        incoming[post_pop.name].append(
+                            (proj, pre_pop,
+                             [(i - start_i, j - start_j) for i, j in conns
+                              if (i >= start_i and i < end_i and
+                                  j >= start_j and j < end_j)]))
+                        start_j = end_j
+                    start_i = end_i
+            comp_arrays = []
+            external_conns = []
+            for pop in self.populations:
+                sub_comps = [[pop.cell.sample(i)] for i in range(pop.size)]
+                internal_conns = [[] for i in range(pop.size)]
+                for proj, pre_pop, conns in incoming[pop.name]:
+                    # Add sub-components for each incoming connection
+                    for i, j in conns:
+                        k = i * proj.pre.size + j
+                        sub_comps[j].append(proj.response.sample(k))
+                        if proj.plasticity is not None:
+                            sub_comps[j].append(proj.plasticity.sample(k))
+                        for port_conn in proj.port_connections:
+                            if 'pre' not in (port_conn.sender_role,
+                                             port_conn.receiver_role):
+                                internal_conns[j].append(port_conn)
+                    for port_conn in proj.port_connections:
+                        if 'pre' in (port_conn.sender_role,
+                                     port_conn.receiver_role):
+                            external_conns.append((proj, port_conn, conns))
         else:
-            component_arrays = []
+            comp_arrays = []
             for population in self.populations:
-                component_arrays.append(ComponentArray(
+                comp_arrays.append(ComponentArray(
                     population.name + ComponentArray.suffix['post'],
                     len(population),
                     population.cell))
             for projection in self.projections:
-                component_arrays.append(ComponentArray(
+                comp_arrays.append(ComponentArray(
                     projection.name + ComponentArray.suffix['response'],
                     len(projection),
                     projection.response))
                 if projection.plasticity is not None:
-                    component_arrays.append(ComponentArray(
+                    comp_arrays.append(ComponentArray(
                         projection.name + ComponentArray.suffix['plasticity'],
                         len(projection),
                         projection.plasticity))
-            comp_array_dict = {c.name: c for c in component_arrays}
-            connection_groups = []
+            comp_array_dict = {c.name: c for c in comp_arrays}
+            conn_groups = []
             for projection in self.projections:
                 for port_connection in projection.port_connections:
-                    connection_groups.extend(
+                    conn_groups.extend(
                         BaseConnectionGroup.from_port_connection(
                             port_connection, projection, comp_array_dict))
-        return component_arrays, connection_groups
+        return comp_arrays, conn_groups
 
     def scale(self, scale):
         """

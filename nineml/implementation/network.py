@@ -17,7 +17,7 @@ class Network(object):
 
     def __init__(self, model, start_t):
         component_arrays, connection_groups = model.flatten(
-            combine_cell_and_synapses=True, merge_linear_synapses=True)
+            combine_cell_with_synapses=True, merge_linear_synapses=True)
         # Initialise a graph to represent the network
         self.graph = nx.MultiDiGraph()
         # Add nodes (2-tuples consisting of <component-array-name> and
