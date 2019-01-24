@@ -86,6 +86,9 @@ class Property(BaseULObject):
                     self.name, qty, qty.units.dimension, self.units.dimension))
         self._quantity = qty
 
+    def sample(self, index=None):
+        return type(self)(self.name, self.quantity.sample(index))
+
     @property
     def value(self):
         return self.quantity.value
@@ -161,7 +164,8 @@ class Component(with_metaclass(
 
     # initial_values is temporary, the idea longer-term is to use a separate
     # library such as SEDML
-    def __init__(self, name, definition, properties=()):
+    def __init__(self, name, definition, properties=(),
+                 check_properties=True):
         """
         Create a new component_class with the given name, definition and
         properties, or create a prototype to another component_class that will
@@ -199,7 +203,8 @@ class Component(with_metaclass(
             properties = (Property(name, qty)
                           for name, qty in properties.items())
         self.add(*properties)
-        self.check_properties()
+        if check_properties:
+            self.check_properties()
 
     @property
     def name(self):
@@ -238,6 +243,14 @@ class Component(with_metaclass(
         while isinstance(defn, Prototype):
             defn = defn.component.definition
         return defn.component_class
+
+    def sample(self, index=None, new_name=None):
+        if new_name is None:
+            name = self.name
+        else:
+            name = new_name
+        return type(self)(name, self.definition,
+                          [p.sample(index) for p in self.properties])
 
     def is_base_component(self):
         return isinstance(self.definition, Prototype)

@@ -60,6 +60,17 @@ class DynamicsProperties(Component, DynamicPortsObject):
         """
         return iter([self.component_class])
 
+    def sample(self, index=None, new_name=None):
+        if new_name is None:
+            name = self.name
+        else:
+            name = new_name
+        return type(self)(name, self.definition,
+                          [p.sample(index) for p in self.properties],
+                          [v.sample(index) for v in self.initial_values],
+                          initial_regime=self.initial_regime,
+                          check_initial_values=False)
+
     def flatten(self, name=None):
         return self.clone(name=name, clone_definitions=True)
 
