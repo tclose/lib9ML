@@ -282,7 +282,7 @@ class Regime(BaseALObject, ContainerObject):
             not checked for linearity (presumably as they are not connected).
             If outputs is None all expressions are checked.
         """
-        return visitors.queriers.DynamicsIsLinear(
+        return visitors.queriers.DynamicsAreLinear(
             check_state_assignments=False).is_linear(
                 self.parent, regime_name=self.name)
 

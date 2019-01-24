@@ -9,6 +9,7 @@ from pprint import pprint
 from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
     BasePortExposure)
+from nineml.abstraction.dynamics.visitors.queriers import DynamicsAreLinear
 from .dynamics import Dynamics, DynamicsClass
 from .utils import create_progress_bar
 
@@ -69,36 +70,31 @@ class Network(object):
         # Initialise all dynamics components in graph
         dyn_class_cache = {}  # Cache for storing previously analysed classes
         self.components = []
-        for node in self.graph.nodes():
-            node_data = self.graph.nodes[node]
+        for node, data in self.graph.nodes(data=True):
             # Attempt to reuse DynamicsClass objects between Dynamics objects
             # to save reanalysing their equations
-            cc = node_data['properties'].dynamics_class
+            cc = data['properties'].dynamics_class
             try:
                 dyn_class = dyn_class_cache[cc]
             except KeyError:
-                dyn_class = DynamicsClass(cc)
-                dyn_class_cache[cc] = dyn_class
+                dyn_class_cache[cc] = dyn_class = DynamicsClass(cc)
             # Create dynamics object
-            node_data['dynamics'] = dynamics = Dynamics(
-                node_data['properties'], start_t,
-                array_index=node_data['array_index'],
+            data['dynamics'] = dynamics = Dynamics(
+                data['properties'], start_t, array_index=data['array_index'],
                 dynamics_class=dyn_class)
             self.components.append(dynamics)
         # Make all connections between dynamics components
         self.min_delay = float('inf')
-        for node in self.graph.nodes():
-            from_dyn = self.graph.nodes[node]['dynamics']
-            for successor in self.graph.successors(node):
-                to_dyn = self.graph.nodes[successor]['dynamics']
-                for conn_data in self.graph.get_edge_data(successor):
-                    delay = conn_data['delay']
-                    from_dyn.ports[conn_data['src_port']].connect_to(
-                        to_dyn.analog_receive_ports[
-                            conn_data['dest_port']],
-                        delay=delay)
-                    if delay < self.min_delay:
-                        self.min_delay = delay
+        for u, v, conns in self.graph.out_edges(data=True):
+            from_dyn = self.graph.nodes[u]['dynamics']
+            to_dyn = self.graph.nodes[v]['dynamics']
+            for conn in conns.values():
+                delay = conn['delay']
+                from_dyn.ports[conn['src_port']].connect_to(
+                    to_dyn.analog_receive_ports[conn['dest_port']],
+                    delay=delay)
+                if delay < self.min_delay:
+                    self.min_delay = delay
 
     def simulate(self, stop_t, dt, progress_bar=True):
         stop_t = float(stop_t.in_units(un.s))
@@ -189,8 +185,24 @@ class Network(object):
                 port_exposures.add(exposure)
                 conn['dest_port'] = exposure.name
                 self.graph.add_edge(u, multi_node, **conn)
+        # Remove merged nodes and their edges
+        self.graph.remove_nodes_from(sub_graph)
+        # Attempt to combine sub-components with equivalent linear dynamics in
+        # order to reduce the number of state-variables in the multi-dynamics
         if combine_linear:
-            raise NotImplementedError
+            for comp_class, nodes in sub_components.items():
+                query = DynamicsAreLinear(comp_class)
+                matching_td_props = defaultdict(list)
+                if query.linear:
+                    # Sort components into matching properties used in ODES
+                    for node in nodes:
+                        props = node['properties']
+                        td_props = frozenset(
+                            props[p] for p in query.time_derivative_parameters)
+                        matching_td_props[td_props].append(props)
+                for td_props, matches in matching_td_props.items():
+                    if len(matches) > 1:
+                        pass
         # Create multi-dynamics object and set it as the properties object of
         # the new multi node
         multi_dyn_props = MultiDynamicsProperties(
@@ -200,5 +212,3 @@ class Network(object):
             port_connections=port_connections,
             port_exposures=port_exposures)
         self.graph.nodes[multi_node]['properties'] = multi_dyn_props
-        # Remove merged nodes
-        self.graph.remove_nodes_from(sub_graph)

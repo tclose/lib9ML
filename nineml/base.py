@@ -463,8 +463,22 @@ class ContainerObject(BaseNineMLObject):
             setattr(self, children_type._children_dict_name(), OrderedDict())
 
         self._parent = None  # Used to link up the the containing document
+        # Despite being mutable container objects can be hashed. However, after
+        # a container object has been hashed it can no longer have elements
+        # added or removed from it
+        self._hash = None
+
+    def __hash__(self):
+        if self._hash is None:
+            self._hash = super(ContainerObject, self).__hash__()
+        return self._hash
 
     def add(self, *elements):
+        if self._hash is not None:
+            raise NineMLUsageError(
+                "Cannot add elements to {} as it has already been hashed ("
+                "which occurs when an element is added to a set or used as "
+                "a key in a dictionary)".format(self))
         add_to_doc_visitor = nineml.document.AddToDocumentVisitor(
             self.document)
         for element in elements:
@@ -483,6 +497,11 @@ class ContainerObject(BaseNineMLObject):
                 add_to_doc_visitor.visit(element)
 
     def remove(self, *elements):
+        if self._hash is not None:
+            raise NineMLUsageError(
+                "Cannot remove elements from {} as it has already been hashed "
+                "(which occurs when an element is added to a set or used as "
+                "a key in a dictionary)".format(self))
         for element in elements:
             dct = self._member_dict(element)
             try:

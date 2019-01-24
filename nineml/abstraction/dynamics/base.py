@@ -235,7 +235,8 @@ class Dynamics(ComponentClass, DynamicPortsObject):
     def is_random(self):
         return DynamicsHasRandomProcess(self).found
 
-    def is_linear(self, outputs=None):
+    def is_linear(self, outputs=None, regime_name=None,
+                  check_state_assignments=True):
         """
         Queries whether time derivative and analog send port expressions in the
         Dynamics class is linear w.r.t. inputs and states. I.e. don't contain
@@ -249,8 +250,15 @@ class Dynamics(ComponentClass, DynamicPortsObject):
             that only mapped to analog send ports that aren't in the list are
             not checked for linearity (presumably as they are not connected).
             If outputs is None all expressions are checked.
+        regime_name : str | None
+            The regime to check for linearity. If None then if there is more
+            than one regime is_linear is false
+        check_state_assignments : bool
+            Whether to check state assignments for linearity
         """
-        return DynamicsIsLinear().is_linear(self, outputs=outputs)
+        return DynamicsAreLinear(
+            self, outputs=outputs, regime_name=regime_name,
+            check_state_assignments=check_state_assignments).linear
 
     def is_flat(self):
         return True
@@ -531,7 +539,7 @@ from .visitors.queriers import (DynamicsRequiredDefinitions,  # @IgnorePep8
                                 DynamicsExpressionExtractor,
                                 DynamicsDimensionResolver,
                                 DynamicsHasRandomProcess,
-                                DynamicsIsLinear,
+                                DynamicsAreLinear,
                                 DynamicsInterfaceInferer)
 from .visitors.modifiers import (  # @IgnorePep8
     DynamicsRenameSymbol, DynamicsSubstituteAliases)

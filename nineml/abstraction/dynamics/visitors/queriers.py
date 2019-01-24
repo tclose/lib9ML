@@ -117,7 +117,7 @@ class DynamicsHasRandomProcess(BaseDynamicsVisitor):
         pass
 
 
-class DynamicsIsLinear(BaseDynamicsVisitor):
+class DynamicsAreLinear(BaseDynamicsVisitor):
     """
     Checks to see whether the dynamics class is linear or nonlinear
 
@@ -137,10 +137,10 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
         Flags whether to check if state assignments are linear
     """
 
-    def __init__(self, check_state_assignments=True):
+    def __init__(self, dynamics, outputs=None, regime_name=None,
+                 check_state_assignments=True):
         self._check_state_assignments = check_state_assignments
-
-    def is_linear(self, dynamics, outputs=None, regime_name=None):
+        self.dynamics = dynamics
         self.outputs = (set(dynamics.analog_send_port_names)
                         if outputs is None else outputs)
         substituted = dynamics.flatten()
@@ -152,13 +152,13 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
                 substituted.analog_reduce_port_names)]
         if regime_name is not None:
             substituted = substituted.regime(regime_name)
+        self.time_derivative_parameters = set()
         try:
             self.visit(substituted)
         except NineMLStopVisitException:
-            linear = False
+            self.linear = False
         else:
-            linear = True
-        return linear
+            self.linear = True
 
     def action_dynamics(self, dynamics, **kwargs):  # @UnusedVariable
         # Dynamics are piecewise
@@ -176,6 +176,9 @@ class DynamicsIsLinear(BaseDynamicsVisitor):
 
     def action_timederivative(self, time_derivative, **kwargs):  # @UnusedVariable @IgnorePep8
         self._check_linear(time_derivative)
+        symbols = [str(s) for s in time_derivative.rhs_symbols]
+        self.time_derivative_parameters.update(
+            p for p in self.dynamics.parameter_names if p in symbols)
 
     def action_alias(self, alias, **kwargs):  # @UnusedVariable @IgnorePep8
         if alias.name in self.outputs:

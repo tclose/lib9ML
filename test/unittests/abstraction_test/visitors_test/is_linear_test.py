@@ -6,7 +6,7 @@ from nineml.abstraction import (
 from nineml import units as un
 
 
-class DynamicsIsLinearTest(unittest.TestCase):
+class DynamicsAreLinearTest(unittest.TestCase):
 
     def test_basic_linear(self):
         """A basic linear dynamics example"""
