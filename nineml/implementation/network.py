@@ -202,7 +202,19 @@ class Network(object):
                         matching_td_props[td_props].append(props)
                 for td_props, matches in matching_td_props.items():
                     if len(matches) > 1:
-                        pass
+                        assert comp_class.num_regimes == 1
+                        # Split time-derivatives and transitions in (sole)
+                        # regime into separate dynamics classes
+                        state_dyn = comp_class.clone(
+                            name=comp_class.name + '__state')
+                        trans_dyn = comp_class.clone(
+                            name=comp_class.name + '__trans')
+                        state_regime = next(state_dyn.regimes)
+                        trans_regime = next(trans_dyn.regimes)
+                        for trans in list(state_regime.transitions):
+                            state_regime.remove(trans)
+                        for td in list(trans_regime.time_derivatives):
+                            trans_regime.remove(td)
         # Create multi-dynamics object and set it as the properties object of
         # the new multi node
         multi_dyn_props = MultiDynamicsProperties(
