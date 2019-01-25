@@ -4,7 +4,7 @@ This file contains utility classes for modifying components.
 :copyright: Copyright 2010-2017 by the NineML Python team, see AUTHORS.
 :license: BSD-3, see LICENSE for details.
 """
-
+from collections import defaultdict
 import sympy
 from .base import BaseDynamicsVisitor
 from ...componentclass.visitors.modifiers import (
@@ -120,3 +120,25 @@ class DynamicsSubstituteAliases(ComponentSubstituteAliases,
 
     def post_action_regime(self, regime, results, **kwargs):  # @UnusedVariable
         self.remove_uneeded_aliases(regime)
+
+
+class DynamicsMergeLinearSubComponents(BaseDynamicsVisitor):
+    """
+    Attempts to combine sub-components with equivalent linear dynamics in
+    order to reduce the number of state-variables in the multi-dynamics
+    """
+
+    def __init__(self, multi_dynamics, multi_properties=None):
+        self.multi_dynamics = self.multi_dynamics
+        # Flatten multi dynamics so we can remove unrequired states + dynamics
+        self.merged = multi_dynamics.flatten()
+
+    def _group_properties(self, multi_properties):
+        for comp in multi_properties.sub_components:
+            matching_td_props = defaultdict(list)
+            # Sort components into matching properties used in ODES
+            for node in nodes:
+                props = node['properties']
+                td_props = frozenset(
+                    props[p] for p in self.time_derivative_parameters)
+                matching_td_props[td_props].append(props)

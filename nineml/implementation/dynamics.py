@@ -35,9 +35,9 @@ class Dynamics(object):
         for sv_name in self.defn.state_variable_names:
             try:
                 qty = initial_state[sv_name]
-            except KeyError:
+            except (TypeError, KeyError):
                 try:
-                    qty = model.initial_value(sv_name)
+                    qty = model.initial_value(sv_name).quantity
                 except NineMLNameError:
                     raise NineMLUsageError(
                         "No initial value provided for '{}'"
@@ -643,8 +643,7 @@ class LinearRegime(Regime):
 
             solution = sp.solve_linear_system(self.coeffs.row_join(constants),
                                               *active_vars)
-            if solution is None or sorted(solution.keys(),
-                                          key=lambda x: str(x)) != active_vars:
+            if solution is None or set(solution.keys()) != set(active_vars):
                 raise SolverNotValidForRegimeException
 
             b = sp.ImmutableMatrix([solution[s] for s in active_vars])

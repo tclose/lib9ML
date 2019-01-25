@@ -568,7 +568,12 @@ class RandomDistributionValue(BaseValue):
         value : SingleValue
             The single value corresponding to the index
         """
-        return SingleValue(next(self._generator()))
+        if self._generator is None:
+            # Uses builtin numpy functions
+            value = self.distribution.sample()
+        else:
+            next(self._generator())
+        return SingleValue(value)
 
     def is_random(self):
         return True
@@ -581,11 +586,7 @@ class RandomDistributionValue(BaseValue):
         return 0
 
     def __iter__(self):
-        if self._generator is None:
-            raise NineMLUsageError(
-                "Generator not set for RandomDistributionValue '{}'"
-                .format(self))
-        yield self._generator()
+        yield self.sample()
 
     def set_generator(self, generator_cls):
         """

@@ -5,6 +5,8 @@ from nineml import units as un
 from nineml.user import Property as Property
 from nineml.implementation import Network, EventSink
 from nineml.exceptions import NineMLNameError
+
+
 if __name__ == '__main__':
 
     class TestCase(object):
@@ -16,8 +18,7 @@ if __name__ == '__main__':
         """Dummy skip that just returns original function"""
         def decorator(test):  # @UnusedVariable
             return test
-#             def error_message(*args, **kwargs):
-#                 raise Exception(reason)
+        return decorator
 
 
 else:

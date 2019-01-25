@@ -14,7 +14,7 @@ from nineml.annotations import PY9ML_NS
 from nineml.utils.iterables import unique_by_id
 # from nineml.abstraction.dynamics.visitors.cloner import DynamicsCloner
 from nineml.exceptions import (
-    NineMLUsageError, NineMLNameError, name_error, NineMLUsageError)
+    NineMLNameError, name_error, NineMLUsageError)
 from ..port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
 from nineml.abstraction import BaseALObject
@@ -278,6 +278,7 @@ class MultiDynamics(Dynamics):
                  event_receive_port_exposures=None,
                  analog_receive_port_exposures=None,
                  analog_reduce_port_exposures=None,
+                 validate=True,
                  validate_dimensions=True,
                  **kwargs):
         self._name = validate_identifier(name)
@@ -339,7 +340,8 @@ class MultiDynamics(Dynamics):
 
         self.annotations.set((VALIDATION, PY9ML_NS), DIMENSIONALITY,
                              validate_dimensions)
-        self.validate(**kwargs)
+        if validate:
+            self.validate(validate_dimensions=validate_dimensions, **kwargs)
 
     def __getitem__(self, comp_name):
         return self._sub_components[comp_name]
@@ -1157,7 +1159,7 @@ class MultiDynamicsProperties(DynamicsProperties):
 
     def __init__(self, name, sub_components, port_connections=[],
                  port_exposures=[], check_initial_values=False,
-                 definition=None):
+                 definition=None, **kwargs):
         self._name = validate_identifier(name)
         # Initiate inherited base classes
         BaseULObject.__init__(self)
@@ -1175,7 +1177,7 @@ class MultiDynamicsProperties(DynamicsProperties):
             # This is just until the user layer is split into structure and
             # property layers
             self._definition = self._extract_definition(
-                sub_components, port_exposures, port_connections)
+                sub_components, port_exposures, port_connections, **kwargs)
         else:
             self._definition = definition
         # Check for property/parameter matches
@@ -1184,7 +1186,7 @@ class MultiDynamicsProperties(DynamicsProperties):
             self.check_initial_values()
 
     def _extract_definition(self, sub_components, port_exposures,
-                            port_connections):
+                            port_connections, **kwargs):
         sub_dynamics = [
             SubDynamics(sc.name, sc.component.component_class)
             for sc in sub_components]
@@ -1193,7 +1195,7 @@ class MultiDynamicsProperties(DynamicsProperties):
             self.name + '_dynamics', sub_dynamics,
             port_exposures=port_exposures,
             port_connections=port_connections,
-            document=self.document))
+            document=self.document, **kwargs))
 
     def flatten(self, name=None):
         if name is None:
