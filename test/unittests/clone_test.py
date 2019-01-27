@@ -1,7 +1,7 @@
 from __future__ import print_function
 import unittest
 from nineml.abstraction import Dynamics, ConnectionRule, RandomDistribution
-from nineml.utils.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import instances_of_all_types
 from nineml.visitors.cloner import Cloner
 from nineml.units import Unit, Dimension
 

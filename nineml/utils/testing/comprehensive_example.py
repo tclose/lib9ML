@@ -499,7 +499,7 @@ netA = Network(
 
 netB = Network(
     name='netB',
-    populations=[popC, popD],
+    populations=[popC, popD, popE],
     projections=[projB])
 
 netC = Network(

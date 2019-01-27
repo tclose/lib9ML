@@ -169,6 +169,9 @@ class Hasher(BaseVisitor):
             self._hash ^= (attr_hash + self.seed + (self._hash << 6) +
                            (self._hash >> 2))
 
+    def action_nineml(self, doc, nineml_cls, **kwargs):  # @UnusedVariable
+        self._hash_attr(doc.url)
+
     def action_reference(self, ref, nineml_cls, **kwargs):  # @UnusedVariable @IgnorePep8
         self._hash_attr(ref.url)
 
@@ -185,7 +188,7 @@ class Hasher(BaseVisitor):
     def _hash_rhs(self, rhs, **kwargs):  # @UnusedVariable
         try:
             rhs = sympy.expand(rhs)
-        except:
+        except AttributeError:
             pass
         self._hash_attr(rhs)
 

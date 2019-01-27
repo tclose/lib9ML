@@ -5,10 +5,15 @@ This file contains utility classes for modifying components.
 :license: BSD-3, see LICENSE for details.
 """
 from collections import defaultdict
+from itertools import chain
 import sympy
 from .base import BaseDynamicsVisitor
+from ..transitions import StateAssignment
+from ...expressions.named import Alias
+from nineml.visitors.base import BaseVisitorWithContext
 from ...componentclass.visitors.modifiers import (
     ComponentRenameSymbol, ComponentSubstituteAliases)
+from nineml.exceptions import NineMLNameError
 
 
 class DynamicsRenameSymbol(ComponentRenameSymbol,
@@ -122,23 +127,122 @@ class DynamicsSubstituteAliases(ComponentSubstituteAliases,
         self.remove_uneeded_aliases(regime)
 
 
-class DynamicsMergeLinearSubComponents(BaseDynamicsVisitor):
+class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
+                                               BaseDynamicsVisitor):
     """
-    Attempts to combine sub-components with equivalent linear dynamics in
-    order to reduce the number of state-variables in the multi-dynamics
+    Attempts to combine the states of linear sub-components of the same class
+    (typically synapses) in order to reduce the number of state-variables in
+    the multi-dynamics class (and hence speed up the simulation).
+
+    Parameters
+    ----------
+    multi_properties : MultiDynamicsProperties
+        A multi-dynamics properties (which references a multi-dynamics class)
+        which is to have linear sub-components merged where possible given
+        matching dynamics and consistent parameters between sub-components
+    validate : bool
+        Whether to validate the merged dynamics or not (i.e. whether you trust
+        the algorithm works), probably a good idea during prototyping phase
+        but can slow the construction down significantly.
     """
 
-    def __init__(self, multi_dynamics, multi_properties=None):
-        self.multi_dynamics = self.multi_dynamics
-        # Flatten multi dynamics so we can remove unrequired states + dynamics
-        self.merged = multi_dynamics.flatten()
+    def __init__(self, multi_properties, validate=True):
+        self.multi_dynamics = multi_properties.component_class
 
-    def _group_properties(self, multi_properties):
-        for comp in multi_properties.sub_components:
+        # Sort sub-components into matching definitions and parameters used
+        # in their time-derivatives
+        candidates = defaultdict(list)
+        for comp in self.multi_properties.sub_components:
+            if comp.is_linear():
+                candidates[comp.component_class].append(comp)
+
+        # Used to hold mappings from state-variable and parameter names from
+        # expanded original class to merged class
+        self.state_var_map = {}
+        self.param_map = {}
+
+        # Group sub-components by component class
+        for comp_class, comps in candidates.items():
+            if len(comps) == 1:
+                continue  # Skip as this is the only sub-comp of this class
+            assert comp_class.num_regimes == 1
+            regime = next(comp_class.regimes)
+            param_symbols = set(sympy.Symbol(s)
+                                for s in comp_class.parameter_names)
+            td_params = sorted(
+                str(s) for s in chain(td.rhs_symbols
+                                      for td in regime.time_derivatives)
+                if s in param_symbols)
+
+            # Group properties into groups with matching values for parameters
+            # used in the state equations
             matching_td_props = defaultdict(list)
-            # Sort components into matching properties used in ODES
-            for node in nodes:
-                props = node['properties']
+            for props in multi_properties.sub_components:
                 td_props = frozenset(
-                    props[p] for p in self.time_derivative_parameters)
+                    props[p] for p in td_params)
                 matching_td_props[td_props].append(props)
+
+            for td_props, matching in matching_td_props.items():
+                if len(matching) == 1:
+                    continue  # Skip as no other sub-comp properties match
+                ref = matching[0]
+                for match in matching[1:]:
+                    for param in td_params:
+                        self.param_map[
+                            match.namespace(param)] = ref.namespace(param)
+                    for state_var in comp_class.state_variable_names:
+                        self.state_var_map[
+                            match.namespace(state_var)] = ref.namespace(
+                                state_var)
+
+        # Flatten multi dynamics so we can map and remove unrequired states +
+        # dynamics
+        self.merged = multi_properties.flatten()
+        self.merged_class = self.merged
+
+        # Because we are iterating through child elements we can't remove and
+        # add children as we go. So we save the objects to add and remove in
+        # these lists along as the contexts they (are to) belong to
+        self.to_remove = []
+        self.to_add = []
+
+        self.visit(self.merged_class)
+
+        # Add and remove new and old children as required
+        for obj, context in self.to_remove:
+            context.remove(obj)
+        for obj, context in self.to_add:
+            context.add(obj)
+
+        if validate:
+            self.merged_class.validate()
+
+        # Removed merged properties and initial state values from merged
+        # multiproperties
+        for state_var in self.state_var_map:
+            try:
+                self.merged.remove(self.merged.initial_value(state_var))
+            except NineMLNameError:
+                pass  # Initial value not provided
+        for param in self.param_map:
+            self.merged.remove(self.merged.property(param))
+
+    def default_action(self, obj, nineml_cls, **kwargs):  # @UnusedVariable
+        pass
+
+    def action_timederivative(self, time_derivative, **kwargs):  # @UnusedVariable @IgnorePep8
+        if time_derivative.variable in self.state_var_map:
+            self.to_remove.append((time_derivative, self.context))
+
+    def action_stateassignment(self, state_assignment, **kwargs):  # @UnusedVariable @IgnorePep8
+        if state_assignment.variable in self.state_var_map:
+            self.to_remove.append((state_assignment, self.context))
+            self.to_add.append(StateAssignment(
+                self.state_var_map[state_assignment.variable],
+                state_assignment.rhs))
+
+    def action_statevariable(self, state_variable, **kwargs):  # @UnusedVariable @IgnorePep8
+        if state_variable.name in self.state_var_map:
+            self.to_remove((state_variable, self.context))
+            self.to_add((Alias(state_variable.name,
+                               self.state_var_map[state_variable.name])))

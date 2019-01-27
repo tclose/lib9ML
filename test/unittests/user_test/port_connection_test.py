@@ -3,7 +3,7 @@ import unittest
 from nineml import Document
 from nineml.user.port_connections import (AnalogPortConnection,
                                           EventPortConnection)
-from nineml.utils.comprehensive_example import projD
+from nineml.utils.testing.comprehensive_example import projD
 from nineml import units as un
 from nineml.abstraction.ports import (
     EventSendPort, EventReceivePort, AnalogSendPort, AnalogReceivePort,

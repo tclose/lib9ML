@@ -14,6 +14,16 @@ from .utils import create_progress_bar
 
 
 class Network(object):
+    """
+    An implementation of Network model in pure python
+
+    Parameters
+    ----------
+    model : nineml.user.Network
+        The model of the network described in 9ML
+    start_t : Quantity(time)
+        The starting time of the simulation
+    """
 
     def __init__(self, model, start_t):
         component_arrays, connection_groups = model.flatten()
@@ -47,9 +57,9 @@ class Network(object):
         for node in list(self.graph.nodes):
             if node not in self.graph:
                 continue  # If node has already been merged
-            conn_without_delay = self._get_connected_without_delay(node)
+            conn_without_delay = self.sub_graph_connected_without_delay(node)
             if conn_without_delay:
-                self._merge_sub_graph(self.graph.subgraph(conn_without_delay))
+                self.merge_nodes(conn_without_delay)
         # Initialise all dynamics components in graph
         dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
@@ -92,7 +102,19 @@ class Network(object):
         if progress_bar is not None:
             progress_bar.finish()
 
-    def _get_connected_without_delay(self, start_node, connected=None):
+    def sub_graph_connected_without_delay(self, start_node, connected=None):
+        """
+        Returns the sub-graph of nodes connected to the current node by
+        (potentially multiple) delayless connections
+
+        Parameters
+        ----------
+        start_node : tuple(str, int)
+            The starting node to check for delayless connected neighbours from
+        connected : set(tuple(str, int))
+            The set eventually returned by the method, passed as a arg to
+            recursive calls of this method
+        """
         if connected is None:
             connected = set()
         # Iterate all in-coming and out-going edges and check for
@@ -108,7 +130,7 @@ class Network(object):
                 self._get_connected_without_delay(neigh, connected=connected)
         return connected
 
-    def _merge_sub_graph(self, sub_graph):
+    def merge_nodes(self, nodes):
         """
         Merges a sub-graph of nodes into a single node represented by a
         multi-dynamics object. Used to merge nodes that are connected without
@@ -116,9 +138,10 @@ class Network(object):
 
         Parameters
         ----------
-        sub_graph : nx.MultiDiGraph
-            A sub-graph of self.graph that is to be merged
+        nodes : iterable(2-tuple(str, int))
+            The indices of the nodes to merge into a single sub-component
         """
+        sub_graph = self.graph.subgraph(nodes)
         # Create name for new combined multi-dynamics node from node
         # with the higest degree
         central_node = max(self.graph.degree(sub_graph.nodes),
@@ -193,5 +216,9 @@ class Network(object):
             validate=False)
         # Remove merged nodes and their edges
         self.graph.remove_nodes_from(sub_graph)
+        # Attempt to merge linear sub-components to limit the number of
+        # states
+        multi_props = multi_props.merge_states_of_linear_sub_components(
+            validate=True)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = multi_props

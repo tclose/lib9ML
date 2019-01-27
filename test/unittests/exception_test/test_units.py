@@ -1,7 +1,7 @@
 from builtins import next
 import unittest
 from nineml.units import (Dimension, Unit, Quantity)
-from nineml.utils.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import instances_of_all_types
 from nineml.exceptions import (NineMLDimensionError, NineMLNameError,
                                NineMLUsageError)
 import nineml.units as un

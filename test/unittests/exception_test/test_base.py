@@ -1,5 +1,5 @@
 import unittest
-from nineml.utils.comprehensive_example import dynA
+from nineml.utils.testing.comprehensive_example import dynA
 from nineml.exceptions import (
     NineMLNameError, NineMLUsageError)
 from nineml.abstraction import Parameter

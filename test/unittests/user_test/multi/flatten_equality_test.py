@@ -1,6 +1,6 @@
 import unittest
 from nineml.user.multi import MultiDynamics
-from nineml.utils.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import instances_of_all_types
 
 
 class TestFlattenEquality(unittest.TestCase):

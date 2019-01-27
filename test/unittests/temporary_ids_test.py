@@ -3,7 +3,7 @@ import numpy as np
 from nineml.visitors.base import BaseVisitorWithContext
 from nineml.abstraction.dynamics import Dynamics
 from nineml.user.multi import MultiDynamics
-from nineml.utils.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import instances_of_all_types
 from nineml.exceptions import NineMLUsageError
 
 

@@ -2,7 +2,7 @@ from __future__ import print_function
 from builtins import zip
 from collections import OrderedDict
 import unittest
-from nineml.utils.comprehensive_example import (
+from nineml.utils.testing.comprehensive_example import (
     all_types, instances_of_all_types)
 from nineml.abstraction.ports import SendPortBase
 from nineml.base import pluralise
@@ -316,3 +316,27 @@ class TestRepr(unittest.TestCase):
                         "__repr__ for {} instance does not start with '{}' "
                         "('{}')"
                         .format(name, all_types[name].__name__, repr(elem)))
+
+
+class TestHash(unittest.TestCase):
+
+    def test_hashes(self):
+        mismatching_hashes = []
+        for name, elems in instances_of_all_types.items():
+            if name in ('Annotations',):
+                continue
+            for elem in elems.values():
+                if elem.temporary:
+                    continue
+                clone = elem.clone()
+                if hash(elem) != hash(clone):
+                    mismatching_hashes.append(elem)
+#                 try:
+#                     self.assertEqual(
+#                         hash(elem), hash(clone),
+#                         "Hashes not equal between original and clones of '{}' ("
+#                         "{} and {})".format(name, elem, clone))
+#                 except:
+#                     raise
+        if mismatching_hashes:
+            self.assertFalse(mismatching_hashes)

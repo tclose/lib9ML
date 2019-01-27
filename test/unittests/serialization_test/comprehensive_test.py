@@ -4,7 +4,7 @@ import os.path
 import tempfile
 from unittest import TestCase
 import nineml
-from nineml.utils.comprehensive_example import (
+from nineml.utils.testing.comprehensive_example import (
     instances_of_all_types, v1_safe_docs)
 from nineml.serialization import ext_to_format, format_to_serializer
 

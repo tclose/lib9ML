@@ -1,6 +1,7 @@
 from .base import BaseChildResultsVisitor
 from copy import copy
-from nineml.exceptions import NineMLNotBoundException, NineMLUsageError
+from nineml.exceptions import (
+    NineMLNotBoundException, NineMLUsageError, NineMLInternalError)
 
 
 class Cloner(BaseChildResultsVisitor):
@@ -46,7 +47,11 @@ class Cloner(BaseChildResultsVisitor):
         they go out of scope, are not saved in # the memo.
         """
         if obj.temporary:
-            assert nineml_cls is not None or isinstance(obj, self.as_class)
+            if nineml_cls is None and not isinstance(obj, self.as_class):
+                raise NineMLInternalError(
+                    "nineml_cls was not explicitly specified "
+                    "and {} is not of type {} ({})".format(obj, self.as_class,
+                                                           type(obj)))
             id_ = None
         else:
             id_ = id(obj)

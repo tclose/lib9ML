@@ -1,6 +1,6 @@
 import unittest
 import nineml.units as un
-from nineml.utils.comprehensive_example import ranDistrA, dynA, dynB, conA
+from nineml.utils.testing.comprehensive_example import ranDistrA, dynA, dynB, conA
 
 
 class TestFindElement(unittest.TestCase):

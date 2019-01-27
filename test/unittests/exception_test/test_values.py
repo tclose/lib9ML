@@ -1,7 +1,7 @@
 from builtins import next
 import unittest
 from nineml.values import ArrayValue
-from nineml.utils.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import instances_of_all_types
 from nineml.exceptions import (NineMLValueError, NineMLUsageError)
 from nineml.document import Document
 from lxml.builder import ElementMaker

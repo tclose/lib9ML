@@ -1,6 +1,6 @@
 import unittest
 from nineml.user.multi.dynamics import MultiDynamics
-from nineml.utils.comprehensive_example import dynD, dynE
+from nineml.utils.testing.comprehensive_example import dynD, dynE
 from nineml.exceptions import NineMLUsageError
 from nineml.user.multi.port_exposures import AnalogReceivePortExposure
 from nineml.user.multi.dynamics import SubDynamics

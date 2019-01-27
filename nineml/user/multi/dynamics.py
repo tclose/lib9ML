@@ -40,6 +40,8 @@ from .namespace import (
     _NamespaceConstant, _NamespaceParameter, _NamespaceProperty,
     _NamespaceInitial, append_namespace,
     split_namespace, make_regime_name, split_multi_regime_name)
+from nineml.abstraction.dynamics.visitors.modifiers import (
+    DynamicsMergeStatesOfLinearSubComponents)
 
 
 # Used to create initial regime name from sub-component initial regimes
@@ -1206,6 +1208,10 @@ class MultiDynamicsProperties(DynamicsProperties):
         return DynamicsProperties(
             name, self.component_class.flatten(name=cc_name),
             properties=self.properties, initial_values=self.initial_values)
+
+    def merge_states_of_linear_sub_components(self, validate=True):
+        return DynamicsMergeStatesOfLinearSubComponents(
+            self, validate=validate).merged
 
     @property
     def name(self):
