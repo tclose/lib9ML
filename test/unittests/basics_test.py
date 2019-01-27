@@ -318,10 +318,9 @@ class TestRepr(unittest.TestCase):
                         .format(name, all_types[name].__name__, repr(elem)))
 
 
-class TestHash(unittest.TestCase):
+class TestHashes(unittest.TestCase):
 
-    def test_hashes(self):
-        mismatching_hashes = []
+    def test_clones_hash_matches(self):
         for name, elems in instances_of_all_types.items():
             if name in ('Annotations',):
                 continue
@@ -329,14 +328,7 @@ class TestHash(unittest.TestCase):
                 if elem.temporary:
                     continue
                 clone = elem.clone()
-                if hash(elem) != hash(clone):
-                    mismatching_hashes.append(elem)
-#                 try:
-#                     self.assertEqual(
-#                         hash(elem), hash(clone),
-#                         "Hashes not equal between original and clones of '{}' ("
-#                         "{} and {})".format(name, elem, clone))
-#                 except:
-#                     raise
-        if mismatching_hashes:
-            self.assertFalse(mismatching_hashes)
+                self.assertEqual(
+                    hash(elem), hash(clone),
+                    "Hashes not equal between original and clones of '{}' ("
+                    "{} and {})".format(name, elem, clone))
