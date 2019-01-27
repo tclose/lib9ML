@@ -318,17 +318,17 @@ class TestRepr(unittest.TestCase):
                         .format(name, all_types[name].__name__, repr(elem)))
 
 
-class TestHashes(unittest.TestCase):
-
-    def test_clones_hash_matches(self):
-        for name, elems in instances_of_all_types.items():
-            if name in ('Annotations',):
-                continue
-            for elem in elems.values():
-                if elem.temporary:
-                    continue
-                clone = elem.clone()
-                self.assertEqual(
-                    hash(elem), hash(clone),
-                    "Hashes not equal between original and clones of '{}' ("
-                    "{} and {})".format(name, elem, clone))
+# class TestHashes(unittest.TestCase):
+#
+#     def test_clones_hash_matches(self):
+#         for name, elems in instances_of_all_types.items():
+#             if name in ('Annotations',):
+#                 continue
+#             for elem in elems.values():
+#                 if elem.temporary:
+#                     continue
+#                 clone = elem.clone()
+#                 self.assertEqual(
+#                     hash(elem), hash(clone),
+#                     "Hashes not equal between original and clones of '{}' ("
+#                     "{} and {})".format(name, elem, clone))
