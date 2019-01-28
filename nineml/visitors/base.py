@@ -264,7 +264,7 @@ class BaseDualVisitor(BaseVisitor):
         keys2 = set(parent2._member_keys_iter(children_type))
         if keys1 != keys2:
             self._raise_keys_mismatch_exception(children_type, parent1,
-                                                parent2)
+                                                parent2, keys1, keys2)
         for key in keys1:
             child1 = parent1._member_accessor(children_type)(key)
             child2 = parent2._member_accessor(children_type)(key)
@@ -288,13 +288,20 @@ class BaseDualVisitor(BaseVisitor):
                        "({} & {})".format(nineml_cls, obj1, obj2))
 
     def _raise_type_exception(self, obj1, obj2):
-        raise NineMLDualVisitException()
+        raise NineMLDualVisitException(
+            "Types don't match between {} ({}) and {} ({})"
+            .format(obj1, type(obj1), obj2, type(obj2)))
 
     def _raise_none_child_exception(self, child_name, child1, child2):
-        raise NineMLDualVisitException()
+        raise NineMLDualVisitException(
+            "'{}' is None in one tree but not the other ({} and {})"
+            .format(child_name, child1, child2))
 
-    def _raise_keys_mismatch_exception(self, children_type, obj1, obj2):
-        raise NineMLDualVisitException()
+    def _raise_keys_mismatch_exception(self, children_type, obj1, obj2,
+                                       keys1, keys2):
+        raise NineMLDualVisitException(
+            "{} keys don't match between {} and {}: {} and {}"
+            .format(children_type, obj1, obj2, keys1, keys2))
 
 
 class DualWithContextMixin(object):

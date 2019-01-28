@@ -8,6 +8,7 @@ from .. import BaseULObject
 import sympy
 from collections import defaultdict
 from itertools import product
+from operator import attrgetter, itemgetter
 from nineml.abstraction import AnalogReceivePort, AnalogReducePort
 from nineml.user import DynamicsProperties, Definition
 from nineml.annotations import PY9ML_NS
@@ -292,9 +293,10 @@ class MultiDynamics(Dynamics):
         # =====================================================================
         if isinstance(sub_components, dict):
             self.add(*(SubDynamics(name, dyn)
-                       for name, dyn in sub_components.items()))
+                       for name, dyn in sorted(sub_components.items(),
+                                               key=itemgetter(0))))
         else:
-            self.add(*sub_components)
+            self.add(*sorted(sub_components, key=attrgetter('name')))
         # =====================================================================
         # Save port exposurs into separate member dictionaries
         # =====================================================================
@@ -310,12 +312,13 @@ class MultiDynamics(Dynamics):
             analog_receive_port_exposures = []
         if analog_reduce_port_exposures is None:
             analog_reduce_port_exposures = []
-        for exposure in chain(port_exposures,
-                              analog_send_port_exposures,
-                              event_send_port_exposures,
-                              event_receive_port_exposures,
-                              analog_receive_port_exposures,
-                              analog_reduce_port_exposures):
+        for exposure in sorted(chain(port_exposures,
+                                     analog_send_port_exposures,
+                                     event_send_port_exposures,
+                                     event_receive_port_exposures,
+                                     analog_receive_port_exposures,
+                                     analog_reduce_port_exposures),
+                               key=attrgetter('name')):
             if isinstance(exposure, tuple):
                 exposure = BasePortExposure.from_tuple(exposure, self)
             exposure.bind(self)
@@ -332,8 +335,10 @@ class MultiDynamics(Dynamics):
             analog_port_connections = []
         if event_port_connections is None:
             event_port_connections = []
-        for port_connection in chain(port_connections, analog_port_connections,
-                                     event_port_connections):
+        for port_connection in sorted(chain(port_connections,
+                                            analog_port_connections,
+                                            event_port_connections),
+                                      key=attrgetter('name')):
             if isinstance(port_connection, tuple):
                 port_connection = BasePortConnection.from_tuple(
                     port_connection, self)
