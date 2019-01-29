@@ -8,7 +8,7 @@ from collections import defaultdict
 from itertools import chain
 import sympy
 from .base import BaseDynamicsVisitor
-from ..transitions import StateAssignment
+from ..transitions import StateAssignment, OnCondition
 from ...expressions.named import Alias
 from nineml.visitors.base import BaseVisitorWithContext
 from ...componentclass.visitors.modifiers import (
@@ -147,13 +147,15 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
     """
 
     def __init__(self, multi_properties, validate=True):
+        BaseVisitorWithContext.__init__(self)
+        BaseDynamicsVisitor.__init__(self)
         self.multi_dynamics = multi_properties.component_class
 
         # Sort sub-components into matching definitions and parameters used
         # in their time-derivatives
         candidates = defaultdict(list)
-        for comp in self.multi_properties.sub_components:
-            if comp.is_linear():
+        for comp in multi_properties.sub_components:
+            if comp.component_class.is_linear():
                 candidates[comp.component_class].append(comp)
 
         # Used to hold mappings from state-variable and parameter names from
@@ -169,18 +171,17 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
             regime = next(comp_class.regimes)
             param_symbols = set(sympy.Symbol(s)
                                 for s in comp_class.parameter_names)
-            td_params = sorted(
-                str(s) for s in chain(td.rhs_symbols
-                                      for td in regime.time_derivatives)
+            td_params = set(
+                str(s) for s in chain(*(td.rhs_symbols
+                                        for td in regime.time_derivatives))
                 if s in param_symbols)
 
             # Group properties into groups with matching values for parameters
             # used in the state equations
             matching_td_props = defaultdict(list)
-            for props in multi_properties.sub_components:
-                td_props = frozenset(
-                    props[p] for p in td_params)
-                matching_td_props[td_props].append(props)
+            for comp in comps:
+                td_props = frozenset(comp.component[p] for p in td_params)
+                matching_td_props[td_props].append(comp)
 
             for td_props, matching in matching_td_props.items():
                 if len(matching) == 1:
@@ -188,17 +189,16 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
                 ref = matching[0]
                 for match in matching[1:]:
                     for param in td_params:
-                        self.param_map[
-                            match.namespace(param)] = ref.namespace(param)
+                        self.param_map[match.append_namespace(
+                            param)] = ref.append_namespace(param)
                     for state_var in comp_class.state_variable_names:
-                        self.state_var_map[
-                            match.namespace(state_var)] = ref.namespace(
-                                state_var)
+                        self.state_var_map[match.append_namespace(
+                            state_var)] = ref.append_namespace(state_var)
 
         # Flatten multi dynamics so we can map and remove unrequired states +
         # dynamics
         self.merged = multi_properties.flatten()
-        self.merged_class = self.merged
+        self.merged_class = self.merged.component_class
 
         # Because we are iterating through child elements we can't remove and
         # add children as we go. So we save the objects to add and remove in
@@ -209,10 +209,10 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
         self.visit(self.merged_class)
 
         # Add and remove new and old children as required
-        for obj, context in self.to_remove:
-            context.remove(obj)
-        for obj, context in self.to_add:
-            context.add(obj)
+        for obj, parent in self.to_remove:
+            parent.remove(obj)
+        for obj, parent in self.to_add:
+            parent.add(obj)
 
         if validate:
             self.merged_class.validate()
@@ -230,19 +230,26 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
     def default_action(self, obj, nineml_cls, **kwargs):  # @UnusedVariable
         pass
 
+    def action_parameter(self, parameter, **kwargs):  # @UnusedVariable
+        if parameter.name in self.param_map:
+            self.to_remove.append((parameter, self.context.parent))
+
     def action_timederivative(self, time_derivative, **kwargs):  # @UnusedVariable @IgnorePep8
         if time_derivative.variable in self.state_var_map:
-            self.to_remove.append((time_derivative, self.context))
+            self.to_remove.append((time_derivative, self.context.parent))
 
     def action_stateassignment(self, state_assignment, **kwargs):  # @UnusedVariable @IgnorePep8
         if state_assignment.variable in self.state_var_map:
-            self.to_remove.append((state_assignment, self.context))
-            self.to_add.append(StateAssignment(
-                self.state_var_map[state_assignment.variable],
-                state_assignment.rhs))
+            self.to_remove.append((state_assignment, self.context.parent))
+            self.to_add.append(
+                (StateAssignment(self.state_var_map[state_assignment.variable],
+                                 state_assignment.rhs),
+                 self.context.parent))
 
     def action_statevariable(self, state_variable, **kwargs):  # @UnusedVariable @IgnorePep8
         if state_variable.name in self.state_var_map:
-            self.to_remove((state_variable, self.context))
-            self.to_add((Alias(state_variable.name,
-                               self.state_var_map[state_variable.name])))
+            self.to_remove.append((state_variable, self.context.parent))
+            self.to_add.append(
+                (Alias(state_variable.name,
+                       self.state_var_map[state_variable.name]),
+                 self.context.parent))

@@ -11,17 +11,6 @@ from nineml.user import (
     BasePortExposure)
 from .dynamics import Dynamics, DynamicsClass
 from .utils import create_progress_bar
-from nineml.visitors.base import BaseDualVisitor
-from nineml.exceptions import NineMLDualVisitException
-
-
-class HashChecker(BaseDualVisitor):
-
-    def action(self, obj1, obj2, nineml_cls, **kwargs):  # @UnusedVariable
-        pass
-#         if hash(obj1) != hash(obj2):
-            #print('hash for {} ({}) does not match that of {} ({})'
-            #      .format(obj1, hash(obj1), obj2, hash(obj2)))
 
 
 class Network(object):
@@ -72,25 +61,21 @@ class Network(object):
             if conn_without_delay:
                 self.merge_nodes(conn_without_delay)
         # Initialise all dynamics components in graph
-        dyn_class_cache = {}  # Cache for storing previously analysed classes
+        dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
         for node, data in self.graph.nodes(data=True):
             # Attempt to reuse DynamicsClass objects between Dynamics objects
             # to save reanalysing their equations
             model = data['properties'].component_class
             try:
-                dyn_class = dyn_class_cache[model]
-            except KeyError:
-                for cc in dyn_class_cache:
-                    try:
-                        HashChecker().visit(cc, model)
-                    except NineMLDualVisitException as e:
-                        print(e)
-                dyn_class_cache[model] = dyn_class = None  # DynamicsClass(model)
+                dyn_class = next(dc for m, dc in dyn_class_cache if m == model)
+            except StopIteration:
+                dyn_class = DynamicsClass(model)
+                dyn_class_cache.append((model, dyn_class))
             # Create dynamics object
-#             data['dynamics'] = dynamics = Dynamics(
-#                 data['properties'], start_t, dynamics_class=dyn_class)
-#             self.components.append(dynamics)
+            data['dynamics'] = dynamics = Dynamics(
+                data['properties'], start_t, dynamics_class=dyn_class)
+            self.components.append(dynamics)
         # Make all connections between dynamics components
         self.min_delay = float('inf')
         for u, v, conn in self.graph.out_edges(data=True):
@@ -233,7 +218,7 @@ class Network(object):
         self.graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
-#         multi_props = multi_props.merge_states_of_linear_sub_components(
-#             validate=True)
+        multi_props = multi_props.merge_states_of_linear_sub_components(
+            validate=False)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = multi_props

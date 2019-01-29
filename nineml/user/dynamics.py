@@ -100,9 +100,10 @@ class DynamicsProperties(Component, DynamicPortsObject):
 
     def __getitem__(self, name):
         try:
-            return self.initial_value(name).quantity
+            qty = self.initial_value(name).quantity
         except NineMLNameError:
-            super(DynamicsProperties, self).__getitem__(name)
+            qty = super(DynamicsProperties, self).__getitem__(name)
+        return qty
 
     def __setitem__(self, name, qty):
         try:

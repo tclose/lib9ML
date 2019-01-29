@@ -1081,6 +1081,12 @@ class SubDynamicsProperties(BaseULObject):
     def __iter__(self):
         return self.properties
 
+    def __getitem__(self, name):
+        return self.property(name).quantity
+
+    def __setitem__(self, name, qty):
+        self.property(name).quantity = qty
+
     def append_namespace(self, name):
         return append_namespace(name, self.name)
 

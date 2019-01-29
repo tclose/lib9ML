@@ -113,6 +113,9 @@ class _NamespaceObject(BaseNineMLObject):
     def annotations(self):
         return self._object.annotations
 
+#     def append_namespace(self, identifier):
+#         return append_namespace(identifier, self._sub_component.name)
+
 
 class _NamespaceNamed(_NamespaceObject):
     """
