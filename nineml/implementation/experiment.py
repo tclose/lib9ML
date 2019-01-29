@@ -1,5 +1,6 @@
 import numpy as np
 import os.path as op
+from itertools import chain, repeat
 from operator import attrgetter
 import bisect
 import nineml.units as un
@@ -88,7 +89,8 @@ class AnalogSink(AnalogReceivePort):
         ax = fig.gca()
         for sink in sinks:
             sink._plot_trace(ax, times)
-        plt.title(op.commonpath(s.name for s in sinks))
+        plt.title("{} Signals".format(
+            op.commonprefix([s.name for s in sinks]).strip('_')))
         dims = set(s.dimension for s in sinks)
         if len(dims) == 1:
             dimension = next(iter(dims))
@@ -134,7 +136,8 @@ class EventSink(Port):
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
         plt.figure()
-        plt.scatter(self.events, 0)
+        if self.events:
+            plt.scatter(self.events, 0)
         plt.xlabel('Time (ms)')
         plt.title("{} Events".format(self.name))
         if show:
@@ -146,12 +149,14 @@ class EventSink(Port):
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
         sinks = sorted(sinks, key=attrgetter('name'))
-        spike_times = np.asarray([s.events for s in sinks])
-        plt.figure()
-        plt.scatter(spike_times, range(len(sinks)))
+        spikes = list(zip(chain(*(
+            zip(s.events, repeat(i)) for i, s in enumerate(sinks)))))
+        if spikes:
+            plt.scatter(*spikes)
         plt.xlabel('Time (ms)')
         plt.ylabel('Cell Indices')
-        plt.title("{} Events".format(op.commonprefix(s.name for s in sinks)))
+        plt.title("{} Events".format(
+            op.commonprefix([s.name for s in sinks]).strip('_')))
         if show:
             plt.show()
 

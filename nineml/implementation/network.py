@@ -25,7 +25,7 @@ class Network(object):
         The starting time of the simulation
     """
 
-    def __init__(self, model, start_t):
+    def __init__(self, model, start_t, record_from=None):
         if isinstance(start_t, Quantity):
             start_t = float(start_t.in_si_units())
         self.t = start_t
@@ -77,7 +77,8 @@ class Network(object):
                 dyn_class_cache.append((model, dyn_class))
             # Create dynamics object
             data['dynamics'] = dynamics = Dynamics(
-                data['properties'], start_t, dynamics_class=dyn_class)
+                data['properties'], start_t, dynamics_class=dyn_class,
+                name='{}_{}'.format(*node))
             self.components.append(dynamics)
         # Make all connections between dynamics components
         self.min_delay = float('inf')
@@ -97,6 +98,7 @@ class Network(object):
             dt = float(dt.in_si_units())
         if progress_bar is True:
             progress_bar = create_progress_bar(self.t, stop_t, self.min_delay)
+            progress_bar.update(self.t)
         while self.t < stop_t:
             self.t = min(stop_t, self.t + self.min_delay)
             for component in self.components:

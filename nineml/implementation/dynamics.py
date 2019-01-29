@@ -19,10 +19,12 @@ dt_symbol = 'dt_'
 class Dynamics(object):
 
     def __init__(self, model, start_t, initial_state=None, array_index=None,
-                 initial_regime=None, dynamics_class=None):
+                 initial_regime=None, dynamics_class=None, name=None):
         if dynamics_class is None:
             dynamics_class = DynamicsClass(model.component_class)
         self.dynamics_class = dynamics_class
+        self.model = model
+        self.name = name
         self.defn = dynamics_class.defn
         # Initialise state information converting all quantities to SI units
         # for simplicity
@@ -80,6 +82,9 @@ class Dynamics(object):
         except TypeError:
             dt = self._dt
         return dt
+
+    def __repr__(self):
+        return "{}(model={})".format(type(self).__name__, self.model)
 
     def update_state(self, new_state, new_t):
         self._state = new_state
@@ -171,6 +176,10 @@ class DynamicsClass(object):
             except NineMLNameError:
                 expr = sp.Symbol(port.name)
             self.port_aliases[port.name] = self.lambdify(expr)
+
+    def __repr__(self):
+        return "{}(definition={})".format(type(self).__name__,
+                                          self.defn)
 
     @property
     def all_symbols(self):
@@ -437,6 +446,9 @@ class Port(object):
     @property
     def name(self):
         return self.defn.name
+
+    def __repr__(self):
+        return "{}(name='{}')".format(type(self).__name__, self.name)
 
 
 class EventSendPort(Port):
