@@ -2,13 +2,13 @@ from operator import itemgetter
 from collections import defaultdict
 from itertools import chain, repeat
 from copy import copy
-import numpy as np
 import networkx as nx
 import nineml.units as un
 from pprint import pprint
 from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
     BasePortExposure)
+from nineml.units import Quantity
 from .dynamics import Dynamics, DynamicsClass
 from .utils import create_progress_bar
 
@@ -26,6 +26,9 @@ class Network(object):
     """
 
     def __init__(self, model, start_t):
+        if isinstance(start_t, Quantity):
+            start_t = float(start_t.in_si_units())
+        self.t = start_t
         component_arrays, connection_groups = model.flatten()
         # Initialise a graph to represent the network
         self.graph = nx.MultiDiGraph()
@@ -83,22 +86,23 @@ class Network(object):
             to_dyn = self.graph.nodes[v]['dynamics']
             delay = conn['delay']
             from_dyn.ports[conn['src_port']].connect_to(
-                to_dyn.analog_receive_ports[conn['dest_port']],
-                delay=delay)
+                to_dyn.ports[conn['dest_port']], delay=delay)
             if delay < self.min_delay:
                 self.min_delay = delay
 
     def simulate(self, stop_t, dt, progress_bar=True):
-        stop_t = float(stop_t.in_units(un.s))
-        dt = float(dt.in_si_units())
+        if isinstance(stop_t, Quantity):
+            stop_t = float(stop_t.in_units(un.s))
+        if isinstance(dt, Quantity):
+            dt = float(dt.in_si_units())
         if progress_bar is True:
             progress_bar = create_progress_bar(self.t, stop_t, self.min_delay)
-        slice_dt = min(stop_t, self.min_delay)
-        for t in np.arange(self.t, stop_t, slice_dt):
+        while self.t < stop_t:
+            self.t = min(stop_t, self.t + self.min_delay)
             for component in self.components:
-                component.simulate(t, dt)
-            if progress_bar is not None:
-                progress_bar.update(t)
+                component.simulate(self.t, dt, progress_bar=False)
+            if progress_bar:
+                progress_bar.update(self.t)
         if progress_bar is not None:
             progress_bar.finish()
 
@@ -168,18 +172,21 @@ class Network(object):
         # Map graph edges onto internal port connections of the new multi-
         # dynamics object
         port_connections = []
+        edges_to_remove = []
         for u, v, conn in sub_graph.edges(data=True):
-            if conn['communicates'] == 'analog':
-                PortConnectionClass = AnalogPortConnection
-            else:
-                PortConnectionClass = EventPortConnection
-            port_connections.append(PortConnectionClass(
-                send_port_name=conn['src_port'],
-                receive_port_name=conn['dest_port'],
-                sender_name=sub_graph.nodes[u]['sub_comp'],
-                receiver_name=sub_graph.nodes[v]['sub_comp']))
+            if not conn['delay']:
+                if conn['communicates'] == 'analog':
+                    PortConnectionClass = AnalogPortConnection
+                else:
+                    PortConnectionClass = EventPortConnection
+                port_connections.append(PortConnectionClass(
+                    send_port_name=conn['src_port'],
+                    receive_port_name=conn['dest_port'],
+                    sender_name=sub_graph.nodes[u]['sub_comp'],
+                    receiver_name=sub_graph.nodes[v]['sub_comp']))
+                edges_to_remove.append((u, v))
         # Remove all edges in the sub-graph from the primary graph
-        self.graph.remove_edges_from(list(sub_graph.edges))
+        self.graph.remove_edges_from(edges_to_remove)
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
         port_exposures = set()

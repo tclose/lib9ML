@@ -7,9 +7,9 @@ import numpy.random
 import bisect
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
-import nineml.units as un
 from .utils import create_progress_bar
 from nineml.exceptions import NineMLUsageError, NineMLNameError
+from nineml.units import Quantity
 
 
 # Set common symbol used to denote step size
@@ -26,9 +26,9 @@ class Dynamics(object):
         self.defn = dynamics_class.defn
         # Initialise state information converting all quantities to SI units
         # for simplicity
-        self.properties = {
-            p.name: float(p.quantity.in_si_units().sample(array_index))
-            for p in model.properties}
+        self.properties = OrderedDict(
+            (p, float(model[p].in_si_units().sample(array_index)))
+            for p in self.defn.parameter_names)
         # Ensure initial state is ordered by var names so it matches up with
         # order in 'dynamics_class.all_symbols'
         self._state = OrderedDict()
@@ -47,7 +47,9 @@ class Dynamics(object):
             initial_regime = model.initial_regime
         self.regime = dynamics_class.regimes[initial_regime]
         # Time
-        self._t = float(start_t.in_si_units())
+        if isinstance(start_t, Quantity):
+            start_t = float(start_t.in_si_units())
+        self._t = start_t
         # Initialise ports
         self.event_send_ports = OrderedDict()
         self.analog_send_ports = OrderedDict()
@@ -91,8 +93,10 @@ class Dynamics(object):
 
     def simulate(self, stop_t, dt, progress_bar=True):
         # Convert time values to SI units
-        stop_t = float(stop_t.in_units(un.s))
-        dt = float(dt.in_si_units())
+        if isinstance(stop_t, Quantity):
+            stop_t = float(stop_t.in_si_units())
+        if isinstance(stop_t, Quantity):
+            dt = float(dt.in_si_units())
         if progress_bar is True:
             progress_bar = create_progress_bar(self.t, stop_t, dt)
         self._update_buffers()
@@ -104,7 +108,7 @@ class Dynamics(object):
                 self.regime.update(self, stop_t, dt, progress_bar=progress_bar)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
-        if progress_bar is not None:
+        if progress_bar:
             progress_bar.finish()
 
     def all_values(self, dt=None, state=None, t=None):
@@ -271,7 +275,7 @@ class Regime(object):
                     new_regime = transition.defn.target_regime.name
             # Update the state and buffers
             dynamics.update_state(proposed_state, proposed_t)
-            if progress_bar is not None:
+            if progress_bar:
                 try:
                     res = progress_bar.res
                 except AttributeError:
@@ -446,7 +450,9 @@ class EventSendPort(Port):
             receiver.receive(t + delay)
 
     def connect_to(self, receive_port, delay):
-        self.receivers.append((receive_port, float(delay.in_si_units())))
+        if isinstance(delay, Quantity):
+            delay = float(delay.in_si_units())
+        self.receivers.append((receive_port, delay))
 
 
 class EventReceivePort(Port):
@@ -521,6 +527,8 @@ class AnalogSendPort(Port):
         return "'{}' port in {}".format(self.name, self.parent)
 
     def connect_to(self, receive_port, delay):
+        if isinstance(delay, Quantity):
+            delay = float(delay.in_si_units())
         # Register the sending port with the receiving port so it can retrieve
         # the values of the sending port
         receive_port.connect_from(self, delay)
@@ -548,12 +556,14 @@ class AnalogReceivePort(Port):
         self.delay = None
 
     def connect_from(self, send_port, delay):
+        if isinstance(delay, Quantity):
+            delay = float(delay.in_si_units())
         if self.sender is not None:
             raise NineMLUsageError(
                 "Cannot connect {} to multiple receive ports".format(
                     self._location))
         self.sender = send_port
-        self.delay = float(delay.in_units(un.s))
+        self.delay = delay
 
     def value(self, t):
         try:
@@ -579,7 +589,9 @@ class AnalogReducePort(Port):
         return self.defn.python_op
 
     def connect_from(self, send_port, delay):
-        self.senders.append((send_port, float(delay.in_units(un.s))))
+        if isinstance(delay, Quantity):
+            delay = float(delay.in_si_units())
+        self.senders.append((send_port, delay))
 
     def value(self, t):
         return reduce(self.operator, (sender.value(t - delay)
