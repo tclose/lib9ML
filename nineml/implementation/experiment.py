@@ -46,6 +46,8 @@ class AnalogSource(AnalogSendPort):
 
 class AnalogSink(AnalogReceivePort):
 
+    DEFAULT_PLOT_STEPS = 100
+
     def __init__(self, name):
         self._name = name
         self.sender = None
@@ -60,16 +62,23 @@ class AnalogSink(AnalogReceivePort):
         return "analog sink '{}'".format(self.name)
 
     def values(self, times):
-        return [self.value(float(t.in_units(un.s))) for t in times]
+        return [
+            self.value(float(t.in_units(un.s))
+                       if isinstance(t, un.Quantity) else t) for t in times]
 
     @property
     def dimension(self):
         return self.sender.defn.dimension
 
-    def plot(self, times, show=True):
+    def plot(self, times=None, show=True):
         if plt is None:
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
+        if times is None:
+            times = self.default_times
+        else:
+            [(float(t.in_si_units()) if isinstance(t, un.Quantity) else t)
+             for t in times]
         fig = plt.figure()
         ax = fig.gca()
         self._plot_trace(ax, times)
@@ -81,16 +90,19 @@ class AnalogSink(AnalogReceivePort):
             plt.show()
 
     @classmethod
-    def combined_plot(cls, sinks, times, show=True):
+    def combined_plot(cls, sinks, times=None, show=True):
         if plt is None:
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
+        if times is None:
+            times = sinks[0].default_times
         fig = plt.figure()
         ax = fig.gca()
+        common_prefix = op.commonprefix([s.name for s in sinks])
         for sink in sinks:
-            sink._plot_trace(ax, times)
-        plt.title("{} Signals".format(
-            op.commonprefix([s.name for s in sinks]).strip('_')))
+            sink._plot_trace(ax, times, label=sink.name[len(common_prefix):])
+        plt.title("{} Signals".format(common_prefix.strip('_')))
+        plt.legend()
         dims = set(s.dimension for s in sinks)
         if len(dims) == 1:
             dimension = next(iter(dims))
@@ -102,9 +114,15 @@ class AnalogSink(AnalogReceivePort):
         if show:
             plt.show()
 
-    def _plot_trace(self, ax, times):
-        ax.plot([float(t.in_si_units()) for t in times],
-                 self.values(times))
+    def _plot_trace(self, ax, times, label=None):
+        ax.plot(times, self.values(times), label=label)
+
+    @property
+    def default_times(self):
+        incr = ((self.sender.stop_t - self.sender.start_t) /
+                self.DEFAULT_PLOT_STEPS)
+        return [t * incr + self.sender.start_t + self.delay
+                for t in range(self.DEFAULT_PLOT_STEPS)]
 
 
 class EventSource(object):
@@ -151,6 +169,7 @@ class EventSink(Port):
         sinks = sorted(sinks, key=attrgetter('name'))
         spikes = list(zip(chain(*(
             zip(s.events, repeat(i)) for i, s in enumerate(sinks)))))
+        plt.figure()
         if spikes:
             plt.scatter(*spikes)
         plt.xlabel('Time (ms)')

@@ -559,6 +559,14 @@ class AnalogSendPort(Port):
         while self.buffer[0][0] < min_t:
             self.buffer.popleft()
 
+    @property
+    def start_t(self):
+        return self.buffer[0][0]
+
+    @property
+    def stop_t(self):
+        return self.buffer[-1][0]
+
 
 class AnalogReceivePort(Port):
 
@@ -589,6 +597,14 @@ class AnalogReceivePort(Port):
         return "analog receive port '{}' in {}".format(self.name,
                                                        self.parent)
 
+    @property
+    def start_t(self):
+        return self.sender.start_t
+
+    @property
+    def stop_t(self):
+        return self.sender.end_t
+
 
 class AnalogReducePort(Port):
 
@@ -608,6 +624,14 @@ class AnalogReducePort(Port):
     def value(self, t):
         return reduce(self.operator, (sender.value(t - delay)
                                       for sender, delay in self.senders))
+
+    @property
+    def start_t(self):
+        return min(s.start_t for s in self.senders)
+
+    @property
+    def stop_t(self):
+        return max(s.stop_t for s in self.senders)
 
 
 class LinearRegime(Regime):

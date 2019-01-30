@@ -35,35 +35,14 @@ class TestNetwork(TestCase):
                     dt=0.01 * un.ms, random_seed=None):
         random.seed(random_seed)
         model = self._reduced_brunel_9ml(case, order, random_seed=random_seed)
-        network = Network(model, start_t=0 * un.s)
-        event_sinks = defaultdict(list)
-        analog_sinks = defaultdict(list)
-        for comp in network.components:
-            event_sink = EventSink(comp.name + '_spike_sink')
-            analog_sink = AnalogSink(comp.name + '_v_sink')
-            if comp.name.startswith('Exc'):
-                comp.ports['spike_output__LeakyIntegrateAndFire'].connect_to(
-                    event_sink, network.min_delay)
-                comp.ports['v__LeakyIntegrateAndFire'].connect_to(
-                    analog_sink, network.min_delay)
-                event_sinks['Exc'].append(event_sink)
-                analog_sinks['Exc'].append(analog_sink)
-            elif comp.name.startswith('Inh'):
-                comp.ports['spike_output__LeakyIntegrateAndFire'].connect_to(
-                    event_sink, network.min_delay)
-                event_sinks['Inh'].append(event_sink)
-                comp.ports['v__LeakyIntegrateAndFire'].connect_to(
-                    analog_sink, network.min_delay)
-                event_sinks['Inh'].append(event_sink)
-                analog_sinks['Inh'].append(analog_sink)
-            elif comp.name.startswith('Ext'):
-                comp.ports['spike_output'].connect_to(event_sink,
-                                                      network.min_delay)
-                event_sinks['Ext'].append(event_sink)
-            else:
-                assert False, "Unrecognised component '{}'".format(comp.name)
+        network = Network(model, start_t=0 * un.s,
+                          sinks=[('Exc__cell', 'spike_output'),
+                                 ('Inh__cell', 'spike_output'),
+                                 ('Ext__cell', 'spike_output'),
+                                 ('Exc__cell', 'v', range(10)),
+                                 ('Inh__cell', 'v')])
         network.simulate(duration, dt=dt)
-        return event_sinks, analog_sinks
+        return network.sinks
 
     def _reduced_brunel_9ml(self, case, order, random_seed=None):
 
@@ -103,10 +82,8 @@ if __name__ == '__main__':
         model, duration, dt))
     tester = TestNetwork()
     test = getattr(tester, 'test_{}'.format(model))
-    event_sinks, analog_sinks = test(dt=dt, duration=duration, case=case,
-                                     order=order, random_seed=12345)
-    for pop_sinks in event_sinks.values():
-        EventSink.combined_plot(pop_sinks, show=False)
-    for pop_sinks in analog_sinks.values():
-        AnalogSink.combined_plot(pop_sinks[:10], show=False)
+    sinks = test(dt=dt, duration=duration, case=case, order=order,
+                 random_seed=12345)
+    for pop_sinks in sinks.values():
+        pop_sinks[0].combined_plot(pop_sinks, show=False)
     plt.show()
