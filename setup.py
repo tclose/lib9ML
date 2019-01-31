@@ -47,7 +47,7 @@ setup(
                       'PyYAML>=3.1',
                       'sympy>=1.2',
                       'networkx>=2.2',
-                      'progressbar2>=3.38.0'],
+                      'tqdm>=4.25.0'],
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
     tests_require=['nose', 'numpy', 'ninemlcatalog']
 )

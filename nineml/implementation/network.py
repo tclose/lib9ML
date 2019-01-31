@@ -11,7 +11,7 @@ from nineml.user import (
 from nineml.units import Quantity
 from .dynamics import Dynamics, DynamicsClass
 from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
-from .utils import create_progress_bar
+from .utils import ProgressBar
 from nineml.exceptions import NineMLUsageError
 
 
@@ -52,6 +52,7 @@ class Network(object):
         if sinks is None:
             sinks = []
         self.t = start_t
+        self.model = model
         component_arrays, connection_groups = model.flatten()
         # Initialise a graph to represent the network
         self.graph = nx.MultiDiGraph()
@@ -177,22 +178,21 @@ class Network(object):
                 to_port = v_attr['sink']
             from_port.connect_to(to_port, delay=conn['delay'])
 
-    def simulate(self, stop_t, dt, progress_bar=True):
+    def simulate(self, stop_t, dt, show_progress=True):
         if isinstance(stop_t, Quantity):
             stop_t = float(stop_t.in_units(un.s))
         if isinstance(dt, Quantity):
             dt = float(dt.in_si_units())
-        if progress_bar is True:
-            progress_bar = create_progress_bar(self.t, stop_t, self.min_delay)
-            progress_bar.update(self.t)
+        progress_bar = ProgressBar(
+            self.t, stop_t, show=show_progress,
+            label=("Simulating '{}' network (dt={} s)"
+                   .format(self.model.name, dt)),)
         while self.t < stop_t:
             self.t = min(stop_t, self.t + self.min_delay)
             for component in self.components:
                 component.simulate(self.t, dt, progress_bar=False)
-            if progress_bar:
-                progress_bar.update(self.t)
-        if progress_bar is not None:
-            progress_bar.finish()
+            progress_bar.update(self.t)
+        progress_bar.close()
 
     def connected_without_delay(self, start_node, connected=None):
         """

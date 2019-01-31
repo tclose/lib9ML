@@ -7,7 +7,7 @@ import numpy.random
 import bisect
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
-from .utils import create_progress_bar
+from .utils import ProgressBar
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
 
@@ -90,31 +90,34 @@ class Dynamics(object):
         self._state = new_state
         self._t = new_t
         self._update_buffers()
+        self.progress_bar.update(new_t)
 
     def _update_buffers(self):
         for port in chain(self.analog_send_ports.values(),
                           self.event_receive_ports.values()):
             port.update_buffer()
 
-    def simulate(self, stop_t, dt, progress_bar=True):
+    def simulate(self, stop_t, dt, show_progress=True):
         # Convert time values to SI units
         if isinstance(stop_t, Quantity):
             stop_t = float(stop_t.in_si_units())
-        if isinstance(stop_t, Quantity):
+        if isinstance(dt, Quantity):
             dt = float(dt.in_si_units())
-        if progress_bar is True:
-            progress_bar = create_progress_bar(self.t, stop_t, dt)
+        # Set progress bar
+        self.progress_bar = ProgressBar(
+            self.t, stop_t, dt, show=show_progress,
+            label=("Simulating '{}' dynamics (dt={} s)"
+                   .format(self.model.name, dt)))
         self._update_buffers()
         # Update the simulation until stop_t
         while self.t < stop_t:
             # Simulte the current regime until t > stop_t or there is a
             # transition to a new regime
             try:
-                self.regime.update(self, stop_t, dt, progress_bar=progress_bar)
+                self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
-        if progress_bar:
-            progress_bar.finish()
+        self.progress_bar.close()
 
     def all_values(self, dt=None, state=None, t=None):
         if state is None:
@@ -226,7 +229,7 @@ class Regime(object):
             self.on_events.append(OnEvent(oe_def, self))
         self.updates = {}
 
-    def update(self, dynamics, stop_t, dt, progress_bar=None):
+    def update(self, dynamics, stop_t, dt):
         """
         Simulate the regime for the given duration unless an event is
         raised.
@@ -236,12 +239,12 @@ class Regime(object):
         stop_t : Quantity(time)
             The time to run the simulation until
         """
-        transition = None
+        transitions = []
         while dynamics.t < stop_t:
             # If new state has been assigned by a transition in a previous
             # iteration then we don't do an ODE step to allow for multiple
             # transitions at the same time-point
-            if transition is None:
+            if not transitions:
                 # Attempt to step to the end of the update window or until the
                 # next incoming event. Although in practice the step-size of
                 # the solver should be small enough for acceptable levels of
@@ -251,45 +254,57 @@ class Regime(object):
                     min(self.time_of_next_handled_event(dynamics), stop_t) -
                     dynamics.t, dt)
                 proposed_state, proposed_t = self.step(dynamics, step_dt)
-            # Find next transition that will occur (on-conditions that aren't
-            # triggered or ports with no upcoming events are set to a time of
-            # 'inf').
+            # Detect transitions that have occured during the update step (NB:
+            # on- conditions that aren't triggered or ports with no upcoming
+            # events are set to a time of 'inf').
             transitions = [(oc, oc.time_of_trigger(dynamics, proposed_state,
                                                    proposed_t))
                            for oc in self.on_conditions]
             transitions.extend((oe, oe.time_of_next_event(dynamics))
                                for oe in self.on_events)
-            try:
-                transition, transition_t = min(transitions, key=itemgetter(1))
-            except ValueError:
-                transition = None  # If there are no transitions in the regime
-            else:
-                if transition_t > proposed_t:
-                    # The next transition doesn't occur until after the end of
-                    # the current step so can be ignored
-                    transition = None
+            # Sort transitions in order of the occurence
+            transitions = sorted(
+                (a for a in transitions if a[1] <= proposed_t),
+                key=itemgetter(1))
             new_regime = None
-            if transition is not None:
-                # Action the transition assignments and output events
+            remaining_transitions_valid = True
+            for transition, transition_t in transitions:
+                # Send output events
+                for port_name in transition.defn.output_event_keys:
+                    dynamics.event_send_ports[port_name].send(transition_t)
+                # Detect regime change
+                if transition.defn.target_regime.name != self.name:
+                    new_regime = transition.defn.target_regime.name
+                    # Remaining transitions won't neccessarily occur as we will
+                    # transition to new regime after updating the state
+                    remaining_transitions_valid = False
+                # Assign new state values
                 if transition.defn.num_state_assignments:
                     # If the state has been assigned mid-step, we rewind the
                     # simulation to the time of the assignment
-                    proposed_t = transition_t
+                    if transition_t < proposed_t:
+                        # Check for states that aren't explicitly assigned as
+                        # we will need to run a shortened version of the step
+                        # up to the the trigger time (otherwise if all states
+                        # updated by time-derivatives are assigned they just
+                        # assume the assigned values)
+                        if (set(self.defn.time_derivative_variables) -
+                              set(transition.defn.state_assignment_variables)):
+                            proposed_state, proposed_t = self.step(
+                                dynamics, transition_t - dynamics.t)
+                            assert transition_t == proposed_t
                     # Assign states
-                    proposed_state = transition.assign_states(
-                        dynamics, t=proposed_t)
-                for port_name in transition.defn.output_event_keys:
-                    dynamics.event_send_ports[port_name].send(transition_t)
-                if transition.defn.target_regime.name != self.name:
-                    new_regime = transition.defn.target_regime.name
+                    proposed_state = transition.assign_states(dynamics,
+                                                              t=proposed_t)
+                    # Since we have assigned new states, remaining detected
+                    # transitions are not necessarily valid and will need to
+                    # be checked in the next loop
+                    remaining_transitions_valid = False
+                proposed_t = transition_t
+                if not remaining_transitions_valid:
+                    break
             # Update the state and buffers
             dynamics.update_state(proposed_state, proposed_t)
-            if progress_bar:
-                try:
-                    res = progress_bar.res
-                except AttributeError:
-                    res = None
-                progress_bar.update(round(proposed_t, ndigits=res))
             # Transition to new regime if specified in the active transition.
             # NB: that this transition occurs after all other elements of the
             # transition and the update of the state/time

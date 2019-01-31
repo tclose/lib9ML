@@ -312,16 +312,19 @@ class MultiDynamics(Dynamics):
             analog_receive_port_exposures = []
         if analog_reduce_port_exposures is None:
             analog_reduce_port_exposures = []
-        for exposure in sorted(chain(port_exposures,
-                                     analog_send_port_exposures,
-                                     event_send_port_exposures,
-                                     event_receive_port_exposures,
-                                     analog_receive_port_exposures,
-                                     analog_reduce_port_exposures),
-                               key=attrgetter('name')):
+        all_exposures = []
+        for exposure in chain(port_exposures,
+                              analog_send_port_exposures,
+                              event_send_port_exposures,
+                              event_receive_port_exposures,
+                              analog_receive_port_exposures,
+                              analog_reduce_port_exposures):
             if isinstance(exposure, tuple):
                 exposure = BasePortExposure.from_tuple(exposure, self)
             exposure.bind(self)
+            all_exposures.append(exposure)
+        # Ensure exposures are added in order
+        for exposure in sorted(all_exposures, key=attrgetter('name')):
             self.add(exposure)
         # =====================================================================
         # Set port connections
@@ -335,14 +338,18 @@ class MultiDynamics(Dynamics):
             analog_port_connections = []
         if event_port_connections is None:
             event_port_connections = []
-        for port_connection in sorted(chain(port_connections,
-                                            analog_port_connections,
-                                            event_port_connections),
-                                      key=attrgetter('name')):
+        all_port_connections = []
+        for port_connection in chain(port_connections,
+                                     analog_port_connections,
+                                     event_port_connections):
             if isinstance(port_connection, tuple):
                 port_connection = BasePortConnection.from_tuple(
                     port_connection, self)
             port_connection.bind(self)
+            all_port_connections.append(port_connection)
+        # Ensure port-connections are added in order
+        for port_connection in sorted(all_port_connections,
+                                      key=attrgetter('name')):
             self.add(port_connection)
 
         self.annotations.set((VALIDATION, PY9ML_NS), DIMENSIONALITY,

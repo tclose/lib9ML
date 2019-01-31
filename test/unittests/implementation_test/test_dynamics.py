@@ -17,6 +17,7 @@ if __name__ == '__main__':
         def decorator(test):  # @UnusedVariable
             def error_message(*args, **kwargs):
                 raise Exception(reason)
+        return decorator
 
     def skipIf(condition, reason):
         """Dummy skipIf that just returns original function"""
@@ -27,6 +28,7 @@ if __name__ == '__main__':
             else:
                 # Else return plain test function
                 return test
+        return decorator
 else:
     from unittest import TestCase, skipIf
 
@@ -206,9 +208,7 @@ if __name__ == '__main__':
     import numpy as np
     dt = 0.001 * un.ms
     duration = 100.0 * un.ms
-    model = 'hodgkin_huxley'
-    print("Simulating {} model for {} with {} resolution".format(model,
-                                                                 duration, dt))
+    model = 'liaf_alpha_syn'
     tester = TestDynamics()
     sink = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration)
     if isinstance(sink, AnalogSink):

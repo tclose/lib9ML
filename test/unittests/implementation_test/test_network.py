@@ -78,8 +78,6 @@ if __name__ == '__main__':
     order = 10
     duration = 20.0 * un.ms
     model = 'brunel'
-    print("Simulating {} model for {} with {} resolution".format(
-        model, duration, dt))
     tester = TestNetwork()
     test = getattr(tester, 'test_{}'.format(model))
     sinks = test(dt=dt, duration=duration, case=case, order=order,
