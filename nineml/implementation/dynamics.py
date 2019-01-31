@@ -238,6 +238,11 @@ class Regime(object):
         stop_t : Quantity(time)
             The time to run the simulation until
         """
+        if not self.updates:
+            # Make the time-step infinite if there ae no time derivative
+            # updates as there is no need to step incrementally, just go to the
+            # next handled event
+            dt = float('inf')
         transitions = []
         while dynamics.t < stop_t:
             # If new state has been assigned by a transition in a previous
@@ -279,22 +284,17 @@ class Regime(object):
                     remaining_transitions_valid = False
                 # Assign new state values
                 if transition.defn.num_state_assignments:
-                    # If the state has been assigned mid-step, we rewind the
-                    # simulation to the time of the assignment
-                    if transition_t < proposed_t:
-                        # Check for states that aren't explicitly assigned as
-                        # we will need to run a shortened version of the step
-                        # up to the the trigger time (otherwise if all states
-                        # updated by time-derivatives are assigned they just
-                        # assume the assigned values)
-                        if (set(self.defn.time_derivative_variables) -
-                              set(transition.defn.state_assignment_variables)):
-                            proposed_state, proposed_t = self.step(
-                                dynamics, transition_t - dynamics.t)
-                            assert transition_t == proposed_t
+                    # If the state is to been assigned mid-step and not all
+                    # states with time-derivatives are assigned, we need to
+                    # rewind the simulation to the time of the assignment
+                    if transition_t < proposed_t and (
+                        set(self.defn.time_derivative_variables) -
+                            set(transition.defn.state_assignment_variables)):
+                        proposed_state, _ = self.step(
+                            dynamics, transition_t - dynamics.t)
                     # Assign states
                     proposed_state = transition.assign_states(dynamics,
-                                                              t=proposed_t)
+                                                              t=transition_t)
                     # Since we have assigned new states, remaining detected
                     # transitions are not necessarily valid and will need to
                     # be checked in the next loop

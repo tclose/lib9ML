@@ -167,7 +167,7 @@ class EventSink(Port):
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
         sinks = sorted(sinks, key=attrgetter('name'))
-        spikes = list(zip(chain(*(
+        spikes = list(zip(*chain(*(
             zip(s.events, repeat(i)) for i, s in enumerate(sinks)))))
         plt.figure()
         if spikes:

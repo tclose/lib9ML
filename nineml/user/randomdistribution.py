@@ -39,7 +39,7 @@ class RandomDistributionProperties(Component):
         elif self.standard_library == self.UNCERTML_PREFIX + 'poisson':
             value = numpy.random.poisson(1.0 / self['rate'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'exponential':
-            value = numpy.random.exponential(self['rate'].value)
+            value = numpy.random.exponential(1.0 / self['rate'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'normal':
             value = numpy.random.normal(self['mean'].value,
                                          self['variannce'].value)
