@@ -5,11 +5,15 @@ from copy import copy
 from collections import deque, OrderedDict
 import numpy.random
 import bisect
+from logging import getLogger
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
 from .utils import ProgressBar
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
+
+
+logger = getLogger('nineml')
 
 
 # Set common symbol used to denote step size
@@ -117,6 +121,7 @@ class Dynamics(object):
                 self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
+        self.progress_bar.close()
 
     def all_values(self, dt=None, state=None, t=None):
         if state is None:
@@ -153,6 +158,7 @@ class DynamicsClass(object):
     def __init__(self, model, regime_kwargs=None, **kwargs):
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
+        logger.info("Initialising '{}' class".format(model.name))
         self.defn = model.substitute_aliases()
         self.constants = OrderedDict(
             (c.name, float(c.quantity.in_si_units()))
@@ -178,6 +184,7 @@ class DynamicsClass(object):
             except NineMLNameError:
                 expr = sp.Symbol(port.name)
             self.port_aliases[port.name] = self.lambdify(expr)
+        logger.info("Finished initialising '{}' class".format(model.name))
 
     def __repr__(self):
         return "{}(definition={})".format(type(self).__name__,
@@ -673,6 +680,8 @@ class LinearRegime(Regime):
             sp.Symbol(n) for n in self.defn.time_derivative_variables]
 
         if active_vars:
+            logger.info("Solving linear ODEs for '{}' regime of '{}' class"
+                        .format(self.defn.name, self.parent.defn.name))
             # Get coefficient matrix
             self.coeffs = sp.zeros(len(active_vars))
             constants = sp.zeros(len(active_vars), 1)
@@ -726,6 +735,8 @@ class LinearRegime(Regime):
             # Create lambda functions to evaluate the subsitution
             # of state and parameter variables
             self.updates = self._lambdify_update_exprs(update_exprs, x)
+            logger.info("Finished solving linear ODEs for '{}' regime of '{}' "
+                        "class".format(self.defn.name, self.parent.defn.name))
 
 
 class NonlinearRegime(Regime):
@@ -734,6 +745,9 @@ class NonlinearRegime(Regime):
 
     def __init__(self, defn, parent, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
         Regime.__init__(self, defn, parent)
+        logger.info("Constructing explicit update equations for '{}' regime of"
+                    " '{}' class".format(self.defn.name,
+                                         self.parent.defn.name))
         if integration_method not in self.VALID_METHODS:
             raise NineMLUsageError(
                 "'{}' is not a valid integration method ('{}')"
@@ -767,6 +781,9 @@ class NonlinearRegime(Regime):
         # Create lambda functions to evaluate the subsitution
         # of state and parameter variables
         self.updates = self._lambdify_update_exprs(update_exprs, x)
+        logger.info("Finished constructing explicit update equations for '{}' "
+                    "regime of '{}' class".format(self.defn.name,
+                                                  self.parent.defn.name))
 
 
 class RegimeTransition(Exception):

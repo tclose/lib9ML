@@ -2,9 +2,9 @@ from operator import itemgetter
 from collections import defaultdict
 from itertools import chain, repeat
 from copy import copy
+from logging import getLogger
 import networkx as nx
 import nineml.units as un
-from pprint import pprint
 from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
     BasePortExposure)
@@ -13,6 +13,9 @@ from .dynamics import Dynamics, DynamicsClass
 from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
 from .utils import ProgressBar
 from nineml.exceptions import NineMLUsageError
+
+
+logger = getLogger('nineml')
 
 
 class Network(object):
@@ -55,6 +58,7 @@ class Network(object):
         self.model = model
         component_arrays, connection_groups = model.flatten()
         # Initialise a graph to represent the network
+        logger.info("Constructing graph of '{}' network".format(self.name))
         self.graph = nx.MultiDiGraph()
         # Add nodes (2-tuples consisting of <component-array-name> and
         # <cell-index>) for each component in each array
@@ -138,6 +142,8 @@ class Network(object):
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
+        logger.info("Merging sub-graphs connected by zero delay connections")
+        self._merged_node_cache = []
         for node in list(self.graph.nodes):
             if node not in self.graph:
                 continue  # If node has already been merged
@@ -145,6 +151,7 @@ class Network(object):
             if conn_without_delay:
                 self.merge_nodes(conn_without_delay)
         # Initialise all dynamics components in graph
+        logger.info("Initialising components")
         dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
         for node, attr in self.graph.nodes(data=True):
@@ -165,6 +172,7 @@ class Network(object):
                 name='{}_{}'.format(*node))
             self.components.append(dynamics)
         # Make all connections between dynamics components, sources and sinks
+        logger.info("Connecting components")
         for u, v, conn in self.graph.out_edges(data=True):
             u_attr = self.graph.nodes[u]
             v_attr = self.graph.nodes[v]
@@ -192,6 +200,11 @@ class Network(object):
             for component in self.components:
                 component.simulate(self.t, dt, show_progress=False)
             progress_bar.update(self.t)
+        progress_bar.close()
+
+    @property
+    def name(self):
+        return self.model.name
 
     def connected_without_delay(self, start_node, connected=None):
         """
@@ -313,7 +326,12 @@ class Network(object):
         self.graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
-        multi_props = multi_props.merge_states_of_linear_sub_components(
-            validate=False)
+        try:
+            merged = next(m for p, m in self._merged_node_cache
+                               if p == multi_props)
+        except StopIteration:
+            merged = multi_props.merge_states_of_linear_sub_components(
+                validate=False)
+            self._merged_node_cache.append((multi_props, merged))
         # Add merged node
-        self.graph.nodes[multi_node]['properties'] = multi_props
+        self.graph.nodes[multi_node]['properties'] = merged
