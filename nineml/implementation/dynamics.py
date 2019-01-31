@@ -105,7 +105,7 @@ class Dynamics(object):
             dt = float(dt.in_si_units())
         # Set progress bar
         self.progress_bar = ProgressBar(
-            self.t, stop_t, dt, show=show_progress,
+            self.t, stop_t, show=show_progress,
             label=("Simulating '{}' dynamics (dt={} s)"
                    .format(self.model.name, dt)))
         self._update_buffers()

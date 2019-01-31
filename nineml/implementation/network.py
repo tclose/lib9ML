@@ -190,7 +190,7 @@ class Network(object):
         while self.t < stop_t:
             self.t = min(stop_t, self.t + self.min_delay)
             for component in self.components:
-                component.simulate(self.t, dt, progress_bar=False)
+                component.simulate(self.t, dt, show_progress=False)
             progress_bar.update(self.t)
         progress_bar.close()
 

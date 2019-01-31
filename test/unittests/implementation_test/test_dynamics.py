@@ -141,7 +141,7 @@ class TestDynamics(TestCase):
         static_props = DynamicsProperties(
             'static_props', static, {'weight': 5 * un.nA})
         properties = MultiDynamicsProperties(
-            name='IafAlpha_sans_synapses',
+            name='IafAlpha_with_alpha_syn',
             sub_components={
                 'cell': liaf,
                 'syn': MultiDynamicsProperties(
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     import numpy as np
     dt = 0.001 * un.ms
     duration = 100.0 * un.ms
-    model = 'liaf_alpha_syn'
+    model = 'liaf'
     tester = TestDynamics()
     sink = getattr(tester, 'test_{}'.format(model))(dt=dt, duration=duration)
     if isinstance(sink, AnalogSink):
