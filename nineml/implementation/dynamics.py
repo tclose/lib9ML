@@ -117,7 +117,6 @@ class Dynamics(object):
                 self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
-        self.progress_bar.close()
 
     def all_values(self, dt=None, state=None, t=None):
         if state is None:

@@ -1,4 +1,3 @@
-import math
 from tqdm import tqdm
 
 
@@ -16,7 +15,3 @@ class ProgressBar(object):
         if self.tqdm is not None:
             self.tqdm.update(t - self.t)
             self.t = t
-
-    def close(self):
-        if self.tqdm is not None:
-            self.tqdm.close()

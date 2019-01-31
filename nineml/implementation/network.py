@@ -192,7 +192,6 @@ class Network(object):
             for component in self.components:
                 component.simulate(self.t, dt, show_progress=False)
             progress_bar.update(self.t)
-        progress_bar.close()
 
     def connected_without_delay(self, start_node, connected=None):
         """
