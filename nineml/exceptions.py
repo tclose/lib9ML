@@ -15,6 +15,10 @@ class NineMLUsageError(NineMLException):
     pass
 
 
+class NineMLCannotMergeException(NineMLException):
+    pass
+
+
 class NineMLInternalError(NineMLException):
     pass
 

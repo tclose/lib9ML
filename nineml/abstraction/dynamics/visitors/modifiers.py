@@ -13,7 +13,7 @@ from ...expressions.named import Alias
 from nineml.visitors.base import BaseVisitorWithContext
 from ...componentclass.visitors.modifiers import (
     ComponentRenameSymbol, ComponentSubstituteAliases)
-from nineml.exceptions import NineMLNameError
+from nineml.exceptions import NineMLNameError, NineMLCannotMergeException
 
 
 class DynamicsRenameSymbol(ComponentRenameSymbol,
@@ -151,17 +151,60 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
         BaseDynamicsVisitor.__init__(self)
         self.multi_dynamics = multi_properties.component_class
 
+        self.linear_sub_classes = []
+        self.nonlinear_sub_classes = []
+
+        self.state_var_map, self.param_map = self.get_name_maps(
+            multi_properties)
+
+        # Because we are iterating through child elements we can't remove and
+        # add children as we go. So we save the objects to add and remove in
+        # these lists along as the contexts they (are to) belong to
+        self.to_remove = []
+        self.to_add = []
+
+        # Flatten multi dynamics so we can map and remove unrequired states +
+        # dynamics
+        self.merged_class = self.multi_dynamics.flatten()
+        self.visit(self.merged_class)
+
+        # Add and remove new and old children as required
+        for obj, parent in self.to_remove:
+            parent.remove(obj)
+        for obj, parent in self.to_add:
+            parent.add(obj)
+
+        if validate:
+            self.merged_class.validate()
+
+        # Merge multi_properties
+        self.merged = self._merge(multi_properties)
+
+    def get_name_maps(self, multi_properties):
         # Sort sub-components into matching definitions and parameters used
         # in their time-derivatives
         candidates = defaultdict(list)
         for comp in multi_properties.sub_components:
-            if comp.component_class.is_linear():
+            comp_class = comp.component_class
+            # Cache linear and nonlinear sub-classes in list to save having to
+            # check their linearity
+            if comp_class in self.linear_sub_classes:
+                is_linear = True
+            elif comp_class in self.nonlinear_sub_classes:
+                is_linear = False
+            elif comp_class.is_linear():
+                is_linear = True
+                self.linear_sub_classes.append(comp_class)
+            else:
+                is_linear = False
+                self.nonlinear_sub_classes.append(comp_class)
+            if is_linear:
                 candidates[comp.component_class].append(comp)
 
         # Used to hold mappings from state-variable and parameter names from
         # expanded original class to merged class
-        self.state_var_map = {}
-        self.param_map = {}
+        state_var_map = {}
+        param_map = {}
 
         # Group sub-components by component class
         for comp_class, comps in candidates.items():
@@ -189,43 +232,32 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
                 ref = matching[0]
                 for match in matching[1:]:
                     for param in td_params:
-                        self.param_map[match.append_namespace(
+                        param_map[match.append_namespace(
                             param)] = ref.append_namespace(param)
                     for state_var in comp_class.state_variable_names:
-                        self.state_var_map[match.append_namespace(
+                        state_var_map[match.append_namespace(
                             state_var)] = ref.append_namespace(state_var)
+        return state_var_map, param_map
 
-        # Flatten multi dynamics so we can map and remove unrequired states +
-        # dynamics
-        self.merged = multi_properties.flatten()
-        self.merged_class = self.merged.component_class
+    def merge(self, multi_properties):
+        state_var_map, param_map = self.get_name_maps(multi_properties)
+        if state_var_map != self.state_var_map or param_map != self.param_map:
+            raise NineMLCannotMergeException
+        return self._merge(multi_properties)
 
-        # Because we are iterating through child elements we can't remove and
-        # add children as we go. So we save the objects to add and remove in
-        # these lists along as the contexts they (are to) belong to
-        self.to_remove = []
-        self.to_add = []
-
-        self.visit(self.merged_class)
-
-        # Add and remove new and old children as required
-        for obj, parent in self.to_remove:
-            parent.remove(obj)
-        for obj, parent in self.to_add:
-            parent.add(obj)
-
-        if validate:
-            self.merged_class.validate()
-
+    def _merge(self, multi_properties):
+        flattened = multi_properties.flatten(component_class=self.merged_class,
+                                             check_properties=False)
         # Removed merged properties and initial state values from merged
         # multiproperties
         for state_var in self.state_var_map:
             try:
-                self.merged.remove(self.merged.initial_value(state_var))
+                flattened.remove(flattened.initial_value(state_var))
             except NineMLNameError:
                 pass  # Initial value not provided
         for param in self.param_map:
-            self.merged.remove(self.merged.property(param))
+            flattened.remove(flattened.property(param))
+        return flattened
 
     def default_action(self, obj, nineml_cls, **kwargs):  # @UnusedVariable
         pass

@@ -138,12 +138,12 @@ class DynamicsAreLinear(BaseDynamicsVisitor):
     """
 
     def __init__(self, dynamics, outputs=None, regime_name=None,
-                 check_state_assignments=True):
+                 check_state_assignments=True, **kwargs):
         self._check_state_assignments = check_state_assignments
         self.dynamics = dynamics
         self.outputs = (set(dynamics.analog_send_port_names)
                         if outputs is None else outputs)
-        substituted = dynamics.flatten()
+        substituted = dynamics.flatten(**kwargs)
         DynamicsSubstituteAliases(substituted)
         self.input_and_states = [
             sympy.Symbol(i) for i in chain(

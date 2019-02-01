@@ -236,7 +236,7 @@ class Dynamics(ComponentClass, DynamicPortsObject):
         return DynamicsHasRandomProcess(self).found
 
     def is_linear(self, outputs=None, regime_name=None,
-                  check_state_assignments=True):
+                  check_state_assignments=True, **kwargs):
         """
         Queries whether time derivative and analog send port expressions in the
         Dynamics class is linear w.r.t. inputs and states. I.e. don't contain
@@ -258,7 +258,8 @@ class Dynamics(ComponentClass, DynamicPortsObject):
         """
         return DynamicsAreLinear(
             self, outputs=outputs, regime_name=regime_name,
-            check_state_assignments=check_state_assignments).linear
+            check_state_assignments=check_state_assignments,
+            **kwargs).linear
 
     def is_flat(self):
         return True

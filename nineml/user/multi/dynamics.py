@@ -1217,15 +1217,15 @@ class MultiDynamicsProperties(DynamicsProperties):
             port_connections=port_connections,
             document=self.document, **kwargs))
 
-    def flatten(self, name=None):
+    def flatten(self, component_class=None, name=None, **kwargs):
         if name is None:
             name = self.name + '__flat'
-            cc_name = None
-        else:
-            cc_name = name + '__dynamics'
+        if component_class is None:
+            component_class = self.component_class.flatten(name=name +
+                                                           '__dynamics')
         return DynamicsProperties(
-            name, self.component_class.flatten(name=cc_name),
-            properties=self.properties, initial_values=self.initial_values)
+            name, component_class, properties=self.properties,
+            initial_values=self.initial_values, **kwargs)
 
     def merge_states_of_linear_sub_components(self, validate=True):
         return DynamicsMergeStatesOfLinearSubComponents(

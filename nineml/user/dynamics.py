@@ -40,10 +40,10 @@ class DynamicsProperties(Component, DynamicPortsObject):
     nineml_children = Component.nineml_children + (Initial,)
 
     def __init__(self, name, definition, properties={}, initial_values={},
-                 initial_regime=None,
-                 check_initial_values=False):
+                 initial_regime=None, check_initial_values=False, **kwargs):
         super(DynamicsProperties, self).__init__(
-            name=name, definition=definition, properties=properties)
+            name=name, definition=definition, properties=properties,
+            **kwargs)
         if isinstance(initial_values, dict):
             initial_values = (Initial(name, qty)
                               for name, qty in initial_values.items())

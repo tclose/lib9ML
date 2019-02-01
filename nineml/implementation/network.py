@@ -12,7 +12,9 @@ from nineml.units import Quantity
 from .dynamics import Dynamics, DynamicsClass
 from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
 from .utils import ProgressBar
-from nineml.exceptions import NineMLUsageError
+from nineml.abstraction.dynamics.visitors.modifiers import (
+    DynamicsMergeStatesOfLinearSubComponents)
+from nineml.exceptions import NineMLUsageError, NineMLCannotMergeException
 
 
 logger = getLogger('nineml')
@@ -143,7 +145,7 @@ class Network(object):
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
         logger.info("Merging sub-graphs connected by zero delay connections")
-        self._merged_node_cache = []
+        self.cached_mergers = []
         for node in list(self.graph.nodes):
             if node not in self.graph:
                 continue  # If node has already been merged
@@ -326,12 +328,16 @@ class Network(object):
         self.graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
-        try:
-            merged = next(m for p, m in self._merged_node_cache
-                               if p == multi_props)
-        except StopIteration:
-            merged = multi_props.merge_states_of_linear_sub_components(
-                validate=False)
-            self._merged_node_cache.append((multi_props, merged))
+        merged = None
+        for cached_merger in self.cached_mergers:
+            try:
+                merged = cached_merger.merge(multi_props)
+            except NineMLCannotMergeException:
+                continue
+        if merged is None:
+            merger = DynamicsMergeStatesOfLinearSubComponents(multi_props,
+                                                              validate=False)
+            merged = merger.merged
+            self.cached_mergers.append(merger)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = merged
