@@ -34,20 +34,20 @@ class TestNetwork(TestCase):
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
                     dt=0.01 * un.ms, random_seed=None):
         random.seed(random_seed)
-        model = self._reduced_brunel_9ml(case, order, random_seed=random_seed)
+        model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
+            'Brunel_{}'.format(case))
+        if order is not None:
+            model = self._reduced_brunel(model, order, random_seed=random_seed)
         network = Network(model, start_t=0 * un.s,
-                          sinks=[('Exc__cell', 'spike_output'),
-                                 ('Inh__cell', 'spike_output'),
-                                 ('Ext__cell', 'spike_output'),
+                          sinks=[('Exc__cell', 'spike_output', range(250)),
+                                 ('Inh__cell', 'spike_output', range(250)),
+                                 ('Ext__cell', 'spike_output', range(250)),
                                  ('Exc__cell', 'v', range(10)),
-                                 ('Inh__cell', 'v')])
+                                 ('Inh__cell', 'v', range(10))])
         network.simulate(duration, dt=dt)
         return network.sinks
 
-    def _reduced_brunel_9ml(self, case, order, random_seed=None):
-
-        model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
-            'Brunel_{}'.format(case))
+    def _reduced_brunel(self, model, order, random_seed=None):
         model = model.clone()
         if random_seed is not None:
             for projection in model.projections:
@@ -73,7 +73,10 @@ class TestNetwork(TestCase):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+    import os.path as op
+    import os
     import sys
+    from argparse import ArgumentParser
     import logging
 
     logger = logging.getLogger('nineml')
@@ -84,15 +87,36 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    dt = 0.01 * un.ms
-    case = 'AI'
-    order = 50
-    duration = 20.0 * un.ms
+    parser = ArgumentParser()
+    parser.add_argument('--dt', default=0.01, type=float,
+                        help="time step size")
+    parser.add_argument('--case', default='AI', help="Brunel network case")
+    parser.add_argument('--order', default=50, type=int,
+                        help=("The number of inhibitory neurons. The rest of "
+                              "the network is scaled accordingly "
+                              "(original=1000)"))
+    parser.add_argument('--duration', default=50.0, type=float,
+                        help="The duration of the simulation")
+    parser.add_argument('--save_figs', default=None, type=str, metavar='PATH',
+                        help=("The location of the directory to save the "
+                              "generated figures"))
+    args = parser.parse_args()
+
+    if args.save_figs:
+        os.makedirs(args.save_figs, exist_ok=True)
+
+    dt = args.dt * un.ms
+    duration = args.duration * un.ms
     model = 'brunel'
     tester = TestNetwork()
     test = getattr(tester, 'test_{}'.format(model))
-    sinks = test(dt=dt, duration=duration, case=case, order=order,
+    sinks = test(dt=dt, duration=duration, case=args.case, order=args.order,
                  random_seed=12345)
     for pop_sinks in sinks.values():
-        pop_sinks[0].combined_plot(pop_sinks, show=False)
-    plt.show()
+        fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
+        if args.save_figs:
+            filename = op.commonprefix([s.name for s in pop_sinks]) + '.png'
+            fig.set_size_inches(10, 10)
+            plt.savefig(op.join(args.save_figs, filename))
+    if not args.save_figs:
+        plt.show()

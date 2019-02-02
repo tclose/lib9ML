@@ -123,13 +123,16 @@ class Network(object):
                     raise NineMLUsageError(
                         "Unrecognised component array name in list of sinks "
                         "'{}'".format(comp_array_name))
-            port = ca_dict[comp_array_name].dynamics_properties.port(port_name)
+            comp_array = ca_dict[comp_array_name]
+            port = comp_array.dynamics_properties.port(port_name)
             if port.communicates == 'analog':
                 sink_cls = AnalogSink
             else:
                 sink_cls = EventSink
             sink_array_name = '{}_{}' .format(comp_array_name, port_name)
             for index in indices:
+                if index > comp_array.size:
+                    continue  # Skip this sink as it is out of bounds
                 sink = sink_cls(sink_array_name + str(index))
                 self.sinks[sink_array_name].append(sink)
                 # NB: Use negative index to avoid any (unlikely) name-clashes
@@ -179,13 +182,17 @@ class Network(object):
             u_attr = self.graph.nodes[u]
             v_attr = self.graph.nodes[v]
             try:
-                from_port = u_attr['dynamics'].ports[conn['src_port']]
+                dyn = u_attr['dynamics']
             except KeyError:
                 from_port = u_attr['source']
+            else:
+                from_port = dyn.ports[conn['src_port']]
             try:
-                to_port = v_attr['dynamics'].ports[conn['dest_port']]
+                dyn = v_attr['dynamics']
             except KeyError:
                 to_port = v_attr['sink']
+            else:
+                to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
 
     def simulate(self, stop_t, dt, show_progress=True):

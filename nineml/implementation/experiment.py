@@ -88,6 +88,7 @@ class AnalogSink(AnalogReceivePort):
         plt.xlabel('time (s)')
         if show:
             plt.show()
+        return fig
 
     @classmethod
     def combined_plot(cls, sinks, times=None, show=True):
@@ -113,6 +114,7 @@ class AnalogSink(AnalogReceivePort):
         plt.xlabel('time (s)')
         if show:
             plt.show()
+        return fig
 
     def _plot_trace(self, ax, times, label=None):
         ax.plot(times, self.values(times), label=label)
@@ -153,13 +155,14 @@ class EventSink(Port):
         if plt is None:
             raise ImportError(
                 "Cannot plot as matplotlib is not installed")
-        plt.figure()
+        fig = plt.figure()
         if self.events:
             plt.scatter(self.events, 0)
         plt.xlabel('Time (ms)')
         plt.title("{} Events".format(self.name))
         if show:
             plt.show()
+        return fig
 
     @classmethod
     def combined_plot(self, sinks, show=True):
@@ -169,7 +172,7 @@ class EventSink(Port):
         sinks = sorted(sinks, key=attrgetter('name'))
         spikes = list(zip(*chain(*(
             zip(s.events, repeat(i)) for i, s in enumerate(sinks)))))
-        plt.figure()
+        fig = plt.figure()
         if spikes:
             plt.scatter(*spikes)
         plt.xlabel('Time (ms)')
@@ -178,6 +181,7 @@ class EventSink(Port):
             op.commonprefix([s.name for s in sinks]).strip('_')))
         if show:
             plt.show()
+        return fig
 
     @classmethod
     def histogram_plot(cls, sinks, duration, bin_width, show=True):
