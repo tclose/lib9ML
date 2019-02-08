@@ -8,7 +8,7 @@ import bisect
 from logging import getLogger
 import sympy as sp
 # from sympy.utilities.lambdify import lambdastr
-from .utils import ProgressBar
+from tqdm import tqdm
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
 
@@ -78,6 +78,7 @@ class Dynamics(object):
         for pdef in self.defn.analog_reduce_ports:
             self.ports[pdef.name] = self.analog_reduce_ports[pdef.name] = (
                 AnalogReducePort(pdef, self))
+        self.progress_bar = None
 
     @property
     def dt(self):
@@ -92,9 +93,10 @@ class Dynamics(object):
 
     def update_state(self, new_state, new_t):
         self._state = new_state
+        dt = new_t - self._t
         self._t = new_t
         self._update_buffers()
-        self.progress_bar.update(new_t)
+        self.progress_bar.update(dt)
 
     def _update_buffers(self):
         for port in chain(self.analog_send_ports.values(),
@@ -108,10 +110,10 @@ class Dynamics(object):
         if isinstance(dt, Quantity):
             dt = float(dt.in_si_units())
         # Set progress bar
-        self.progress_bar = ProgressBar(
-            self.t, stop_t, show=show_progress,
-            label=("Simulating '{}' dynamics (dt={} s)"
-                   .format(self.model.name, dt)))
+        self.progress_bar = tqdm(
+            initial=self.t, total=stop_t, desc=(
+                "Simulating '{}' (dt={} s)".format(self.model.name, dt)),
+            disable=not show_progress)
         self._update_buffers()
         # Update the simulation until stop_t
         while self.t < stop_t:
@@ -121,7 +123,6 @@ class Dynamics(object):
                 self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
-        self.progress_bar.close()
 
     def all_values(self, dt=None, state=None, t=None):
         if state is None:

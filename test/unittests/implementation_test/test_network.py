@@ -78,6 +78,7 @@ if __name__ == '__main__':
     import sys
     from argparse import ArgumentParser
     import logging
+    import pickle as pkl
 
     logger = logging.getLogger('nineml')
 
@@ -100,6 +101,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_figs', default=None, type=str, metavar='PATH',
                         help=("The location of the directory to save the "
                               "generated figures"))
+    parser.add_argument('--save_sinks', default=None, type=str,
+                        help=("Save sinks instead of plotting results"))
     args = parser.parse_args()
 
     if args.save_figs:
@@ -112,11 +115,16 @@ if __name__ == '__main__':
     test = getattr(tester, 'test_{}'.format(model))
     sinks = test(dt=dt, duration=duration, case=args.case, order=args.order,
                  random_seed=12345)
-    for pop_sinks in sinks.values():
-        fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
-        if args.save_figs:
-            filename = op.commonprefix([s.name for s in pop_sinks]) + '.png'
-            fig.set_size_inches(10, 10)
-            plt.savefig(op.join(args.save_figs, filename))
-    if not args.save_figs:
-        plt.show()
+    if args.save_sinks is None:
+        for pop_sinks in sinks.values():
+            fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
+            if args.save_figs:
+                filename = (op.commonprefix([s.name for s in pop_sinks]) +
+                            '.png')
+                fig.set_size_inches(10, 10)
+                plt.savefig(op.join(args.save_figs, filename))
+        if not args.save_figs:
+            plt.show()
+    else:
+        with open(args.save_sinks) as f:
+            pkl.dump(f, sinks)

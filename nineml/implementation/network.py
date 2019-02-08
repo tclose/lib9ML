@@ -11,7 +11,7 @@ from nineml.user import (
 from nineml.units import Quantity
 from .dynamics import Dynamics, DynamicsClass
 from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
-from .utils import ProgressBar
+from tqdm import tqdm
 from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import NineMLUsageError, NineMLCannotMergeException
@@ -47,9 +47,12 @@ class Network(object):
         tuple consists of 2 or 3 values corresponding to:
             <comp-array-name>, <send-port-name>, <node-indices> (optional)
         If node indices are not provided then sinks are added to all nodes
+    show_progress : bool
+        Whether to show progress of network construction
     """
 
-    def __init__(self, model, start_t, sources=None, sinks=None):
+    def __init__(self, model, start_t, sources=None, sinks=None,
+                 show_progress=True):
         if isinstance(start_t, Quantity):
             start_t = float(start_t.in_si_units())
         if sources is None:
@@ -60,7 +63,10 @@ class Network(object):
         self.model = model
         component_arrays, connection_groups = model.flatten()
         # Initialise a graph to represent the network
-        logger.info("Constructing graph of '{}' network".format(self.name))
+        progress_bar = tqdm(
+            total=sum(ca.size for ca in component_arrays),
+            desc="Adding nodes to network graph",
+            disable=not show_progress)
         self.graph = nx.MultiDiGraph()
         # Add nodes (2-tuples consisting of <component-array-name> and
         # <cell-index>) for each component in each array
@@ -71,8 +77,13 @@ class Network(object):
             for i in range(comp_array.size):
                 self.graph.add_node((comp_array.name, i),
                                     properties=props.sample(i))
+                progress_bar.update()
         # Add connections between components from connection groups
         self.min_delay = float('inf')
+        progress_bar = tqdm(
+            total=sum(len(cg) for cg in connection_groups),
+            desc="Adding edges to network graph",
+            disable=not show_progress)
         for conn_group in connection_groups:
             delay_qty = conn_group.delay
             if delay_qty is None:
@@ -89,6 +100,7 @@ class Network(object):
                     dest_port=conn_group.destination_port)
                 if delay and delay < self.min_delay:
                     self.min_delay = delay
+                progress_bar.update()
         # Add sources to network graph
         self.sources = defaultdict(list)
         for comp_array_name, port_name, index, signal in sources:
@@ -147,19 +159,25 @@ class Network(object):
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
-        logger.info("Merging sub-graphs connected by zero delay connections")
+        progress_bar = tqdm(
+            total=len(self.graph),
+            desc="Merging sub-graphs with delayless connections",
+            disable=not show_progress)
         self.cached_mergers = []
         for node in list(self.graph.nodes):
             if node not in self.graph:
                 continue  # If node has already been merged
             conn_without_delay = self.connected_without_delay(node)
+            num_to_merge = len(conn_without_delay)
             if conn_without_delay:
                 self.merge_nodes(conn_without_delay)
+            progress_bar.update(num_to_merge)
         # Initialise all dynamics components in graph
-        logger.info("Initialising components")
         dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
-        for node, attr in self.graph.nodes(data=True):
+        for node, attr in tqdm(self.graph.nodes(data=True),
+                               desc="Iniitalising dynamics",
+                               disable=not show_progress):
             # Attempt to reuse DynamicsClass objects between Dynamics objects
             # to save reanalysing their equations
             try:
@@ -177,8 +195,9 @@ class Network(object):
                 name='{}_{}'.format(*node))
             self.components.append(dynamics)
         # Make all connections between dynamics components, sources and sinks
-        logger.info("Connecting components")
-        for u, v, conn in self.graph.out_edges(data=True):
+        for u, v, conn in tqdm(self.graph.out_edges(data=True),
+                               desc="Connecting components",
+                               disable=not show_progress):
             u_attr = self.graph.nodes[u]
             v_attr = self.graph.nodes[v]
             try:
@@ -200,16 +219,18 @@ class Network(object):
             stop_t = float(stop_t.in_units(un.s))
         if isinstance(dt, Quantity):
             dt = float(dt.in_si_units())
-        progress_bar = ProgressBar(
-            self.t, stop_t, show=show_progress,
-            label=("Simulating '{}' network (dt={} s)"
-                   .format(self.model.name, dt)),)
+        progress_bar = tqdm(
+            initial=self.t, total=stop_t,
+            desc=("Simulating '{}' network (dt={} s)".format(self.model.name,
+                                                             dt)),
+            disable=not show_progress)
         while self.t < stop_t:
-            self.t = min(stop_t, self.t + self.min_delay)
+            new_t = min(stop_t, self.t + self.min_delay)
+            pb_step = (new_t - self.t) / len(self.components)
             for component in self.components:
-                component.simulate(self.t, dt, show_progress=False)
-            progress_bar.update(self.t)
-        progress_bar.close()
+                component.simulate(new_t, dt, show_progress=False)
+                progress_bar.update(pb_step)
+            self.t = new_t
 
     @property
     def name(self):
