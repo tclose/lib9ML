@@ -103,18 +103,27 @@ if __name__ == '__main__':
                               "generated figures"))
     parser.add_argument('--save_sinks', default=None, type=str,
                         help=("Save sinks instead of plotting results"))
+    parser.add_argument('--load_sinks', default=None, type=str,
+                        help=("Load previously saved sinks and plot"))
     args = parser.parse_args()
 
     if args.save_figs:
         os.makedirs(args.save_figs, exist_ok=True)
 
-    dt = args.dt * un.ms
-    duration = args.duration * un.ms
-    model = 'brunel'
-    tester = TestNetwork()
-    test = getattr(tester, 'test_{}'.format(model))
-    sinks = test(dt=dt, duration=duration, case=args.case, order=args.order,
-                 random_seed=12345)
+    if args.save_sinks and args.load_sinks:
+        raise Exception("Can't load and save sinks simultaneously")
+
+    if not args.load_sinks:
+        dt = args.dt * un.ms
+        duration = args.duration * un.ms
+        model = 'brunel'
+        tester = TestNetwork()
+        test = getattr(tester, 'test_{}'.format(model))
+        sinks = test(dt=dt, duration=duration, case=args.case,
+                     order=args.order, random_seed=12345)
+    else:
+        with open(args.load_sinks) as f:
+            sinks = pkl.load(f)
     if args.save_sinks is None:
         for pop_sinks in sinks.values():
             fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
@@ -126,5 +135,5 @@ if __name__ == '__main__':
         if not args.save_figs:
             plt.show()
     else:
-        with open(args.save_sinks) as f:
+        with open(args.save_sinks, 'w') as f:
             pkl.dump(f, sinks)

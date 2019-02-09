@@ -78,13 +78,12 @@ class Network(object):
                 self.graph.add_node((comp_array.name, i),
                                     properties=props.sample(i))
                 progress_bar.update()
+        progress_bar.close()
         # Add connections between components from connection groups
         self.min_delay = float('inf')
-        progress_bar = tqdm(
-            total=sum(len(cg) for cg in connection_groups),
-            desc="Adding edges to network graph",
-            disable=not show_progress)
-        for conn_group in connection_groups:
+        for conn_group in tqdm(connection_groups,
+                               desc="Adding edges to network graph",
+                               disable=not show_progress):
             delay_qty = conn_group.delay
             if delay_qty is None:
                 delays = repeat(0.0)
@@ -100,7 +99,6 @@ class Network(object):
                     dest_port=conn_group.destination_port)
                 if delay and delay < self.min_delay:
                     self.min_delay = delay
-                progress_bar.update()
         # Add sources to network graph
         self.sources = defaultdict(list)
         for comp_array_name, port_name, index, signal in sources:
@@ -143,16 +141,16 @@ class Network(object):
                 sink_cls = EventSink
             sink_array_name = '{}_{}' .format(comp_array_name, port_name)
             for index in indices:
-                if index > comp_array.size:
+                if index >= comp_array.size:
                     continue  # Skip this sink as it is out of bounds
                 sink = sink_cls(sink_array_name + str(index))
                 self.sinks[sink_array_name].append(sink)
                 # NB: Use negative index to avoid any (unlikely) name-clashes
                 #     with other component arrays
-                self.graph.add_node((sink_array_name, -(index + 1)), sink=sink)
+                sink_node_id = (sink_array_name, -(index + 1))
+                self.graph.add_node(sink_node_id, sink=sink)
                 self.graph.add_edge(
-                    (comp_array_name, index),
-                    (sink_array_name, -(index + 1)),
+                    (comp_array_name, index), sink_node_id,
                     communicates=port.communicates,
                     delay=self.min_delay,
                     src_port=port_name)
@@ -169,9 +167,10 @@ class Network(object):
                 continue  # If node has already been merged
             conn_without_delay = self.connected_without_delay(node)
             num_to_merge = len(conn_without_delay)
-            if conn_without_delay:
+            if num_to_merge > 1:
                 self.merge_nodes(conn_without_delay)
             progress_bar.update(num_to_merge)
+        progress_bar.close()
         # Initialise all dynamics components in graph
         dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
@@ -251,6 +250,7 @@ class Network(object):
         """
         if connected is None:
             connected = set()
+        connected.add(start_node)
         # Iterate all in-coming and out-going edges and check for
         # any zero delays. If so, add to set of nodes to merge
         for neigh, conn in chain(
@@ -259,7 +259,6 @@ class Network(object):
             ((n, c) for _, n, c in self.graph.out_edges(start_node,
                                                         data=True))):
             if not conn['delay'] and neigh not in connected:
-                connected.add(neigh)
                 # Recurse through neighbours edges
                 self.connected_without_delay(neigh, connected=connected)
         return connected
