@@ -72,7 +72,10 @@ class TestNetwork(TestCase):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        plt = None
     import os.path as op
     import os
     import sys
@@ -135,5 +138,5 @@ if __name__ == '__main__':
         if not args.save_figs:
             plt.show()
     else:
-        with open(args.save_sinks, 'w') as f:
-            pkl.dump(f, sinks)
+        with open(args.save_sinks, 'wb') as f:
+            pkl.dump(sinks, f)

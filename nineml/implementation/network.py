@@ -120,6 +120,8 @@ class Network(object):
                 communicates=port.communicates,
                 delay=self.min_delay,
                 dest_port=port_name)
+        # Replace default dict with a regular dict to allow it to be pickled
+        self.sources = dict(self.sources)
         # Add sinks to network graph
         self.sinks = defaultdict(list)
         for sink_tuple in sinks:
@@ -154,6 +156,8 @@ class Network(object):
                     communicates=port.communicates,
                     delay=self.min_delay,
                     src_port=port_name)
+        # Replace default dict with regular dict to allow it to be pickled
+        self.sinks = dict(self.sinks)
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
@@ -222,14 +226,16 @@ class Network(object):
             initial=self.t, total=stop_t,
             desc=("Simulating '{}' network (dt={} s)".format(self.model.name,
                                                              dt)),
+            unit='s (sim)', unit_scale=True,
             disable=not show_progress)
         while self.t < stop_t:
             new_t = min(stop_t, self.t + self.min_delay)
-            pb_step = (new_t - self.t) / len(self.components)
+            slice_dt = new_t - self.t
             for component in self.components:
                 component.simulate(new_t, dt, show_progress=False)
-                progress_bar.update(pb_step)
             self.t = new_t
+            progress_bar.update(slice_dt)
+        progress_bar.close()
 
     @property
     def name(self):

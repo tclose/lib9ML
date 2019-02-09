@@ -113,6 +113,7 @@ class Dynamics(object):
         self.progress_bar = tqdm(
             initial=self.t, total=stop_t, desc=(
                 "Simulating '{}' (dt={} s)".format(self.model.name, dt)),
+            unit='s (sim)', unit_scale=True,
             disable=not show_progress)
         self._update_buffers()
         # Update the simulation until stop_t
@@ -123,6 +124,7 @@ class Dynamics(object):
                 self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
                 self.regime = self.dynamics_class.regimes[transition.target]
+        self.progress_bar.close()
 
     def all_values(self, dt=None, state=None, t=None):
         if state is None:
