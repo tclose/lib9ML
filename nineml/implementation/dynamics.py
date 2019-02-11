@@ -220,8 +220,13 @@ class DynamicsClass(object):
         "Lambdifies a sympy expression, substituting in all values"
         symbols = self.all_symbols
         symbols.extend(extra_symbols)
-#         return sp.lambdify(symbols, expr, 'math')
-        return Expression(symbols, expr)
+        return sp.lambdify(symbols, expr, 'math')
+        # Convert expression into a string representation of a lambda function
+#         lstr = lambdastr(symbols, expr, 'math')
+#         lfunc = eval(lstr)
+#         # Save lambda string for pickling/unpickling
+#         lfunc.str = lstr
+#         return lfunc
 
 
 class Regime(object):
@@ -345,7 +350,7 @@ class Regime(object):
             proposed_state = copy(dynamics.state)
             values = dynamics.all_values(dt=dt)
             for var_name, update in self.updates.items():
-                proposed_state[var_name] = update.eval(*values)
+                proposed_state[var_name] = update(*values)
         else:
             # No time derivatives in regime so state stays the same
             proposed_state = dynamics.state
@@ -406,9 +411,9 @@ class Transition(object):
         for var_name, (assign, rand_vars) in self._assigns.items():
             rand_values = {}
             for rv_name, (rand_func, args_lambdas) in rand_vars.items():
-                args = [al.eval(*all_values) for al in args_lambdas]
+                args = [al(*all_values) for al in args_lambdas]
                 rand_values[rv_name] = rand_func(*args)
-            state[var_name] = assign.eval(*all_values, **rand_values)
+            state[var_name] = assign(*all_values, **rand_values)
         return state
 
 
@@ -446,10 +451,9 @@ class OnCondition(Transition):
         values = dynamics.all_values()
         proposed_values = dynamics.all_values(state=proposed_state,
                                               t=proposed_t)
-        if not self.trigger_expr.eval(*values) and self.trigger_expr.eval(
-          *proposed_values):  # @IgnorePep8
+        if not self.trigger_expr(*values) and self.trigger_expr(*proposed_values):  # @IgnorePep8
             if self.trigger_time_expr is not None:
-                trigger_time = self.trigger_time_expr.eval(*values)
+                trigger_time = self.trigger_time_expr(*values)
             else:
                 # Default to proposed time if we can't solve trigger expression
                 trigger_time = proposed_t
@@ -584,7 +588,7 @@ class AnalogSendPort(Port):
         """
         if self.receivers:
             self.buffer.append((self.parent.t,
-                                self.expr.eval(*self.parent.all_values())))
+                                self.expr(*self.parent.all_values())))
 
     def clear_buffer(self, min_t):
         while self.buffer[0][0] < min_t:
