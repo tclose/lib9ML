@@ -7,7 +7,6 @@ import numpy.random
 import bisect
 from logging import getLogger
 import sympy as sp
-# from sympy.utilities.lambdify import lambdastr
 from tqdm import tqdm
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
@@ -21,6 +20,19 @@ dt_symbol = 'dt_'
 
 
 class Dynamics(object):
+    """
+    An implementation of a Dynamics model in pure Python. The dynamics model
+    is flattened into a single-component dynamics class.
+
+    Parameters
+    ----------
+    model : nineml.user.DynamicsProperties
+        The DynamicsProperties to initialise the component with.
+    start_t : Quantity (time) | float (s)
+        The initial time that dynamics is initialised with
+    initial_state : dict(str, float)
+        The state that dynamics is initialised with
+    """
 
     def __init__(self, model, start_t, initial_state=None, array_index=None,
                  initial_regime=None, dynamics_class=None, name=None):
@@ -208,18 +220,12 @@ class DynamicsClass(object):
         "Lambdifies a sympy expression, substituting in all values"
         symbols = self.all_symbols
         symbols.extend(extra_symbols)
-        return sp.lambdify(symbols, expr, 'math')
-        # Convert expression into a string representation of a lambda function
-#         lstr = lambdastr(symbols, expr, 'math')
-#         lfunc = eval(lstr)
-#         # Save lambda string for pickling/unpickling
-#         lfunc.str = lstr
-#         return lfunc
+#         return sp.lambdify(symbols, expr, 'math')
+        return Expression(symbols, expr)
 
 
 class Regime(object):
     """
-
     Simulate the regime for the given duration unless an event is
     raised.
 
@@ -339,7 +345,7 @@ class Regime(object):
             proposed_state = copy(dynamics.state)
             values = dynamics.all_values(dt=dt)
             for var_name, update in self.updates.items():
-                proposed_state[var_name] = update(*values)
+                proposed_state[var_name] = update.eval(*values)
         else:
             # No time derivatives in regime so state stays the same
             proposed_state = dynamics.state
@@ -400,9 +406,9 @@ class Transition(object):
         for var_name, (assign, rand_vars) in self._assigns.items():
             rand_values = {}
             for rv_name, (rand_func, args_lambdas) in rand_vars.items():
-                args = [al(*all_values) for al in args_lambdas]
+                args = [al.eval(*all_values) for al in args_lambdas]
                 rand_values[rv_name] = rand_func(*args)
-            state[var_name] = assign(*all_values, **rand_values)
+            state[var_name] = assign.eval(*all_values, **rand_values)
         return state
 
 
@@ -440,9 +446,10 @@ class OnCondition(Transition):
         values = dynamics.all_values()
         proposed_values = dynamics.all_values(state=proposed_state,
                                               t=proposed_t)
-        if not self.trigger_expr(*values) and self.trigger_expr(*proposed_values):  # @IgnorePep8
+        if not self.trigger_expr.eval(*values) and self.trigger_expr.eval(
+          *proposed_values):  # @IgnorePep8
             if self.trigger_time_expr is not None:
-                trigger_time = self.trigger_time_expr(*values)
+                trigger_time = self.trigger_time_expr.eval(*values)
             else:
                 # Default to proposed time if we can't solve trigger expression
                 trigger_time = proposed_t
@@ -577,7 +584,7 @@ class AnalogSendPort(Port):
         """
         if self.receivers:
             self.buffer.append((self.parent.t,
-                                self.expr(*self.parent.all_values())))
+                                self.expr.eval(*self.parent.all_values())))
 
     def clear_buffer(self, min_t):
         while self.buffer[0][0] < min_t:
@@ -807,3 +814,24 @@ class SolverNotValidForRegimeException(Exception):
     Raised when the selected solver isn't appropriate for the given ODE
     system
     """
+
+
+class Expression(object):
+    """
+    A thin wrapper around a lambda function that can be pickled
+
+    Parameters
+    ----------
+    symbols : list(str)
+        The list of symbols to be the substituted
+    expr : sympy.Expression
+        The Sympy expression
+    """
+
+    def __init__(self, symbols, expr):
+        self._symbols = symbols
+        self._expr = expr
+        self.eval = sp.lambdify(symbols, expr)
+
+    def __getinitargs__(self):
+        return self._symbols, self._expr
