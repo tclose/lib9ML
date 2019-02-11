@@ -220,7 +220,9 @@ class DynamicsClass(object):
         "Lambdifies a sympy expression, substituting in all values"
         symbols = self.all_symbols
         symbols.extend(extra_symbols)
-        return sp.lambdify(symbols, expr, 'math')
+        args = (symbols, expr, 'math')
+        func = sp.lambdify(*args)
+        return func
         # Convert expression into a string representation of a lambda function
 #         lstr = lambdastr(symbols, expr, 'math')
 #         lfunc = eval(lstr)
