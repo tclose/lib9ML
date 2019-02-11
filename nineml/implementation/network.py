@@ -22,7 +22,7 @@ logger = getLogger('nineml')
 
 class Network(object):
     """
-    An implementation of Network model in pure python. All populations and
+    An implementation of Network model in pure Python. All populations and
     projections in the network model are first flattened to component-arrays
     and connection groups, then a network graph is constructed using networkx.
     Sub-graphs of nodes connected by delayless connections are merged into
@@ -218,6 +218,18 @@ class Network(object):
             from_port.connect_to(to_port, delay=conn['delay'])
 
     def simulate(self, stop_t, dt, show_progress=True):
+        """
+        Simulate the network until stop_t
+
+        Parameters
+        ----------
+        stop_t : Quantity (time) | float (s)
+            The time to simulate the network until
+        dt : Quantity (time) | float (s)
+            The timestep for the components
+        show_progress : bool
+            Display a progress bar.
+        """
         if isinstance(stop_t, Quantity):
             stop_t = float(stop_t.in_units(un.s))
         if isinstance(dt, Quantity):
