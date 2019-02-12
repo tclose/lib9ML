@@ -386,3 +386,43 @@ class Network(object):
             self.cached_mergers.append(merger)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = merged
+        
+
+
+# Thoughts for multiprocessing
+
+
+# In [11]: from collections import defaultdict
+# In [12]: import multiprocessing as mp
+# 
+# In [13]: num_procs = 5
+# 
+# In [25]: def send_receive(i, send_pipes, recv_pipes, barrier, print_lock):
+#     ...:     print_lock.acquire()
+#     ...:     print((i, send_pipes, recv_pipes, barrier, print_lock))
+#     ...:     print_lock.release()
+#     ...:     for pipe in send_pipes.values():
+#     ...:         pipe.send(i)
+#     ...:     barrier.wait()
+#     ...:     for pipe in recv_pipes.values():
+#     ...:         print_lock.acquire()
+#     ...:         print('{} received msg from {}'.format(i, pipe.recv()))
+#     ...:         print_lock.release()
+# 
+# In [12]: send_pipes = defaultdict(dict)
+#     ...: recv_pipes = defaultdict(dict)
+#     ...: for i in range(num_procs):
+#     ...:     for j in range(num_procs):
+#     ...:         send_pipes[i][j], recv_pipes[j][i] = mp.Pipe()
+# 
+# In [13]: print_lock = mp.Lock()
+# 
+# In [14]: barrier = mp.Barrier(num_procs)
+# 
+# In [26]: procs = [mp.Process(target=send_receive, args=(i, send_pipes[i], recv_pipes[i], barrier, print_lock)) for i in range(num_procs)]
+# 
+# In [27]: for p in procs:
+#     ...:     p.start()
+#     ...: for p in procs:
+#     ...:     p.join()
+
