@@ -138,8 +138,8 @@ if __name__ == '__main__':
         if not args.save_figs:
             plt.show()
     else:
-        for pop_sinks in sinks.values():
-            sink_name = op.commonprefix([s.name for s in pop_sinks])
-            pop_sinks[0].save()
         with open(args.save_sinks, 'wb') as f:
+            sinks = {
+                pop_name: [s.picklable() for s in pop_sinks]
+                for pop_name, pop_sinks in sinks.items()}
             pkl.dump(sinks, f)
