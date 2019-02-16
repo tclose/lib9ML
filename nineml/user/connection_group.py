@@ -175,15 +175,12 @@ class BaseConnectionGroup(
                     (dest_pop, dest_start, dest_end)) in enumerate(product(
                         sources, destinations)):
                 # Get source and destination component arrays
-                try:
-                    source_array = component_arrays[
-                        source_pop.name +
-                        ComponentArray.suffix[port_conn.sender_role]]
-                    dest_array = component_arrays[
-                        dest_pop.name +
-                        ComponentArray.suffix[port_conn.receiver_role]]
-                except:
-                    raise
+                source_array = component_arrays[
+                    source_pop.name +
+                    ComponentArray.suffix[port_conn.sender_role]]
+                dest_array = component_arrays[
+                    dest_pop.name +
+                    ComponentArray.suffix[port_conn.receiver_role]]
                 if len(sources) == 1 and len(destinations) == 1:
                     # There is only one conn_group generated from this port
                     # connection
@@ -197,7 +194,10 @@ class BaseConnectionGroup(
                         (s - src_start, d - dest_start) for s, d in conns
                         if (s >= src_start and s < src_end and
                             d >= dest_start and d < dest_end)]
-                source_inds, dest_inds = zip(*conn_group_conns)
+                if conn_group_conns:
+                    source_inds, dest_inds = zip(*conn_group_conns)
+                else:
+                    source_inds, dest_inds = ()
                 conn_props = ConnectionRuleProperties(
                     name=conn_group_name + '_connectivity',
                     definition=explicit_connection_rule,

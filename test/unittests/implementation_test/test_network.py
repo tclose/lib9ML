@@ -52,7 +52,7 @@ class TestNetwork(TestCase):
         if random_seed is not None:
             for projection in model.projections:
                 projection.connectivity.seed = random.randint(0, LARGE_INT)
-        scale = order / model.population('Inh').size
+        scale = float(order) / model.population('Inh').size
         # rescale populations
         for pop in model.populations:
             pop.size = int(math.ceil(pop.size * scale))
@@ -138,5 +138,8 @@ if __name__ == '__main__':
         if not args.save_figs:
             plt.show()
     else:
+        for pop_sinks in sinks.values():
+            sink_name = op.commonprefix([s.name for s in pop_sinks])
+            pop_sinks[0].save()
         with open(args.save_sinks, 'wb') as f:
             pkl.dump(sinks, f)

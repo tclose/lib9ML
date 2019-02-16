@@ -6,6 +6,10 @@ import bisect
 import nineml.units as un
 from .dynamics import AnalogSendPort, AnalogReceivePort, Port
 try:
+    import cPickle as pkl
+except ImportError:
+    import pickle as pkl
+try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
@@ -91,6 +95,20 @@ class AnalogSink(AnalogReceivePort):
         return fig
 
     @classmethod
+    def save(self, path, sinks, times=None):
+        picklable_sinks = []
+        for sink in sinks:
+            if times is None:
+                sink_times = sink.default_times
+            else:
+                sink_times = times
+            picklable_sinks.append(PicklableAnalogSink(
+                sink.name, sink_times, sink.values(sink_times),
+                sink.dimension))
+        with open(path, 'w') as f:
+            pkl.dump(picklable_sinks, f)
+
+    @classmethod
     def combined_plot(cls, sinks, times=None, show=True):
         if plt is None:
             raise ImportError(
@@ -165,6 +183,11 @@ class EventSink(Port):
         return fig
 
     @classmethod
+    def save(self, path, sinks):
+        with open(path, 'w') as f:
+            pkl.dump(sinks, f)
+
+    @classmethod
     def combined_plot(self, sinks, show=True):
         if plt is None:
             raise ImportError(
@@ -196,3 +219,22 @@ class EventSink(Port):
         plt.title("{} PSTH".format(op.commonprefix(s.name for s in sinks)))
         if show:
             plt.show()
+
+
+class PicklableAnalogSink(AnalogSink):
+    """
+    A copy of an AnalogSink object that can be pickled to file but then plotted
+    as per a regular analog sink
+    """
+
+    def __init__(self, name, times, values, dimension):
+        self._name = name
+        self._times = times
+        self._values = values
+        self.dimension = dimension
+
+    def values(self, times):
+        times = [float(t.in_units(un.s)) if isinstance(t, un.Quantity) else t
+                 for t in times]
+        assert times == self._times
+        return self._values
