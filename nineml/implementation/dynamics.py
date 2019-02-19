@@ -581,7 +581,7 @@ class AnalogSendPort(Port):
             t2, v2 = self.buffer[len(self.buffer) - i]
         except IndexError:
             raise NineMLUsageError(
-                "Requested time {} s is after end of the buffer for  ({} s)"
+                "Requested time {} s is after end of the buffer for ({} s)"
                 .format(t, self._location, self.buffer[-1][0]))
         # Linearly interpolate the point between the buffer
         return v1 + (v2 - v1) * (t - t1) / (t2 - t1)
