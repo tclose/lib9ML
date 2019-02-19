@@ -1,5 +1,6 @@
 import numpy as np
 import os.path as op
+from copy import copy
 from itertools import chain, repeat
 from operator import attrgetter
 import bisect
@@ -50,6 +51,7 @@ class AnalogSink(AnalogReceivePort):
 
     def __init__(self, name):
         self._name = name
+        self._buffer = []
         self.sender = None
         self.delay = None
 
@@ -60,11 +62,6 @@ class AnalogSink(AnalogReceivePort):
     @property
     def _location(self):
         return "analog sink '{}'".format(self.name)
-
-    def values(self, times):
-        return [
-            self.value(float(t.in_units(un.s))
-                       if isinstance(t, un.Quantity) else t) for t in times]
 
     @property
     def dimension(self):
@@ -77,8 +74,9 @@ class AnalogSink(AnalogReceivePort):
         if times is None:
             times = self.default_times
         else:
-            [(float(t.in_si_units()) if isinstance(t, un.Quantity) else t)
-             for t in times]
+            times = [(t.in_si_units() if isinstance(t, un.Quantity) else t)
+                     for t in times]
+        times = np.asarray(times)
         fig = plt.figure()
         ax = fig.gca()
         self._plot_trace(ax, times)
@@ -90,11 +88,13 @@ class AnalogSink(AnalogReceivePort):
             plt.show()
         return fig
 
-    def picklable(self, times=None):
-        if times is None:
-            times = self.default_times
-        return PicklableAnalogSink(
-            self.name, times, self.values(times), self.dimension)
+    def update_buffer(self):
+        self._buffer.append(self.sender.buffer[-1])
+
+    def detach(self):
+        cpy = copy(self)
+        cpy.sender = None
+        return cpy
 
     @classmethod
     def combined_plot(cls, sinks, times=None, show=True):
@@ -103,6 +103,10 @@ class AnalogSink(AnalogReceivePort):
                 "Cannot plot as matplotlib is not installed")
         if times is None:
             times = sinks[0].default_times
+        else:
+            times = [(t.in_si_units() if isinstance(t, un.Quantity) else t)
+                     for t in times]
+        times = np.asarray(times)
         fig = plt.figure()
         ax = fig.gca()
         common_prefix = op.commonprefix([s.name for s in sinks])
@@ -123,13 +127,16 @@ class AnalogSink(AnalogReceivePort):
         return fig
 
     def _plot_trace(self, ax, times, label=None):
-        ax.plot(times, self.values(times), label=label)
+        buff_array = np.asarray(self._buffer)
+        values = np.interp(times, *buff_array.T)
+        ax.plot(times, values, label=label)
 
     @property
     def default_times(self):
-        incr = ((self.sender.stop_t - self.sender.start_t) /
-                self.DEFAULT_PLOT_STEPS)
-        return [t * incr + self.sender.start_t + self.delay
+        start_t = self._buffer[0][0]
+        stop_t = self._buffer[-1][0]
+        incr = (stop_t - start_t) / self.DEFAULT_PLOT_STEPS
+        return [(t * incr + start_t + self.delay)
                 for t in range(self.DEFAULT_PLOT_STEPS)]
 
 
@@ -156,6 +163,9 @@ class EventSink(Port):
 
     def receive(self, t):
         bisect.insort(self.events, t)
+
+    def detach(self):
+        return copy(self)
 
     def plot(self, show=True):
         if plt is None:

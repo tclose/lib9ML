@@ -32,7 +32,7 @@ class TestNetwork(TestCase):
 
     @skip("Network test isn't ready yet")
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
-                    dt=0.01 * un.ms, random_seed=None):
+                    dt=0.01 * un.ms, random_seed=None, **kwargs):
         random.seed(random_seed)
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
@@ -44,8 +44,10 @@ class TestNetwork(TestCase):
                                  ('Ext__cell', 'spike_output', range(250)),
                                  ('Exc__cell', 'v', range(10)),
                                  ('Inh__cell', 'v', range(10))])
-        network.simulate(duration, dt=dt)
-        return network.sinks
+        network.simulate(duration, dt=dt, **kwargs)
+        # Detach sinks and return
+        return {name: [s.detach() for s in sink_group]
+                for name, sink_group in network.sinks.items()}
 
     def _reduced_brunel(self, model, order, random_seed=None):
         model = model.clone()
@@ -82,6 +84,9 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     import logging
     import pickle as pkl
+    # Disable tqdm locking, which causes issues with PyPy
+    from tqdm import tqdm
+    tqdm.get_lock().locks = []
 
     logger = logging.getLogger('nineml')
 
@@ -108,38 +113,42 @@ if __name__ == '__main__':
                         help=("Save sinks instead of plotting results"))
     parser.add_argument('--load_sinks', default=None, type=str,
                         help=("Load previously saved sinks and plot"))
+    parser.add_argument('--hide_progress', default=False, action='store_true',
+                        help="Whether to hide progress bar")
     args = parser.parse_args()
 
     if args.save_figs:
         os.makedirs(args.save_figs, exist_ok=True)
 
     if args.save_sinks and args.load_sinks:
-        raise Exception("Can't load and save sinks simultaneously")
+        raise Exception("Why load and save sinks in the same command?")
 
-    if not args.load_sinks:
+    if args.load_sinks:
+        with open(args.load_sinks, 'rb') as f:
+            sinks = pkl.load(f)
+    else:
         dt = args.dt * un.ms
         duration = args.duration * un.ms
         model = 'brunel'
         tester = TestNetwork()
         test = getattr(tester, 'test_{}'.format(model))
         sinks = test(dt=dt, duration=duration, case=args.case,
-                     order=args.order, random_seed=12345)
+                     order=args.order, random_seed=12345,
+                     show_progress=(not args.hide_progress))
+    if args.save_sinks:
+        with open(args.save_sinks, 'wb') as f:
+            pkl.dump(sinks, f)
+        logger.info("Saved sinks to '{}'".format(args.save_sinks))
     else:
-        with open(args.load_sinks) as f:
-            sinks = pkl.load(f)
-    if args.save_sinks is None:
         for pop_sinks in sinks.values():
             fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
             if args.save_figs:
-                filename = (op.commonprefix([s.name for s in pop_sinks]) +
-                            '.png')
+                common_prefix = op.commonprefix([s.name for s in pop_sinks])
+                filename = common_prefix + '.png'
                 fig.set_size_inches(10, 10)
-                plt.savefig(op.join(args.save_figs, filename))
+                fig_path = op.join(args.save_figs, filename)
+                plt.savefig(fig_path)
+                logger.info("Saved '{}' figure to '{}'".format(
+                    common_prefix, fig_path))
         if not args.save_figs:
             plt.show()
-    else:
-        with open(args.save_sinks, 'wb') as f:
-            sinks = {
-                pop_name: [s.picklable() for s in pop_sinks]
-                for pop_name, pop_sinks in sinks.items()}
-            pkl.dump(sinks, f)

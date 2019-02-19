@@ -111,8 +111,7 @@ class Dynamics(object):
         self.progress_bar.update(dt)
 
     def _update_buffers(self):
-        for port in chain(self.analog_send_ports.values(),
-                          self.event_receive_ports.values()):
+        for port in self.ports.values():
             port.update_buffer()
 
     def simulate(self, stop_t, dt, show_progress=True):
@@ -222,6 +221,14 @@ class DynamicsClass(object):
         symbols.extend(extra_symbols)
         args = (symbols, expr, 'math')
         func = sp.lambdify(*args)
+        # Save the indices of the symbols to provide as arguments with the
+        # lambda function. In Python > 3.7 we can just provide all symbols as
+        # arguments but in < 3.7 we can overflow the maximum number of args
+        # (255) for large networks.
+        arg_inds = []
+        for symbol in expr.atoms:
+            arg_inds.append(symbols.index(symbol))
+        func.arg_inds = arg_inds
         return func
         # Convert expression into a string representation of a lambda function
 #         lstr = lambdastr(symbols, expr, 'math')
@@ -352,7 +359,8 @@ class Regime(object):
             proposed_state = copy(dynamics.state)
             values = dynamics.all_values(dt=dt)
             for var_name, update in self.updates.items():
-                proposed_state[var_name] = update(*values)
+                proposed_state[var_name] = update(
+                    *[values[i] for i in update.arg_inds])
         else:
             # No time derivatives in regime so state stays the same
             proposed_state = dynamics.state
@@ -484,6 +492,9 @@ class Port(object):
     def name(self):
         return self.defn.name
 
+    def update_buffer(self):
+        pass  # default doesn't require updating
+
     def __repr__(self):
         return "{}(name='{}')".format(type(self).__name__, self.name)
 
@@ -591,6 +602,8 @@ class AnalogSendPort(Port):
         if self.receivers:
             self.buffer.append((self.parent.t,
                                 self.expr(*self.parent.all_values())))
+            for receiver in self.receivers:
+                receiver.update_buffer()
 
     def clear_buffer(self, min_t):
         while self.buffer[0][0] < min_t:
