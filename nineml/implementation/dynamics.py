@@ -217,25 +217,22 @@ class DynamicsClass(object):
 
     def lambdify(self, expr, extra_symbols=()):
         "Lambdifies a sympy expression, substituting in all values"
-        symbols = self.all_symbols
+        all_symbols = self.all_symbols
+        arg_inds = []
+        symbols = []
+        # Filter symbols actually required to evaluate the expression
+        for i, sym in enumerate(all_symbols):
+            if sym in expr.free_symbols:
+                symbols.append(sym)
+                arg_inds.append(i)
         symbols.extend(extra_symbols)
-        args = (symbols, expr, 'math')
-        func = sp.lambdify(*args)
+        func = sp.lambdify(symbols, expr, 'math')
         # Save the indices of the symbols to provide as arguments with the
         # lambda function. In Python > 3.7 we can just provide all symbols as
         # arguments but in < 3.7 we can overflow the maximum number of args
         # (255) for large networks.
-        arg_inds = []
-        for symbol in expr.atoms:
-            arg_inds.append(symbols.index(symbol))
         func.arg_inds = arg_inds
         return func
-        # Convert expression into a string representation of a lambda function
-#         lstr = lambdastr(symbols, expr, 'math')
-#         lfunc = eval(lstr)
-#         # Save lambda string for pickling/unpickling
-#         lfunc.str = lstr
-#         return lfunc
 
 
 class Regime(object):
@@ -359,6 +356,7 @@ class Regime(object):
             proposed_state = copy(dynamics.state)
             values = dynamics.all_values(dt=dt)
             for var_name, update in self.updates.items():
+                # Evaluate ODE update given current state values
                 proposed_state[var_name] = update(
                     *[values[i] for i in update.arg_inds])
         else:
@@ -421,9 +419,11 @@ class Transition(object):
         for var_name, (assign, rand_vars) in self._assigns.items():
             rand_values = {}
             for rv_name, (rand_func, args_lambdas) in rand_vars.items():
-                args = [al(*all_values) for al in args_lambdas]
+                args = [al(*[all_values[i] for i in al.arg_inds])
+                        for al in args_lambdas]
                 rand_values[rv_name] = rand_func(*args)
-            state[var_name] = assign(*all_values, **rand_values)
+            state[var_name] = assign(*[all_values[i] for i in assign.arg_inds],
+                                     **rand_values)
         return state
 
 
@@ -459,11 +459,14 @@ class OnCondition(Transition):
             triggered then it returns 'inf'
         """
         values = dynamics.all_values()
+        trig = self.trigger_expr
         proposed_values = dynamics.all_values(state=proposed_state,
                                               t=proposed_t)
-        if not self.trigger_expr(*values) and self.trigger_expr(*proposed_values):  # @IgnorePep8
+        if not trig(*[values[i] for i in trig.arg_inds]) and trig(*[
+          proposed_values[i] for i in trig.arg_inds]):  # @IgnorePep8
             if self.trigger_time_expr is not None:
-                trigger_time = self.trigger_time_expr(*values)
+                trigger_time = self.trigger_time_expr(*[
+                    values[i] for i in self.trigger_time_expr.arg_inds])
             else:
                 # Default to proposed time if we can't solve trigger expression
                 trigger_time = proposed_t
@@ -540,10 +543,11 @@ class AnalogSendPort(Port):
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
         self.receivers = []
-        # A list that saves the value of the send port in a buffer at
+        # To save the values of the send port in a buffer
         self.buffer = deque()
-        dynamics = self.parent
+        self.max_delay = 0  # To determine the required length of the buffer
         # Get the expression that defines the value of the port
+        dynamics = self.parent
         self.expr = dynamics.dynamics_class.port_aliases[defn.name]
 
     def value(self, t):
@@ -594,14 +598,24 @@ class AnalogSendPort(Port):
         receive_port.connect_from(self, delay)
         # Keep track of the receivers connected to this send port
         self.receivers.append(receive_port)
+        if delay > self.max_delay:
+            self.max_delay = delay
 
     def update_buffer(self):
         """
         Buffers the value of the port for reference by receivers
         """
         if self.receivers:
-            self.buffer.append((self.parent.t,
-                                self.expr(*self.parent.all_values())))
+            # Drop buffer values that are no longer required
+            if len(self.buffer) > 1:
+                min_t = self.parent.t - self.max_delay
+                while self.buffer[1][0] <= min_t:
+                    self.buffer.popleft()
+            values = self.parent.all_values()
+            self.buffer.append(
+                (self.parent.t,
+                 self.expr(*[values[i] for i in self.expr.arg_inds])))
+            # If receiver is a sink then we need to update the buffer
             for receiver in self.receivers:
                 receiver.update_buffer()
 

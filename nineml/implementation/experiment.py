@@ -65,7 +65,10 @@ class AnalogSink(AnalogReceivePort):
 
     @property
     def dimension(self):
-        return self.sender.defn.dimension
+        try:
+            return self.sender.defn.dimension
+        except AttributeError:
+            return self._dimension
 
     def plot(self, times=None, show=True):
         if plt is None:
@@ -93,6 +96,7 @@ class AnalogSink(AnalogReceivePort):
 
     def detach(self):
         cpy = copy(self)
+        cpy._dimension = self.dimension
         cpy.sender = None
         return cpy
 
