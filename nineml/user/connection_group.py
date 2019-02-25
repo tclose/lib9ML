@@ -49,6 +49,7 @@ class BaseConnectionGroup(
             connectivity = connectivity_class(
                 connection_rule_properties, source.size, destination.size)
         self._connectivity = connectivity
+        self._connections = None
         self._delay = delay
         if isinstance(source_port, Port):
             self._check_ports(source_port, destination_port)
@@ -81,9 +82,14 @@ class BaseConnectionGroup(
     def delay(self):
         return self._delay
 
+    def __len__(self):
+        return len(self.connections)
+
     @property
     def connections(self):
-        return self._connectivity.connections()
+        if self._connections is None:
+            self._connections = list(self._connectivity.connections())
+        return self._connections
 
     @classmethod
     def from_port_connection(self, port_conn, projection, component_arrays):

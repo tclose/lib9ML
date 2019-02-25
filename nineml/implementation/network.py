@@ -15,8 +15,8 @@ from tqdm import tqdm
 from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import (
-    NineMLUsageError, NineMLCannotMergeException, NineMLNameError)
-from nineml.annotations import PY9ML_NS, REF_IMPL, ORIG_SUB_COMP
+    NineMLUsageError, NineMLCannotMergeException)
+from memory_profiler import profile
 from nineml.utils import get_obj_size
 
 
@@ -52,10 +52,14 @@ class Network(object):
         If node indices are not provided then sinks are added to all nodes
     show_progress : bool
         Whether to show progress of network construction
+    retain_graph : bool
+        Whether to retain the networkx graph after the nodes have been created.
+        For large networks the graph can take up a large of memory and isn't
+        required during the simulation step so it can be a good idea to drop it
     """
 
     def __init__(self, model, start_t, sources=None, sinks=None,
-                 show_progress=True):
+                 show_progress=True, retain_graph=True):
         if isinstance(start_t, Quantity):
             start_t = float(start_t.in_si_units())
         if sources is None:
@@ -85,9 +89,11 @@ class Network(object):
         progress_bar.close()
         # Add connections between components from connection groups
         self.min_delay = float('inf')
-        for conn_group in tqdm(connection_groups,
-                               desc="Adding edges to network graph",
-                               disable=not show_progress):
+        progress_bar = tqdm(
+            total=sum(len(cg) for cg in connection_groups),
+            desc="Adding edges to network graph",
+            disable=not show_progress)
+        for conn_group in connection_groups:
             delay_qty = conn_group.delay
             if delay_qty is None:
                 delays = repeat(0.0)
@@ -103,6 +109,8 @@ class Network(object):
                     dest_port=conn_group.destination_port)
                 if delay and delay < self.min_delay:
                     self.min_delay = delay
+                progress_bar.update()
+        progress_bar.close()
         # Add sources to network graph
         self.sources = defaultdict(list)
         for comp_array_name, port_name, index, signal in sources:
@@ -220,6 +228,10 @@ class Network(object):
             else:
                 to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
+        # Remove graph (which isn't required for simulations) to free up
+        # memory
+        if not retain_graph:
+            self.graph = None
 
     def simulate(self, stop_t, dt, show_progress=True):
         """
