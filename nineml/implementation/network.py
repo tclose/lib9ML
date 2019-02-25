@@ -389,21 +389,6 @@ class Network(object):
             merger = DynamicsMergeStatesOfLinearSubComponents(multi_props,
                                                               validate=False)
             merged = merger.merged
-            # Save component that property originates from so as to map the
-            # sample indices
-            for sub_comp in multi_props.sub_components:
-                for elem in chain(sub_comp.properties,
-                                  sub_comp.initial_values):
-                    try:
-                        corresponding_elem = merged.element(elem.name)
-                    except NineMLNameError:
-                        pass  # Element has been removed in merge
-                    else:
-                        # Save sub-component that property originated from in
-                        # order to map the right sample index to it when
-                        # initialising the Dynamics component
-                        corresponding_elem.annotations.set(
-                            (REF_IMPL, PY9ML_NS), ORIG_SUB_COMP, sub_comp.name)
             self.cached_mergers.append(merger)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = merged

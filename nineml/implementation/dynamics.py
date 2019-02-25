@@ -10,7 +10,7 @@ import sympy as sp
 from tqdm import tqdm
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
-from nineml.annotations import PY9ML_NS, REF_IMPL, ORIG_SUB_COMP
+from nineml.user.multi import split_namespace
 
 
 logger = getLogger('nineml')
@@ -42,12 +42,7 @@ class Dynamics(object):
             # If sample index is a dictionary containing different indices for
             # different sub-components
             if isinstance(sample_index, dict):
-                try:
-                    sub_comp_name = elem.annotations.get((REF_IMPL, PY9ML_NS),
-                                                         ORIG_SUB_COMP)
-                except NineMLNameError:
-                    sub_comp_name = elem.component.name
-                index = sample_index[sub_comp_name]
+                index = sample_index[split_namespace(elem.name)[1]]
             else:
                 index = sample_index
             if isinstance(elem, Quantity):

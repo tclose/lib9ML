@@ -597,10 +597,6 @@ INDEX_INDEX_ATTR = 'index'
 VALIDATION = 'Validation'
 DIMENSIONALITY = 'dimensionality'
 
-# Used in network ref. implementation
-REF_IMPL = 'refimplementation'
-ORIG_SUB_COMP = 'originalsubcomponent'
-
 xml_visitor_module_re = re.compile(r'nineml\.abstraction\.\w+\.visitors\.xml')
 
 import nineml  # @IgnorePep8
