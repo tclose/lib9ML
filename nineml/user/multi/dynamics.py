@@ -20,6 +20,7 @@ from ..port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
 from nineml.abstraction import BaseALObject
 import nineml.units as un
+from nineml.user import Property, Initial
 from nineml.base import (
     ContainerObject, DocumentLevelObject, DynamicPortsObject)
 from nineml.utils import validate_identifier
@@ -1224,8 +1225,12 @@ class MultiDynamicsProperties(DynamicsProperties):
             component_class = self.component_class.flatten(name=name +
                                                            '__dynamics')
         return DynamicsProperties(
-            name, component_class, properties=self.properties,
-            initial_values=self.initial_values, **kwargs)
+            name,
+            component_class,
+            properties=(p.clone(as_class=Property) for p in self.properties),
+            initial_values=(v.clone(as_class=Initial)
+                            for v in self.initial_values),
+            **kwargs)
 
     def merge_states_of_linear_sub_components(self, validate=True):
         return DynamicsMergeStatesOfLinearSubComponents(

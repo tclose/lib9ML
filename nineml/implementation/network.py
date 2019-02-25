@@ -14,7 +14,10 @@ from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
 from tqdm import tqdm
 from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
-from nineml.exceptions import NineMLUsageError, NineMLCannotMergeException
+from nineml.exceptions import (
+    NineMLUsageError, NineMLCannotMergeException, NineMLNameError)
+from nineml.annotations import PY9ML_NS, REF_IMPL, ORIG_SUB_COMP
+from nineml.utils import get_obj_size
 
 
 logger = getLogger('nineml')
@@ -76,7 +79,8 @@ class Network(object):
             props = comp_array.dynamics_properties
             for i in range(comp_array.size):
                 self.graph.add_node((comp_array.name, i),
-                                    properties=props.sample(i))
+                                    sample_index=i,
+                                    properties=props)
                 progress_bar.update()
         progress_bar.close()
         # Add connections between components from connection groups
@@ -195,7 +199,7 @@ class Network(object):
             # Create dynamics object
             attr['dynamics'] = dynamics = Dynamics(
                 attr['properties'], start_t, dynamics_class=dyn_class,
-                name='{}_{}'.format(*node))
+                name='{}_{}'.format(*node), sample_index=attr['sample_index'])
             self.components.append(dynamics)
         # Make all connections between dynamics components, sources and sinks
         for u, v, conn in tqdm(self.graph.out_edges(data=True),
@@ -306,6 +310,7 @@ class Network(object):
         # generic sub-component names based on sub-dynamics classes. This
         # should make the generated multi-dynamics class equalcla
         sub_components = defaultdict(list)
+        sample_indices = {}
         for _, attr in sorted(sub_graph.nodes(data=True),
                               key=itemgetter(0)):
             # Add node to list of matching components
@@ -317,6 +322,7 @@ class Network(object):
             attr['sub_comp'] = component_class.name
             if len(matching) > 1:
                 attr['sub_comp'] += str(len(matching))
+            sample_indices[attr['sub_comp']] = attr['sample_index']
         # Map graph edges onto internal port connections of the new multi-
         # dynamics object
         port_connections = []
@@ -383,10 +389,25 @@ class Network(object):
             merger = DynamicsMergeStatesOfLinearSubComponents(multi_props,
                                                               validate=False)
             merged = merger.merged
+            # Save component that property originates from so as to map the
+            # sample indices
+            for sub_comp in multi_props.sub_components:
+                for elem in chain(sub_comp.properties,
+                                  sub_comp.initial_values):
+                    try:
+                        corresponding_elem = merged.element(elem.name)
+                    except NineMLNameError:
+                        pass  # Element has been removed in merge
+                    else:
+                        # Save sub-component that property originated from in
+                        # order to map the right sample index to it when
+                        # initialising the Dynamics component
+                        corresponding_elem.annotations.set(
+                            (REF_IMPL, PY9ML_NS), ORIG_SUB_COMP, sub_comp.name)
             self.cached_mergers.append(merger)
         # Add merged node
         self.graph.nodes[multi_node]['properties'] = merged
-        
+        self.graph.nodes[multi_node]['sample_index'] = sample_indices
 
 
 # Thoughts for multiprocessing

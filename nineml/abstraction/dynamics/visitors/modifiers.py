@@ -210,7 +210,10 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
         for comp_class, comps in candidates.items():
             if len(comps) == 1:
                 continue  # Skip as this is the only sub-comp of this class
+            # Linear dynamics should only have 1 regime
+            # FIXME: this is true unless just the output events change...
             assert comp_class.num_regimes == 1
+            # Get set of parameters used in time-derivatives of the regime
             regime = next(comp_class.regimes)
             param_symbols = set(sympy.Symbol(s)
                                 for s in comp_class.parameter_names)
@@ -219,8 +222,8 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
                                         for td in regime.time_derivatives))
                 if s in param_symbols)
 
-            # Group properties into groups with matching values for parameters
-            # used in the state equations
+            # Group properties into groups with matching time derivative values
+            # for parameters used in the state equations
             matching_td_props = defaultdict(list)
             for comp in comps:
                 td_props = frozenset(comp.component[p] for p in td_params)
@@ -229,6 +232,9 @@ class DynamicsMergeStatesOfLinearSubComponents(BaseVisitorWithContext,
             for td_props, matching in matching_td_props.items():
                 if len(matching) == 1:
                     continue  # Skip as no other sub-comp properties match
+                if any(p.value.nineml_type != 'SingleValue' for p in td_props):
+                    # Can't merge components with array or distributed values
+                    continue
                 ref = matching[0]
                 for match in matching[1:]:
                     for param in td_params:

@@ -65,10 +65,7 @@ class BaseAnnotations(ContainerObject):
         return chain(*iter(self._branches.values()))
 
     def branch(self, key_index):
-        try:
-            name, ns, index = key_index
-        except:
-            raise
+        name, ns, index = key_index
         try:
             return self._branches[(name, ns)][index]
         except (KeyError, IndexError):
@@ -600,6 +597,9 @@ INDEX_INDEX_ATTR = 'index'
 VALIDATION = 'Validation'
 DIMENSIONALITY = 'dimensionality'
 
+# Used in network ref. implementation
+REF_IMPL = 'refimplementation'
+ORIG_SUB_COMP = 'originalsubcomponent'
 
 xml_visitor_module_re = re.compile(r'nineml\.abstraction\.\w+\.visitors\.xml')
 

@@ -80,6 +80,7 @@ if __name__ == '__main__':
         plt = None
     import os.path as op
     import os
+    import errno
     import sys
     from argparse import ArgumentParser
     import logging
@@ -118,7 +119,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.save_figs:
-        os.makedirs(args.save_figs, exist_ok=True)
+        try:
+            os.makedirs(args.save_figs)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
 
     if args.save_sinks and args.load_sinks:
         raise Exception("Why load and save sinks in the same command?")

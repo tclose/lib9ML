@@ -10,6 +10,7 @@ import sympy as sp
 from tqdm import tqdm
 from nineml.exceptions import NineMLUsageError, NineMLNameError
 from nineml.units import Quantity
+from nineml.annotations import PY9ML_NS, REF_IMPL, ORIG_SUB_COMP
 
 
 logger = getLogger('nineml')
@@ -34,8 +35,27 @@ class Dynamics(object):
         The state that dynamics is initialised with
     """
 
-    def __init__(self, model, start_t, initial_state=None, array_index=None,
+    def __init__(self, model, start_t, initial_state=None, sample_index=None,
                  initial_regime=None, dynamics_class=None, name=None):
+
+        def sample_quantity(elem):
+            # If sample index is a dictionary containing different indices for
+            # different sub-components
+            if isinstance(sample_index, dict):
+                try:
+                    sub_comp_name = elem.annotations.get((REF_IMPL, PY9ML_NS),
+                                                         ORIG_SUB_COMP)
+                except NineMLNameError:
+                    sub_comp_name = elem.component.name
+                index = sample_index[sub_comp_name]
+            else:
+                index = sample_index
+            if isinstance(elem, Quantity):
+                qty = elem
+            else:
+                qty = elem.quantity
+            return float(qty.sample(index).in_si_units())
+
         if dynamics_class is None:
             dynamics_class = DynamicsClass(model.component_class)
         self.dynamics_class = dynamics_class
@@ -45,22 +65,22 @@ class Dynamics(object):
         # Initialise state information converting all quantities to SI units
         # for simplicity
         self.properties = OrderedDict(
-            (p, float(model[p].in_si_units().sample(array_index)))
+            (p, sample_quantity(model.property(p)))
             for p in self.defn.parameter_names)
         # Ensure initial state is ordered by var names so it matches up with
         # order in 'dynamics_class.all_symbols'
         self._state = OrderedDict()
         for sv_name in self.defn.state_variable_names:
             try:
-                qty = initial_state[sv_name]
+                initial = initial_state[sv_name]
             except (TypeError, KeyError):
                 try:
-                    qty = model.initial_value(sv_name).quantity
+                    initial = model.initial_value(sv_name)
                 except NineMLNameError:
                     raise NineMLUsageError(
                         "No initial value provided for '{}'"
                         .format(sv_name))
-            self._state[sv_name] = float(qty.in_si_units().sample(array_index))
+            self._state[sv_name] = sample_quantity(initial)
         if initial_regime is None:
             initial_regime = model.initial_regime
         self.regime = dynamics_class.regimes[initial_regime]
