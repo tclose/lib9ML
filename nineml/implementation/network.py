@@ -16,8 +16,6 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException)
-from memory_profiler import profile
-from nineml.utils import get_obj_size
 
 
 logger = getLogger('nineml')
