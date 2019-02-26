@@ -16,6 +16,7 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException)
+from nineml.utils import get_obj_size
 
 
 logger = getLogger('nineml')
@@ -50,14 +51,12 @@ class Network(object):
         If node indices are not provided then sinks are added to all nodes
     show_progress : bool
         Whether to show progress of network construction
-    retain_graph : bool
-        Whether to retain the networkx graph after the nodes have been created.
-        For large networks the graph can take up a large of memory and isn't
-        required during the simulation step so it can be a good idea to drop it
+    num_processes : int
+        The number of processes to create the network over
     """
 
     def __init__(self, model, start_t, sources=None, sinks=None,
-                 show_progress=True, retain_graph=True):
+                 show_progress=True, num_processes=1):
         if isinstance(start_t, Quantity):
             start_t = float(start_t.in_si_units())
         if sources is None:
@@ -72,7 +71,7 @@ class Network(object):
             total=sum(ca.size for ca in component_arrays),
             desc="Adding nodes to network graph",
             disable=not show_progress)
-        self.graph = nx.MultiDiGraph()
+        graph = nx.MultiDiGraph()
         # Add nodes (2-tuples consisting of <component-array-name> and
         # <cell-index>) for each component in each array
         ca_dict = {}
@@ -80,9 +79,8 @@ class Network(object):
             ca_dict[comp_array.name] = comp_array
             props = comp_array.dynamics_properties
             for i in range(comp_array.size):
-                self.graph.add_node((comp_array.name, i),
-                                    sample_index=i,
-                                    properties=props)
+                graph.add_node((comp_array.name, i),
+                               sample_index=i, properties=props)
                 progress_bar.update()
         progress_bar.close()
         # Add connections between components from connection groups
@@ -98,7 +96,7 @@ class Network(object):
             else:
                 delays = (float(d) for d in delay_qty.in_si_units())
             for (src_i, dest_i), delay in zip(conn_group.connections, delays):
-                self.graph.add_edge(
+                graph.add_edge(
                     (conn_group.source.name, int(src_i)),
                     (conn_group.destination.name, int(dest_i)),
                     communicates=conn_group.communicates,
@@ -122,9 +120,8 @@ class Network(object):
             self.sources[source_array_name].append(source)
             # NB: Use negative index to avoid any (unlikely) name-clashes
             #     with other component arrays
-            self.graph.add_node((source_array_name, -(index + 1)),
-                                source=source)
-            self.graph.add_edge(
+            graph.add_node((source_array_name, -(index + 1)), source=source)
+            graph.add_edge(
                 (source_array_name, -(index + 1)),
                 (comp_array_name, index),
                 communicates=port.communicates,
@@ -160,8 +157,8 @@ class Network(object):
                 # NB: Use negative index to avoid any (unlikely) name-clashes
                 #     with other component arrays
                 sink_node_id = (sink_array_name, -(index + 1))
-                self.graph.add_node(sink_node_id, sink=sink)
-                self.graph.add_edge(
+                graph.add_node(sink_node_id, sink=sink)
+                graph.add_edge(
                     (comp_array_name, index), sink_node_id,
                     communicates=port.communicates,
                     delay=self.min_delay,
@@ -172,23 +169,25 @@ class Network(object):
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
         progress_bar = tqdm(
-            total=len(self.graph),
+            total=len(graph),
             desc="Merging sub-graphs with delayless connections",
             disable=not show_progress)
         self.cached_mergers = []
-        for node in list(self.graph.nodes):
-            if node not in self.graph:
+        for node in list(graph.nodes):
+            if node not in graph:
                 continue  # If node has already been merged
             conn_without_delay = self.connected_without_delay(node)
             num_to_merge = len(conn_without_delay)
             if num_to_merge > 1:
-                self.merge_nodes(conn_without_delay)
+                self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
         # Initialise all dynamics components in graph
         dyn_class_cache = []  # Cache for storing previously analysed classes
         self.components = []
-        for node, attr in tqdm(self.graph.nodes(data=True),
+        if num_processes > 1:
+            pass
+        for node, attr in tqdm(graph.nodes(data=True),
                                desc="Iniitalising dynamics",
                                disable=not show_progress):
             # Attempt to reuse DynamicsClass objects between Dynamics objects
@@ -208,11 +207,11 @@ class Network(object):
                 name='{}_{}'.format(*node), sample_index=attr['sample_index'])
             self.components.append(dynamics)
         # Make all connections between dynamics components, sources and sinks
-        for u, v, conn in tqdm(self.graph.out_edges(data=True),
+        for u, v, conn in tqdm(graph.out_edges(data=True),
                                desc="Connecting components",
                                disable=not show_progress):
-            u_attr = self.graph.nodes[u]
-            v_attr = self.graph.nodes[v]
+            u_attr = graph.nodes[u]
+            v_attr = graph.nodes[v]
             try:
                 dyn = u_attr['dynamics']
             except KeyError:
@@ -226,10 +225,6 @@ class Network(object):
             else:
                 to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
-        # Remove graph (which isn't required for simulations) to free up
-        # memory
-        if not retain_graph:
-            self.graph = None
 
     def simulate(self, stop_t, dt, show_progress=True):
         """
@@ -267,7 +262,7 @@ class Network(object):
     def name(self):
         return self.model.name
 
-    def connected_without_delay(self, start_node, connected=None):
+    def connected_without_delay(self, start_node, graph, connected=None):
         """
         Returns the sub-graph of nodes connected to the start node by a chain
         of delayless connections.
@@ -276,6 +271,8 @@ class Network(object):
         ----------
         start_node : tuple(str, int)
             The starting node to check for delayless connected neighbours from
+        graph : nx.MultiDiGraph
+            The network graph
         connected : set(tuple(str, int))
             The set eventually returned by the method, passed as a arg to
             recursive calls of this method
@@ -286,16 +283,15 @@ class Network(object):
         # Iterate all in-coming and out-going edges and check for
         # any zero delays. If so, add to set of nodes to merge
         for neigh, conn in chain(
-            ((n, c) for n, _, c in self.graph.in_edges(start_node,
-                                                       data=True)),
-            ((n, c) for _, n, c in self.graph.out_edges(start_node,
-                                                        data=True))):
+            ((n, c) for n, _, c in graph.in_edges(start_node, data=True)),
+            ((n, c) for _, n, c in graph.out_edges(start_node,
+                                                   data=True))):
             if not conn['delay'] and neigh not in connected:
                 # Recurse through neighbours edges
-                self.connected_without_delay(neigh, connected=connected)
+                self.connected_without_delay(neigh, graph, connected)
         return connected
 
-    def merge_nodes(self, nodes):
+    def merge_nodes(self, nodes, graph):
         """
         Merges a sub-graph of nodes into a single node represented by a
         multi-dynamics object. Used to merge nodes that are connected without
@@ -307,15 +303,15 @@ class Network(object):
         nodes : iterable(2-tuple(str, int))
             The indices of the nodes to merge into a single sub-component
         """
-        sub_graph = self.graph.subgraph(nodes)
+        sub_graph = graph.subgraph(nodes)
         # Create name for new combined multi-dynamics node from node
         # with the higest degree
-        central_node = max(self.graph.degree(sub_graph.nodes),
+        central_node = max(graph.degree(sub_graph.nodes),
                            key=itemgetter(1))[0]
         multi_node = (central_node[0] + '_multi', central_node[1])
         multi_name = sub_graph.nodes[central_node][
             'properties'].component_class.name + '_multi'
-        self.graph.add_node(multi_node)
+        graph.add_node(multi_node)
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
         # should make the generated multi-dynamics class equalcla
@@ -350,12 +346,12 @@ class Network(object):
                     receiver_name=sub_graph.nodes[v]['sub_comp']))
                 edges_to_remove.append((u, v))
         # Remove all edges in the sub-graph from the primary graph
-        self.graph.remove_edges_from(edges_to_remove)
+        graph.remove_edges_from(edges_to_remove)
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
         port_exposures = set()
-        for u, v, conn in self.graph.out_edges(sub_graph, data=True):
-            attr = self.graph.nodes[u]
+        for u, v, conn in graph.out_edges(sub_graph, data=True):
+            attr = graph.nodes[u]
             # Create a copy of conn dictionary so we can modify it
             conn = copy(conn)
             exposure = BasePortExposure.from_port(
@@ -363,11 +359,11 @@ class Network(object):
                 attr['sub_comp'])
             port_exposures.add(exposure)
             conn['src_port'] = exposure.name
-            self.graph.add_edge(multi_node, v, **conn)
+            graph.add_edge(multi_node, v, **conn)
         # Redirect edges to merged multi-node from nodes external to the sub-
         # graph
-        for u, v, conn in self.graph.in_edges(sub_graph, data=True):
-            attr = self.graph.nodes[v]
+        for u, v, conn in graph.in_edges(sub_graph, data=True):
+            attr = graph.nodes[v]
             # Create a copy of conn dictionary so we can modify it
             conn = copy(conn)
             exposure = BasePortExposure.from_port(
@@ -375,7 +371,7 @@ class Network(object):
                 attr['sub_comp'])
             port_exposures.add(exposure)
             conn['dest_port'] = exposure.name
-            self.graph.add_edge(u, multi_node, **conn)
+            graph.add_edge(u, multi_node, **conn)
         # Create multi-dynamics object and set it as the properties object of
         # the new multi node
         multi_props = MultiDynamicsProperties(
@@ -386,7 +382,7 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
-        self.graph.remove_nodes_from(sub_graph)
+        graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
         merged = None
@@ -401,8 +397,8 @@ class Network(object):
             merged = merger.merged
             self.cached_mergers.append(merger)
         # Add merged node
-        self.graph.nodes[multi_node]['properties'] = merged
-        self.graph.nodes[multi_node]['sample_index'] = sample_indices
+        graph.nodes[multi_node]['properties'] = merged
+        graph.nodes[multi_node]['sample_index'] = sample_indices
 
 
 # Thoughts for multiprocessing
