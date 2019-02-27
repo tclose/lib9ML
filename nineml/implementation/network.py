@@ -3,6 +3,7 @@ from collections import defaultdict
 from itertools import chain, repeat
 from copy import copy
 from logging import getLogger
+import multiprocessing as mp
 import networkx as nx
 import nineml.units as un
 from nineml.user import (
@@ -52,7 +53,9 @@ class Network(object):
     show_progress : bool
         Whether to show progress of network construction
     num_processes : int
-        The number of processes to create the network over
+        The number of processes to create the network over. If != 1 then
+        initialisation of the network is delayed until the first (and only
+        allowable) call to simulate.
     """
 
     def __init__(self, model, start_t, sources=None, sinks=None,
@@ -63,6 +66,14 @@ class Network(object):
             sources = []
         if sinks is None:
             sinks = []
+        if num_processes is None:
+            self.num_processes = mp.cpu_count()
+        elif num_processes < 1:
+            raise NineMLUsageError(
+                "Cannot not specify less than one processor to use ({})"
+                .format(num_processes))
+        else:
+            self.num_processes = num_processes
         self.t = start_t
         self.model = model
         component_arrays, connection_groups = model.flatten()
@@ -176,17 +187,122 @@ class Network(object):
         for node in list(graph.nodes):
             if node not in graph:
                 continue  # If node has already been merged
-            conn_without_delay = self.connected_without_delay(node)
+            conn_without_delay = self.connected_without_delay(node, graph)
             num_to_merge = len(conn_without_delay)
             if num_to_merge > 1:
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
-        # Initialise all dynamics components in graph
+        if self.num_processes == 1:
+            # Initialise all dynamics components in graph
+            self.components = self._initialise_components(graph, start_t,
+                                                          show_progress)
+        else:
+            # Construction of components is delayed until simulation step
+            # so they can be constructed in child processes
+            self.components = None
+            # Construct inter-process pipes between each pair of processes
+            self.send_pipes = {i: {} for i in range(self.num_processes)}
+            self.receive_pipes = copy(self.send_pipes)
+            for i in range(self.num_processes):
+                for j in range(self.num_processes):
+                    send_pipe, receive_pipe = mp.Pipe()
+                    self.send_pipes[i][j] = SendPortPipe(send_pipe)
+                    self.receive_pipes[j][i] = ReceivePortPipe(receive_pipe)
+            # Divide up network graph between available processes
+            self.sub_graphs = []
+
+    @property
+    def name(self):
+        return self.model.name
+
+    def simulate(self, stop_t, dt, show_progress=True):
+        """
+        Simulate the network until stop_t
+
+        Parameters
+        ----------
+        stop_t : Quantity (time) | float (s)
+            The time to simulate the network until
+        dt : Quantity (time) | float (s)
+            The timestep for the components
+        show_progress : bool
+            Display a progress bar.
+        """
+        if isinstance(stop_t, Quantity):
+            stop_t = float(stop_t.in_units(un.s))
+        if isinstance(dt, Quantity):
+            dt = float(dt.in_si_units())
+        if self.num_processes == 1:
+            # Simulate all components on the same node
+            self._simulate(self.components, self.t, stop_t, dt, self.min_delay,
+                           self.model.name, show_progress)
+        else:
+            # To synchronize the end of each simulation slice (min-delay step)
+            barrier = mp.Barrier(self.num_processes)
+            # Create child processes to simulate a sub-graph of the network
+            processes = [
+                mp.Process(
+                    target=self._simulate_sub_graph,
+                    args=(sg, self.t, stop_t, dt, self.min_delay,
+                          self.model.name, False, barrier,
+                          list(self.send_pipes[i].values()),
+                          list(self.receive_pipes[i].values())))
+                for i, sg in enumerate(self.sub_graphs[1:], start=1)]
+            # Start all child processes
+            for p in processes:
+                p.start()
+            # Simulate the first sub-graph on the master process
+            self._simulate_sub_graph(
+                self.sub_graphs[0], self.t, stop_t, dt, self.min_delay,
+                self.model.name, show_progress, barrier,
+                list(self.send_pipes[0].values()),
+                list(self.receive_pipes[0].values()))
+            # Join all child processes
+            for p in processes:
+                p.join()
+        self.t = stop_t
+
+    @classmethod
+    def _simulate(cls, components, t, stop_t, dt, min_delay, model_name,
+                  show_progress, barrier=None, send_pipes=None,
+                  receive_pipes=None):
+        progress_bar = tqdm(
+            initial=t, total=stop_t,
+            desc=("Simulating '{}' network (dt={} s)".format(model_name, dt)),
+            unit='s (sim)', unit_scale=True,
+            disable=not show_progress)
+        while t < stop_t:
+            new_t = min(stop_t, t + min_delay)
+            slice_dt = new_t - t
+            for component in components:
+                component.simulate(new_t, dt, show_progress=False)
+            # Perform inter-process communication if required
+            if barrier is not None:
+                # Send all buffered data
+                for p in send_pipes:
+                    p.send()
+                # Wait for other processes to reach same point
+                barrier.wait()
+                # Receive all buffered data
+                for p in receive_pipes:
+                    p.receive()
+            progress_bar.update(slice_dt)
+            t = new_t
+        progress_bar.close()
+
+    @classmethod
+    def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
+                            model_name, show_progress, barrier, send_pipes,
+                            receive_pipes):
+        components = cls._initialise_components(sub_graph, t, show_progress)
+        cls._simulate(components, t, stop_t, dt, min_delay, model_name,
+                      show_progress, barrier, send_pipes, receive_pipes)
+
+    @classmethod
+    def _initialise_components(cls, graph, start_t, show_progress):
+        components = []
         dyn_class_cache = []  # Cache for storing previously analysed classes
-        self.components = []
-        if num_processes > 1:
-            pass
         for node, attr in tqdm(graph.nodes(data=True),
                                desc="Iniitalising dynamics",
                                disable=not show_progress):
@@ -205,7 +321,7 @@ class Network(object):
             attr['dynamics'] = dynamics = Dynamics(
                 attr['properties'], start_t, dynamics_class=dyn_class,
                 name='{}_{}'.format(*node), sample_index=attr['sample_index'])
-            self.components.append(dynamics)
+            components.append(dynamics)
         # Make all connections between dynamics components, sources and sinks
         for u, v, conn in tqdm(graph.out_edges(data=True),
                                desc="Connecting components",
@@ -225,42 +341,7 @@ class Network(object):
             else:
                 to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
-
-    def simulate(self, stop_t, dt, show_progress=True):
-        """
-        Simulate the network until stop_t
-
-        Parameters
-        ----------
-        stop_t : Quantity (time) | float (s)
-            The time to simulate the network until
-        dt : Quantity (time) | float (s)
-            The timestep for the components
-        show_progress : bool
-            Display a progress bar.
-        """
-        if isinstance(stop_t, Quantity):
-            stop_t = float(stop_t.in_units(un.s))
-        if isinstance(dt, Quantity):
-            dt = float(dt.in_si_units())
-        progress_bar = tqdm(
-            initial=self.t, total=stop_t,
-            desc=("Simulating '{}' network (dt={} s)".format(self.model.name,
-                                                             dt)),
-            unit='s (sim)', unit_scale=True,
-            disable=not show_progress)
-        while self.t < stop_t:
-            new_t = min(stop_t, self.t + self.min_delay)
-            slice_dt = new_t - self.t
-            for component in self.components:
-                component.simulate(new_t, dt, show_progress=False)
-            self.t = new_t
-            progress_bar.update(slice_dt)
-        progress_bar.close()
-
-    @property
-    def name(self):
-        return self.model.name
+        return components
 
     def connected_without_delay(self, start_node, graph, connected=None):
         """
@@ -401,40 +482,79 @@ class Network(object):
         graph.nodes[multi_node]['sample_index'] = sample_indices
 
 
-# Thoughts for multiprocessing
+class SendPortPipe(object):
+
+    def __init__(self, pipe):
+        self.pipe = pipe
+        self.receivers = []
+
+    def send(self):
+        raise NotImplementedError
 
 
-# In [11]: from collections import defaultdict
-# In [12]: import multiprocessing as mp
-# 
-# In [13]: num_procs = 5
-# 
-# In [25]: def send_receive(i, send_pipes, recv_pipes, barrier, print_lock):
-#     ...:     print_lock.acquire()
-#     ...:     print((i, send_pipes, recv_pipes, barrier, print_lock))
-#     ...:     print_lock.release()
-#     ...:     for pipe in send_pipes.values():
-#     ...:         pipe.send(i)
-#     ...:     barrier.wait()
-#     ...:     for pipe in recv_pipes.values():
-#     ...:         print_lock.acquire()
-#     ...:         print('{} received msg from {}'.format(i, pipe.recv()))
-#     ...:         print_lock.release()
-# 
-# In [12]: send_pipes = defaultdict(dict)
-#     ...: recv_pipes = defaultdict(dict)
-#     ...: for i in range(num_procs):
-#     ...:     for j in range(num_procs):
-#     ...:         send_pipes[i][j], recv_pipes[j][i] = mp.Pipe()
-# 
-# In [13]: print_lock = mp.Lock()
-# 
-# In [14]: barrier = mp.Barrier(num_procs)
-# 
-# In [26]: procs = [mp.Process(target=send_receive, args=(i, send_pipes[i], recv_pipes[i], barrier, print_lock)) for i in range(num_procs)]
-# 
-# In [27]: for p in procs:
-#     ...:     p.start()
-#     ...: for p in procs:
-#     ...:     p.join()
+class ReceivePortPipe(object):
 
+    def __init__(self, pipe):
+        self.pipe = pipe
+        self.senders = []
+        self.buffers = None
+
+    def receive(self):
+        raise NotImplementedError
+
+
+class RemoteEventSendPort(object):
+
+    def __init__(self, receive_port, pipe):
+        self.receive_port = receive_port
+        self.pipe = pipe
+
+    def connect_to(self, receive_port, delay):
+        pass
+#         if isinstance(delay, Quantity):
+#             delay = float(delay.in_si_units())
+#         self.receivers.append((receive_port, delay))
+
+
+class RemoteEventReceivePort(object):
+
+    def __init__(self, send_port, pipe):
+        self.send_port = send_port
+        self.pipe = pipe
+
+
+class RemoteAnalogSendPort(object):
+
+    def __init__(self, receive_port, pipe):
+        self.receive_port = receive_port
+        self.pipe = pipe
+
+    def connect_to(self, receive_port, delay):
+        pass
+#         if isinstance(delay, Quantity):
+#             delay = float(delay.in_si_units())
+#         # Register the sending port with the receiving port so it can retrieve
+#         # the values of the sending port
+#         receive_port.connect_from(self, delay)
+#         # Keep track of the receivers connected to this send port
+#         self.receivers.append(receive_port)
+#         if delay > self.max_delay:
+#             self.max_delay = delay
+
+
+class RemoteAnalogReceivePort(object):
+
+    def __init__(self, send_port, pipe):
+        self.send_port = send_port
+        self.pipe = pipe
+
+    def connect_from(self, send_port, delay):
+        pass
+#         if isinstance(delay, Quantity):
+#             delay = float(delay.in_si_units())
+#         if self.sender is not None:
+#             raise NineMLUsageError(
+#                 "Cannot connect {} to multiple receive ports".format(
+#                     self._location))
+#         self.sender = send_port
+#         self.delay = delay

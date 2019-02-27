@@ -43,8 +43,7 @@ class TestNetwork(TestCase):
                                  ('Inh__cell', 'spike_output', range(250)),
                                  ('Ext__cell', 'spike_output', range(250)),
                                  ('Exc__cell', 'v', range(10)),
-                                 ('Inh__cell', 'v', range(10))],
-                          retain_graph=False)
+                                 ('Inh__cell', 'v', range(10))])
         network.simulate(duration, dt=dt, **kwargs)
         # Detach sinks and return
         return {name: [s.detach() for s in sink_group]
