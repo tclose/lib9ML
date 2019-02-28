@@ -195,8 +195,8 @@ class Network(object):
         progress_bar.close()
         if self.num_processes == 1:
             # Initialise all dynamics components in graph
-            self.components = self._initialise_components(graph, start_t,
-                                                          show_progress)
+            self.components, _, _ = self._initialise_components(graph, start_t,
+                                                                show_progress)
         else:
             # Construction of components is delayed until simulation step
             # so they can be constructed in child processes
@@ -206,11 +206,35 @@ class Network(object):
             self.receive_pipes = copy(self.send_pipes)
             for i in range(self.num_processes):
                 for j in range(self.num_processes):
-                    send_pipe, receive_pipe = mp.Pipe()
-                    self.send_pipes[i][j] = SendPortPipe(send_pipe)
-                    self.receive_pipes[j][i] = ReceivePortPipe(receive_pipe)
+                    self.send_pipes[i][j], self.receive_pipes[j][i] = mp.Pipe()
             # Divide up network graph between available processes
             self.sub_graphs = []
+            # Assign nodes to nodes in round robin fashion to balance loads
+            # between processes
+            for i, (node, attr) in enumerate(sorted(graph.nodes(data=True),
+                                                    key=itemgetter(0))):
+                attr['rank'] = i % self.num_processes
+            # Replace edges that will span processes with remote send/receive
+            # port objects
+            for (u, v), attr in graph.edges(data=True):
+                u_attr = graph.nodes[u]
+                v_attr = graph.nodes[v]
+                u_rank = u_attr['rank']
+                v_rank = v_attr['rank']
+                if u_rank != v_rank:
+                    if attr['communicates'] == 'analog':
+                        try:
+                            senders = u_attr['remote_senders']
+                        except KeyError:
+                            senders = u_attr['remote_senders'] = []
+                        senders.append(RemoteAnalogSendPort(
+                            self.send_pipes[u_rank][v_rank]))
+                        try:
+                            receivers = u_attr['remote_receivers']
+                        except KeyError:
+                            receivers = u_attr['remote_receivers'] = []
+                        receivers.append(RemoteAnalogSendPort(
+                            self.send_pipes[u_rank][v_rank]))
 
     @property
     def name(self):
@@ -262,6 +286,7 @@ class Network(object):
             for p in processes:
                 p.join()
         self.t = stop_t
+        return self.sinks
 
     @classmethod
     def _simulate(cls, components, t, stop_t, dt, min_delay, model_name,
@@ -293,15 +318,19 @@ class Network(object):
 
     @classmethod
     def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
-                            model_name, show_progress, barrier, send_pipes,
-                            receive_pipes):
-        components = cls._initialise_components(sub_graph, t, show_progress)
+                            model_name, show_progress, barrier):
+        (components, remote_send_ports,
+         remote_receive_ports) = cls._initialise_components(sub_graph, t,
+                                                            show_progress)
         cls._simulate(components, t, stop_t, dt, min_delay, model_name,
-                      show_progress, barrier, send_pipes, receive_pipes)
+                      show_progress, barrier, remote_send_ports,
+                      remote_receive_ports)
 
     @classmethod
     def _initialise_components(cls, graph, start_t, show_progress):
         components = []
+        remote_send_ports = []
+        remote_receive_ports = []
         dyn_class_cache = []  # Cache for storing previously analysed classes
         for node, attr in tqdm(graph.nodes(data=True),
                                desc="Iniitalising dynamics",
@@ -341,7 +370,7 @@ class Network(object):
             else:
                 to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
-        return components
+        return components, remote_send_ports, remote_receive_ports
 
     def connected_without_delay(self, start_node, graph, connected=None):
         """
@@ -482,45 +511,28 @@ class Network(object):
         graph.nodes[multi_node]['sample_index'] = sample_indices
 
 
-class SendPortPipe(object):
+class RemotePort(object):
 
     def __init__(self, pipe):
         self.pipe = pipe
-        self.receivers = []
-
-    def send(self):
-        raise NotImplementedError
 
 
-class ReceivePortPipe(object):
-
-    def __init__(self, pipe):
-        self.pipe = pipe
-        self.senders = []
-        self.buffers = None
-
-    def receive(self):
-        raise NotImplementedError
-
-
-class RemoteEventSendPort(object):
-
-    def __init__(self, receive_port, pipe):
-        self.receive_port = receive_port
-        self.pipe = pipe
+class RemoteEventSendPort(RemotePort):
 
     def connect_to(self, receive_port, delay):
+        pass
+
+    def send(self):
         pass
 #         if isinstance(delay, Quantity):
 #             delay = float(delay.in_si_units())
 #         self.receivers.append((receive_port, delay))
 
 
-class RemoteEventReceivePort(object):
+class RemoteEventReceivePort(RemotePort):
 
-    def __init__(self, send_port, pipe):
-        self.send_port = send_port
-        self.pipe = pipe
+    def connect_from(self, receive_port, delay):
+        pass
 
 
 class RemoteAnalogSendPort(object):
