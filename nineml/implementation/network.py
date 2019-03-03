@@ -10,7 +10,8 @@ from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
     BasePortExposure)
 from nineml.units import Quantity
-from .dynamics import Dynamics, DynamicsClass
+from .dynamics import (
+    Dynamics, DynamicsClass, AnalogSendPort, EventSendPort)
 from .experiment import AnalogSource, EventSource, AnalogSink, EventSink
 from tqdm import tqdm
 from nineml.abstraction.dynamics.visitors.modifiers import (
@@ -201,40 +202,54 @@ class Network(object):
             # Construction of components is delayed until simulation step
             # so they can be constructed in child processes
             self.components = None
-            # Construct inter-process pipes between each pair of processes
-            self.send_pipes = {i: {} for i in range(self.num_processes)}
-            self.receive_pipes = copy(self.send_pipes)
+            # Construct inter-process pipes between each pair of processes and
+            # wrap in remote receiver/sender objects to handle inter-process
+            # communication
+            self.remote_senders = {i: {} for i in range(self.num_processes)}
+            self.remote_receivers = {i: {} for i in range(self.num_processes)}
             for i in range(self.num_processes):
                 for j in range(self.num_processes):
-                    self.send_pipes[i][j], self.receive_pipes[j][i] = mp.Pipe()
-            # Divide up network graph between available processes
-            self.sub_graphs = []
+                    send_end, receive_end = mp.Pipe()
+                    self.remote_receivers[i][j] = RemoteReceiver(i, j,
+                                                                 send_end)
+                    self.remote_senders[j][i] = RemoteSender(i, j, receive_end)
             # Assign nodes to nodes in round robin fashion to balance loads
             # between processes
             for i, (node, attr) in enumerate(sorted(graph.nodes(data=True),
                                                     key=itemgetter(0))):
                 attr['rank'] = i % self.num_processes
-            # Replace edges that will span processes with remote send/receive
-            # port objects
+            # Record remote send/receivers to replace edges that will span
+            # processes
             for (u, v), attr in graph.edges(data=True):
                 u_attr = graph.nodes[u]
                 v_attr = graph.nodes[v]
                 u_rank = u_attr['rank']
                 v_rank = v_attr['rank']
                 if u_rank != v_rank:
-                    if attr['communicates'] == 'analog':
-                        try:
-                            senders = u_attr['remote_senders']
-                        except KeyError:
-                            senders = u_attr['remote_senders'] = []
-                        senders.append(RemoteAnalogSendPort(
-                            self.send_pipes[u_rank][v_rank]))
-                        try:
-                            receivers = u_attr['remote_receivers']
-                        except KeyError:
-                            receivers = u_attr['remote_receivers'] = []
-                        receivers.append(RemoteAnalogSendPort(
-                            self.send_pipes[u_rank][v_rank]))
+                    try:
+                        remote_receivers = u_attr['remote_receivers']
+                    except KeyError:
+                        remote_receivers = u_attr['remote_receivers'] = set()
+                    # Record port to send from and remote receivers object to
+                    # send it to when the node is constructed
+                    remote_receivers.add(
+                        (attr['send_port'],
+                         self.remote_receivers[u_rank][v_rank]))
+                    try:
+                        remote_senders = v_attr['remote_senders']
+                    except KeyError:
+                        remote_senders = v_attr['remote_senders'] = []
+                    # Record port to receive to, the remote senders object to
+                    # receive it from and the key of the sending component/port
+                    remote_senders.append(
+                        (attr['receive_port'],
+                         (u, attr['send_port']),
+                         self.remote_senders[v_rank][u_rank]))
+            # Divide up network graph between available processes
+            self.sub_graphs = [
+                graph.subgraph(n for n, a in graph.nodes(data=True)
+                               if a['rank'] == i)
+                for i in range(self.num_processes)]
 
     @property
     def name(self):
@@ -351,6 +366,13 @@ class Network(object):
                 attr['properties'], start_t, dynamics_class=dyn_class,
                 name='{}_{}'.format(*node), sample_index=attr['sample_index'])
             components.append(dynamics)
+            # Make all remote connections from send ports (if applicable)
+            for port_name, remote_receiver in attr.get('remote_receivers', []):
+                remote_receiver.connect(node, dynamics.ports[port_name])
+            # Make all remote connections to receive ports (if applicable)
+            for port_name, remote_key, remote_sender in attr.get(
+                    'remote_senders', []):
+                remote_sender.connect(remote_key, dynamics.ports[port_name])
         # Make all connections between dynamics components, sources and sinks
         for u, v, conn in tqdm(graph.out_edges(data=True),
                                desc="Connecting components",
@@ -511,62 +533,114 @@ class Network(object):
         graph.nodes[multi_node]['sample_index'] = sample_indices
 
 
-class RemotePort(object):
+class RemoteCommunicator(object):
 
-    def __init__(self, pipe):
-        self.pipe = pipe
+    def __init__(self, send_rank, receive_rank, pipe_end):
+        self.send_rank = send_rank
+        self.receive_rank = receive_rank
+        self.pipe_end = pipe_end
+        self.ports = {}
+
+    def __hash__(self):
+        return hash((self.end, self.send_rank, self.receive_rank))
+
+    def __eq__(self, other):
+        return (self.end == other.end and
+                self.send_rank == other.send_rank and
+                self.receive_rank == other.receive_rank)
+
+    def __ne__(self, other):
+        return not self == other
 
 
-class RemoteEventSendPort(RemotePort):
+class RemoteReceiver(RemoteCommunicator):
 
-    def connect_to(self, receive_port, delay):
-        pass
+    end = 'receive'
 
     def send(self):
-        pass
-#         if isinstance(delay, Quantity):
-#             delay = float(delay.in_si_units())
-#         self.receivers.append((receive_port, delay))
+        self.pipe_end.send((k, p.data) for k, p in self.ports.items())
+
+    def connect(self, network_id, port):
+        key = (network_id, port.name)
+        assert key not in self.ports
+        if port.communicates == 'analog':
+            remote_port = RemoteAnalogReceivePort()
+        else:
+            remote_port = RemoteEventReceivePort()
+        self.ports[key] = remote_port
+        port.connect_to(remote_port)
 
 
-class RemoteEventReceivePort(RemotePort):
+class RemoteSender(RemoteCommunicator):
 
-    def connect_from(self, receive_port, delay):
-        pass
+    end = 'send'
+
+    def receive(self):
+        for key, data in self.pipe_end.receive():
+            self.ports[key].update(data)
+
+    def connect(self, remote_key, port):
+        try:
+            remote_port = self.ports[remote_key]
+        except KeyError:
+            if port.communicates == 'analog':
+                remote_port = RemoteAnalogSendPort()
+            else:
+                remote_port = RemoteEventSendPort()
+            self.ports[remote_key] = remote_port
+        else:
+            assert port.communicates == remote_port.communicates
+        remote_port.connect_to(port)
+        return port
 
 
-class RemoteAnalogSendPort(object):
+class RemoteEventReceivePort(object):
 
-    def __init__(self, receive_port, pipe):
-        self.receive_port = receive_port
-        self.pipe = pipe
+    communicates = 'event'
 
-    def connect_to(self, receive_port, delay):
-        pass
-#         if isinstance(delay, Quantity):
-#             delay = float(delay.in_si_units())
-#         # Register the sending port with the receiving port so it can retrieve
-#         # the values of the sending port
-#         receive_port.connect_from(self, delay)
-#         # Keep track of the receivers connected to this send port
-#         self.receivers.append(receive_port)
-#         if delay > self.max_delay:
-#             self.max_delay = delay
+    def __init__(self):
+        self.events = []
+
+    def receive(self, t):
+        self.events.append(t)  # We assume that the events will come in order
+
+    @property
+    def data(self):
+        return self.events
 
 
 class RemoteAnalogReceivePort(object):
 
-    def __init__(self, send_port, pipe):
-        self.send_port = send_port
-        self.pipe = pipe
+    communicates = 'analog'
 
-    def connect_from(self, send_port, delay):
-        pass
-#         if isinstance(delay, Quantity):
-#             delay = float(delay.in_si_units())
-#         if self.sender is not None:
-#             raise NineMLUsageError(
-#                 "Cannot connect {} to multiple receive ports".format(
-#                     self._location))
-#         self.sender = send_port
-#         self.delay = delay
+    def __init__(self):
+        self.send_port = None
+
+    def connect_from(self, send_port, delay=None):  # @UnusedVariable
+        # Note delay is not used on the local side of the connection
+        self.send_port = send_port
+
+    @property
+    def data(self):
+        return self.send_port.buffer
+
+
+class RemoteAnalogSendPort(AnalogSendPort):
+
+    def __init__(self):
+        self.receivers = []
+        self.buffer = None
+        self.max_delay = 0.0
+
+    def update(self, buffer):
+        self.buffer = buffer
+
+
+class RemoteEventSendPort(EventSendPort):
+
+    def __init__(self):
+        self.receivers = []
+
+    def update(self, events):
+        for event in events:
+            self.send(event)

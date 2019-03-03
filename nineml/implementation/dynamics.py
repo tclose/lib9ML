@@ -519,6 +519,8 @@ class Port(object):
 
 class EventSendPort(Port):
 
+    communicates = 'events'
+
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
         self.receivers = []
@@ -527,13 +529,15 @@ class EventSendPort(Port):
         for receiver, delay in self.receivers:
             receiver.receive(t + delay)
 
-    def connect_to(self, receive_port, delay):
+    def connect_to(self, receive_port, delay=0.0):
         if isinstance(delay, Quantity):
             delay = float(delay.in_si_units())
         self.receivers.append((receive_port, delay))
 
 
 class EventReceivePort(Port):
+
+    communicates = 'events'
 
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
@@ -555,12 +559,14 @@ class EventReceivePort(Port):
 
 class AnalogSendPort(Port):
 
+    communicates = 'analog'
+
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
         self.receivers = []
         # To save the values of the send port in a buffer
         self.buffer = deque()
-        self.max_delay = 0  # To determine the required length of the buffer
+        self.max_delay = 0.0  # To determine the required length of the buffer
         # Get the expression that defines the value of the port
         dynamics = self.parent
         self.expr = dynamics.dynamics_class.port_aliases[defn.name]
@@ -605,7 +611,7 @@ class AnalogSendPort(Port):
     def _location(self):
         return "'{}' port in {}".format(self.name, self.parent)
 
-    def connect_to(self, receive_port, delay):
+    def connect_to(self, receive_port, delay=0.0):
         if isinstance(delay, Quantity):
             delay = float(delay.in_si_units())
         # Register the sending port with the receiving port so it can retrieve
@@ -648,6 +654,8 @@ class AnalogSendPort(Port):
 
 
 class AnalogReceivePort(Port):
+
+    communicates = 'analog'
 
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
