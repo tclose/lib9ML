@@ -12,11 +12,21 @@ except ImportError:
     plt = None
 
 
-class AnalogSource(AnalogSendPort):
+class ExperimentNode(object):
+
+    def port(self, port_name):
+        "For duck-typing with dynamics components"
+        assert port_name is None
+        return self
+
+
+class AnalogSource(ExperimentNode, AnalogSendPort):
     """
     An input source that can be connected to an AnalogReceivePort or
     AnalogSendPort
     """
+    
+    communicates = 'analog'
 
     def __init__(self, name, signal):
         self._name = name
@@ -45,9 +55,10 @@ class AnalogSource(AnalogSendPort):
                              (stop_t, amplitude)])
 
 
-class AnalogSink(AnalogReceivePort):
+class AnalogSink(ExperimentNode, AnalogReceivePort):
 
-    DEFAULT_PLOT_STEPS = 100
+    DEFAULT_PLOT_STEPS = 100    
+    communicates = 'analog'
 
     def __init__(self, name):
         self._name = name
@@ -144,7 +155,9 @@ class AnalogSink(AnalogReceivePort):
                 for t in range(self.DEFAULT_PLOT_STEPS)]
 
 
-class EventSource(object):
+class EventSource(ExperimentNode):
+
+    communicates = 'event'
 
     def __init__(self, name, events):
         self.name = name
@@ -155,7 +168,9 @@ class EventSource(object):
             receive_port.receive(float((event_t + delay).in_si_units()))
 
 
-class EventSink(Port):
+class EventSink(ExperimentNode, Port):
+
+    communicates = 'event'
 
     def __init__(self, name):
         self._name = name
@@ -219,26 +234,3 @@ class EventSink(Port):
         plt.title("{} PSTH".format(op.commonprefix(s.name for s in sinks)))
         if show:
             plt.show()
-
-
-class PicklableAnalogSink(AnalogSink):
-    """
-    A copy of an AnalogSink object that can be pickled to file but then plotted
-    as per a regular analog sink
-    """
-
-    def __init__(self, name, times, values, dimension):
-        self._name = name
-        self._times = times
-        self._values = values
-        self._dimension = dimension
-
-    def values(self, times):
-        times = [float(t.in_units(un.s)) if isinstance(t, un.Quantity) else t
-                 for t in times]
-        assert times == self._times
-        return self._values
-
-    @property
-    def dimension(self):
-        return self._dimension

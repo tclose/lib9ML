@@ -1,5 +1,5 @@
 from operator import itemgetter
-from collections import defaultdict
+from collections import defaultdict, deque
 from itertools import chain, repeat
 from copy import copy
 from logging import getLogger
@@ -17,9 +17,9 @@ from tqdm import tqdm
 from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import (
-    NineMLUsageError, NineMLCannotMergeException)
+    NineMLUsageError, NineMLCannotMergeException, NineMLInternalError)
 from nineml.utils import get_obj_size
-
+from pprint import pprint, pformat
 
 logger = getLogger('nineml')
 
@@ -53,7 +53,7 @@ class Network(object):
         If node indices are not provided then sinks are added to all nodes
     show_progress : bool
         Whether to show progress of network construction
-    num_processes : int
+    num_procs : int
         The number of processes to create the network over. If != 1 then
         initialisation of the network is delayed until the first (and only
         allowable) call to simulate.
@@ -68,13 +68,13 @@ class Network(object):
         if sinks is None:
             sinks = []
         if num_processes is None:
-            self.num_processes = mp.cpu_count()
+            self.num_procs = mp.cpu_count()
         elif num_processes < 1:
             raise NineMLUsageError(
                 "Cannot not specify less than one processor to use ({})"
                 .format(num_processes))
         else:
-            self.num_processes = num_processes
+            self.num_procs = num_processes
         self.t = start_t
         self.model = model
         component_arrays, connection_groups = model.flatten()
@@ -138,6 +138,7 @@ class Network(object):
                 (comp_array_name, index),
                 communicates=port.communicates,
                 delay=self.min_delay,
+                src_port=None,
                 dest_port=port_name)
         # Replace default dict with a regular dict to allow it to be pickled
         self.sources = dict(self.sources)
@@ -174,7 +175,8 @@ class Network(object):
                     (comp_array_name, index), sink_node_id,
                     communicates=port.communicates,
                     delay=self.min_delay,
-                    src_port=port_name)
+                    src_port=port_name,
+                    dest_port=None)
         # Replace default dict with regular dict to allow it to be pickled
         self.sinks = dict(self.sinks)
         # Merge dynamics definitions for nodes connected without delay
@@ -194,62 +196,80 @@ class Network(object):
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
-        if self.num_processes == 1:
+        if self.num_procs == 1:
             # Initialise all dynamics components in graph
-            self.components, _, _ = self._initialise_components(graph, start_t,
-                                                                show_progress)
+            self.components = self._initialise_components(graph, start_t,
+                                                          show_progress)
         else:
+            # Split network over number of specified processes
+
             # Construction of components is delayed until simulation step
             # so they can be constructed in child processes
             self.components = None
             # Construct inter-process pipes between each pair of processes and
             # wrap in remote receiver/sender objects to handle inter-process
             # communication
-            self.remote_senders = {i: {} for i in range(self.num_processes)}
-            self.remote_receivers = {i: {} for i in range(self.num_processes)}
-            for i in range(self.num_processes):
-                for j in range(self.num_processes):
-                    send_end, receive_end = mp.Pipe()
-                    self.remote_receivers[i][j] = RemoteReceiver(i, j,
-                                                                 send_end)
-                    self.remote_senders[j][i] = RemoteSender(i, j, receive_end)
+            self.remote_senders = {i: {} for i in range(self.num_procs)}
+            self.remote_receivers = {i: {} for i in range(self.num_procs)}
+            for i in range(self.num_procs):
+                for j in range(self.num_procs):
+                    if i != j:
+                        send_end, receive_end = mp.Pipe()
+                        self.remote_senders[i][j] = RemoteSender(
+                            i, j, send_end)
+                        self.remote_receivers[j][i] = RemoteReceiver(
+                            i, j, receive_end)
             # Assign nodes to nodes in round robin fashion to balance loads
             # between processes
             for i, (node, attr) in enumerate(sorted(graph.nodes(data=True),
                                                     key=itemgetter(0))):
-                attr['rank'] = i % self.num_processes
+                if 'properties' in attr:
+                    rank = i % self.num_procs
+                else:
+                    # Sources and sinks are placed on the master node for i/o
+                    rank = 0
+                attr['rank'] = rank
             # Record remote send/receivers to replace edges that will span
             # processes
-            for (u, v), attr in graph.edges(data=True):
+            for u, v, attr in graph.edges(data=True):
                 u_attr = graph.nodes[u]
                 v_attr = graph.nodes[v]
                 u_rank = u_attr['rank']
                 v_rank = v_attr['rank']
                 if u_rank != v_rank:
                     try:
-                        remote_receivers = u_attr['remote_receivers']
+                        remote_receive_ports = u_attr['remote_receive_ports']
                     except KeyError:
-                        remote_receivers = u_attr['remote_receivers'] = set()
+                        remote_receive_ports = {}
+                        u_attr['remote_receive_ports'] = remote_receive_ports
                     # Record port to send from and remote receivers object to
-                    # send it to when the node is constructed
-                    remote_receivers.add(
-                        (attr['send_port'],
-                         self.remote_receivers[u_rank][v_rank]))
+                    # send it to when the node is constructed as well as the
+                    # max delay (for determining the length of the required
+                    # buffer
+                    key = (attr['src_port'],
+                           self.remote_senders[u_rank][v_rank])
                     try:
-                        remote_senders = v_attr['remote_senders']
+                        delay = remote_receive_ports[key]
                     except KeyError:
-                        remote_senders = v_attr['remote_senders'] = []
+                        delay = 0.0
+                    if attr['delay'] >= delay:
+                        remote_receive_ports[key] = attr['delay']
+                    try:
+                        remote_send_ports = v_attr['remote_send_ports']
+                    except KeyError:
+                        remote_send_ports = v_attr['remote_send_ports'] = []
                     # Record port to receive to, the remote senders object to
                     # receive it from and the key of the sending component/port
-                    remote_senders.append(
-                        (attr['receive_port'],
-                         (u, attr['send_port']),
-                         self.remote_senders[v_rank][u_rank]))
+                    remote_send_ports.append(
+                        ((u, attr['src_port']),
+                         attr['dest_port'],
+                         delay,
+                         self.remote_receivers[v_rank][u_rank]))
             # Divide up network graph between available processes
             self.sub_graphs = [
                 graph.subgraph(n for n, a in graph.nodes(data=True)
                                if a['rank'] == i)
-                for i in range(self.num_processes)]
+                for i in range(self.num_procs)]
 
     @property
     def name(self):
@@ -272,21 +292,18 @@ class Network(object):
             stop_t = float(stop_t.in_units(un.s))
         if isinstance(dt, Quantity):
             dt = float(dt.in_si_units())
-        if self.num_processes == 1:
+        if self.num_procs == 1:
             # Simulate all components on the same node
             self._simulate(self.components, self.t, stop_t, dt, self.min_delay,
                            self.model.name, show_progress)
         else:
-            # To synchronize the end of each simulation slice (min-delay step)
-            barrier = mp.Barrier(self.num_processes)
             # Create child processes to simulate a sub-graph of the network
             processes = [
                 mp.Process(
                     target=self._simulate_sub_graph,
                     args=(sg, self.t, stop_t, dt, self.min_delay,
-                          self.model.name, False, barrier,
-                          list(self.send_pipes[i].values()),
-                          list(self.receive_pipes[i].values())))
+                          self.model.name, False, self.remote_senders[i],
+                          self.remote_receivers[i], i))
                 for i, sg in enumerate(self.sub_graphs[1:], start=1)]
             # Start all child processes
             for p in processes:
@@ -294,9 +311,8 @@ class Network(object):
             # Simulate the first sub-graph on the master process
             self._simulate_sub_graph(
                 self.sub_graphs[0], self.t, stop_t, dt, self.min_delay,
-                self.model.name, show_progress, barrier,
-                list(self.send_pipes[0].values()),
-                list(self.receive_pipes[0].values()))
+                self.model.name, show_progress, self.remote_senders[0],
+                self.remote_receivers[0], 0)
             # Join all child processes
             for p in processes:
                 p.join()
@@ -305,8 +321,12 @@ class Network(object):
 
     @classmethod
     def _simulate(cls, components, t, stop_t, dt, min_delay, model_name,
-                  show_progress, barrier=None, send_pipes=None,
-                  receive_pipes=None):
+                  show_progress, remote_senders=None,
+                  remote_receivers=None, rank=None):
+        # Get the schedule for communicating with other processes
+        if rank is not None:
+            comm_schedule = cls.interprocess_comm_schedule(
+                len(remote_receivers) + 1)[rank]
         progress_bar = tqdm(
             initial=t, total=stop_t,
             desc=("Simulating '{}' network (dt={} s)".format(model_name, dt)),
@@ -318,34 +338,43 @@ class Network(object):
             for component in components:
                 component.simulate(new_t, dt, show_progress=False)
             # Perform inter-process communication if required
-            if barrier is not None:
-                # Send all buffered data
-                for p in send_pipes:
-                    p.send()
-                # Wait for other processes to reach same point
-                barrier.wait()
-                # Receive all buffered data
-                for p in receive_pipes:
-                    p.receive()
+            if rank is not None:
+                for pairing in comm_schedule:
+                    if None in pairing:
+                        continue   # "bye"
+                    if rank == pairing[0]:
+                        # If "home" team, send data first
+                        remote = pairing[1]
+                        logger.debug('Sending data from {} to {}'
+                                     .format(rank, remote))
+                        remote_senders[remote].send_data()
+                        logger.debug('Receiving data from {} to {}'
+                                     .format(remote, rank))
+                        remote_receivers[remote].receive_data()
+                    else:
+                        # If "away" team, receive data first
+                        remote = pairing[0]
+                        logger.debug('Receiving data from {} to {}'
+                                     .format(remote, rank))
+                        remote_receivers[remote].receive_data()
+                        logger.debug('Sending data from {} to {}'
+                                     .format(rank, remote))
+                        remote_senders[remote].send_data()
             progress_bar.update(slice_dt)
             t = new_t
         progress_bar.close()
 
     @classmethod
     def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
-                            model_name, show_progress, barrier):
-        (components, remote_send_ports,
-         remote_receive_ports) = cls._initialise_components(sub_graph, t,
-                                                            show_progress)
+                            model_name, show_progress, remote_senders,
+                            remote_receivers, rank):
+        components = cls._initialise_components(sub_graph, t, show_progress)
         cls._simulate(components, t, stop_t, dt, min_delay, model_name,
-                      show_progress, barrier, remote_send_ports,
-                      remote_receive_ports)
+                      show_progress, remote_senders, remote_receivers, rank)
 
     @classmethod
     def _initialise_components(cls, graph, start_t, show_progress):
         components = []
-        remote_send_ports = []
-        remote_receive_ports = []
         dyn_class_cache = []  # Cache for storing previously analysed classes
         for node, attr in tqdm(graph.nodes(data=True),
                                desc="Iniitalising dynamics",
@@ -355,24 +384,35 @@ class Network(object):
             try:
                 model = attr['properties'].component_class
             except KeyError:
-                continue  # Source and sink nodes have already been initialised
-            try:
-                dyn_class = next(dc for m, dc in dyn_class_cache if m == model)
-            except StopIteration:
-                dyn_class = DynamicsClass(model)
-                dyn_class_cache.append((model, dyn_class))
-            # Create dynamics object
-            attr['dynamics'] = dynamics = Dynamics(
-                attr['properties'], start_t, dynamics_class=dyn_class,
-                name='{}_{}'.format(*node), sample_index=attr['sample_index'])
-            components.append(dynamics)
+                # Sources and sinks have already been initialised
+                try:
+                    component = attr['source']
+                except KeyError:
+                    component = attr['sink']
+            else:
+                try:
+                    dyn_class = next(dc for m, dc in dyn_class_cache
+                                     if m == model)
+                except StopIteration:
+                    dyn_class = DynamicsClass(model)
+                    dyn_class_cache.append((model, dyn_class))
+                # Create dynamics object
+                attr['dynamics'] = component = Dynamics(
+                    attr['properties'], start_t, dynamics_class=dyn_class,
+                    name='{}_{}'.format(*node),
+                    sample_index=attr['sample_index'],
+                    rank=attr.get('rank', None))
+                components.append(component)
             # Make all remote connections from send ports (if applicable)
-            for port_name, remote_receiver in attr.get('remote_receivers', []):
-                remote_receiver.connect(node, dynamics.ports[port_name])
+            for (port_name, remote_sender), max_delay in attr.get(
+                    'remote_receive_ports', {}).items():
+                remote_sender.connect(node, component.port(port_name),
+                                      max_delay)
             # Make all remote connections to receive ports (if applicable)
-            for port_name, remote_key, remote_sender in attr.get(
-                    'remote_senders', []):
-                remote_sender.connect(remote_key, dynamics.ports[port_name])
+            for remote_key, port_name, delay, remote_receiver in attr.get(
+                    'remote_send_ports', []):
+                remote_receiver.connect(remote_key, component.port(port_name),
+                                        delay)
         # Make all connections between dynamics components, sources and sinks
         for u, v, conn in tqdm(graph.out_edges(data=True),
                                desc="Connecting components",
@@ -392,7 +432,7 @@ class Network(object):
             else:
                 to_port = dyn.ports[conn['dest_port']]
             from_port.connect_to(to_port, delay=conn['delay'])
-        return components, remote_send_ports, remote_receive_ports
+        return components
 
     def connected_without_delay(self, start_node, graph, connected=None):
         """
@@ -532,6 +572,29 @@ class Network(object):
         graph.nodes[multi_node]['properties'] = merged
         graph.nodes[multi_node]['sample_index'] = sample_indices
 
+    @classmethod
+    def interprocess_comm_schedule(cls, num_procs):
+        """
+        Return schedule for inter-process communication based on a round-robin
+        tournament scheduling algorithm
+        """
+        procs = list(range(num_procs))
+
+        # To make even number of pairings introduce a "bye"
+        if num_procs % 2:
+            procs.append(None)
+        num_procs = len(procs)
+
+        schedule = {i: [] for i in procs}
+        for _ in range(num_procs - 1):
+            for i in range(num_procs // 2):
+                pair = (procs[i], procs[- i - 1])
+                schedule[pair[0]].append(pair)
+                schedule[pair[1]].append(pair)
+            procs.insert(1, procs.pop())
+
+        return schedule
+
 
 class RemoteCommunicator(object):
 
@@ -552,15 +615,21 @@ class RemoteCommunicator(object):
     def __ne__(self, other):
         return not self == other
 
+    def __repr__(self):
+        return "{}(send={}, receive={})".format(type(self).__name__,
+                                                self.send_rank,
+                                                self.receive_rank)
 
-class RemoteReceiver(RemoteCommunicator):
+
+class RemoteSender(RemoteCommunicator):
 
     end = 'receive'
 
-    def send(self):
-        self.pipe_end.send((k, p.data) for k, p in self.ports.items())
+    def send_data(self):
+        data = tuple((k, p.data) for k, p in self.ports.items())
+        self.pipe_end.send(data)
 
-    def connect(self, network_id, port):
+    def connect(self, network_id, port, delay):
         key = (network_id, port.name)
         assert key not in self.ports
         if port.communicates == 'analog':
@@ -568,18 +637,23 @@ class RemoteReceiver(RemoteCommunicator):
         else:
             remote_port = RemoteEventReceivePort()
         self.ports[key] = remote_port
-        port.connect_to(remote_port)
+        port.connect_to(remote_port, delay)
 
 
-class RemoteSender(RemoteCommunicator):
+class RemoteReceiver(RemoteCommunicator):
 
     end = 'send'
 
-    def receive(self):
-        for key, data in self.pipe_end.receive():
-            self.ports[key].update(data)
+    def receive_data(self):
+        for key, data in self.pipe_end.recv():
+            try:
+                self.ports[key].update(data)
+            except KeyError:
+                raise NineMLInternalError(
+                    "Did not find port corresponding to {} key:\n{}"
+                    .format(key, pformat(sorted(self.ports.keys()))))
 
-    def connect(self, remote_key, port):
+    def connect(self, remote_key, port, delay):
         try:
             remote_port = self.ports[remote_key]
         except KeyError:
@@ -590,7 +664,7 @@ class RemoteSender(RemoteCommunicator):
             self.ports[remote_key] = remote_port
         else:
             assert port.communicates == remote_port.communicates
-        remote_port.connect_to(port)
+        remote_port.connect_to(port, delay)
         return port
 
 
@@ -608,6 +682,9 @@ class RemoteEventReceivePort(object):
     def data(self):
         return self.events
 
+    def update_buffer(self):
+        pass
+
 
 class RemoteAnalogReceivePort(object):
 
@@ -623,6 +700,9 @@ class RemoteAnalogReceivePort(object):
     @property
     def data(self):
         return self.send_port.buffer
+
+    def update_buffer(self):
+        pass
 
 
 class RemoteAnalogSendPort(AnalogSendPort):

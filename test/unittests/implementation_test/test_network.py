@@ -32,18 +32,20 @@ class TestNetwork(TestCase):
 
     @skip("Network test isn't ready yet")
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
-                    dt=0.01 * un.ms, random_seed=None, **kwargs):
+                    dt=0.01 * un.ms, random_seed=None, num_processes=1,
+                    **kwargs):
         random.seed(random_seed)
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         if order is not None:
             model = self._reduced_brunel(model, order, random_seed=random_seed)
-        network = Network(model, start_t=0 * un.s,
+        network = Network(model, start_t=0 * un.s, num_processes=num_processes,
                           sinks=[('Exc__cell', 'spike_output', range(250)),
                                  ('Inh__cell', 'spike_output', range(250)),
-                                 ('Ext__cell', 'spike_output', range(250)),
-                                 ('Exc__cell', 'v', range(10)),
-                                 ('Inh__cell', 'v', range(10))])
+#                                  ('Ext__cell', 'spike_output', range(250)),
+#                                  ('Exc__cell', 'v', range(10)),
+#                                  ('Inh__cell', 'v', range(10))
+                                 ])
         network.simulate(duration, dt=dt, **kwargs)
         # Detach sinks and return
         return {name: [s.detach() for s in sink_group]
@@ -91,12 +93,6 @@ if __name__ == '__main__':
 
     logger = logging.getLogger('nineml')
 
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
     parser = ArgumentParser()
     parser.add_argument('--dt', default=0.01, type=float,
                         help="time step size")
@@ -116,7 +112,29 @@ if __name__ == '__main__':
                         help=("Load previously saved sinks and plot"))
     parser.add_argument('--hide_progress', default=False, action='store_true',
                         help="Whether to hide progress bar")
+    parser.add_argument('--num_processes', default=1, type=int,
+                        help="Number of processes to use")
+    parser.add_argument('--loglevel', default='warning', type=str,
+                        help=("The level at which to display logging. Can be "
+                              "one of 'debug', 'info', warning or 'error'"))
     args = parser.parse_args()
+
+    if args.loglevel.lower() == 'debug':
+        loglevel = logging.DEBUG
+    elif args.loglevel.lower() == 'info':
+        loglevel = logging.INFO
+    elif args.loglevel.lower() == 'warning':
+        loglevel = logging.WARNING
+    elif args.loglevel.lower() == 'error':
+        loglevel = logging.ERROR
+    else:
+        raise Exception("Unrecognised log-level '{}'".format(args.loglevel))
+
+    logger.setLevel(loglevel)
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
     if args.save_figs:
         try:
@@ -134,12 +152,14 @@ if __name__ == '__main__':
     else:
         dt = args.dt * un.ms
         duration = args.duration * un.ms
+        num_processes = args.num_processes if args.num_processes > 0 else None
         model = 'brunel'
         tester = TestNetwork()
         test = getattr(tester, 'test_{}'.format(model))
         sinks = test(dt=dt, duration=duration, case=args.case,
                      order=args.order, random_seed=12345,
-                     show_progress=(not args.hide_progress))
+                     show_progress=(not args.hide_progress),
+                     num_processes=num_processes)
     if args.save_sinks:
         with open(args.save_sinks, 'wb') as f:
             pkl.dump(sinks, f)

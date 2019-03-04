@@ -8,7 +8,8 @@ import bisect
 from logging import getLogger
 import sympy as sp
 from tqdm import tqdm
-from nineml.exceptions import NineMLUsageError, NineMLNameError
+from nineml.exceptions import (
+    NineMLUsageError, NineMLNameError, NineMLInternalError)
 from nineml.units import Quantity
 from nineml.user.multi import split_namespace
 
@@ -36,7 +37,8 @@ class Dynamics(object):
     """
 
     def __init__(self, model, start_t, initial_state=None, sample_index=None,
-                 initial_regime=None, dynamics_class=None, name=None):
+                 initial_regime=None, dynamics_class=None, name=None,
+                 rank=None):
 
         def sample_quantity(elem):
             # If sample index is a dictionary containing different indices for
@@ -106,6 +108,7 @@ class Dynamics(object):
             self.ports[pdef.name] = self.analog_reduce_ports[pdef.name] = (
                 AnalogReducePort(pdef, self))
         self.progress_bar = None
+        self.rank = rank
 
     @property
     def dt(self):
@@ -177,6 +180,9 @@ class Dynamics(object):
     def clear_buffers(self, min_t):
         for port in self.analog_send_ports:
             port.clear_buffer(min_t)
+
+    def port(self, port_name):
+        return self.ports[port_name]
 
 
 class DynamicsClass(object):
@@ -519,7 +525,7 @@ class Port(object):
 
 class EventSendPort(Port):
 
-    communicates = 'events'
+    communicates = 'event'
 
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
@@ -529,7 +535,7 @@ class EventSendPort(Port):
         for receiver, delay in self.receivers:
             receiver.receive(t + delay)
 
-    def connect_to(self, receive_port, delay=0.0):
+    def connect_to(self, receive_port, delay):
         if isinstance(delay, Quantity):
             delay = float(delay.in_si_units())
         self.receivers.append((receive_port, delay))
@@ -537,7 +543,7 @@ class EventSendPort(Port):
 
 class EventReceivePort(Port):
 
-    communicates = 'events'
+    communicates = 'event'
 
     def __init__(self, defn, parent):
         Port.__init__(self, defn, parent)
@@ -611,7 +617,7 @@ class AnalogSendPort(Port):
     def _location(self):
         return "'{}' port in {}".format(self.name, self.parent)
 
-    def connect_to(self, receive_port, delay=0.0):
+    def connect_to(self, receive_port, delay):
         if isinstance(delay, Quantity):
             delay = float(delay.in_si_units())
         # Register the sending port with the receiving port so it can retrieve
@@ -630,8 +636,13 @@ class AnalogSendPort(Port):
             # Drop buffer values that are no longer required
             if len(self.buffer) > 1:
                 min_t = self.parent.t - self.max_delay
-                while self.buffer[1][0] <= min_t:
-                    self.buffer.popleft()
+                try:
+                    while self.buffer[1][0] <= min_t:
+                        self.buffer.popleft()
+                except IndexError:
+                    raise NineMLInternalError(
+                        "Buffer of {} does not have at least two "
+                        "values in it: {}".format(self, self.buffer))
             values = self.parent.all_values()
             self.buffer.append(
                 (self.parent.t,
