@@ -182,7 +182,6 @@ class Network(object):
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
-#         print(get_obj_size(graph))
         progress_bar = tqdm(
             total=len(graph),
             desc="Merging sub-graphs with delayless connections",
@@ -197,7 +196,6 @@ class Network(object):
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
-#         print(get_obj_size(graph))
         if self.num_procs == 1:
             # Initialise all dynamics components in graph
             self.components = self._initialise_components(graph, start_t,
@@ -485,7 +483,6 @@ class Network(object):
         multi_node = (central_node[0] + '_multi', central_node[1])
         multi_name = sub_graph.nodes[central_node][
             'properties'].component_class.name + '_multi'
-        print(get_obj_size(graph))
         graph.add_node(multi_node)
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
@@ -521,7 +518,6 @@ class Network(object):
                     receiver_name=sub_graph.nodes[v]['sub_comp']))
                 edges_to_remove.append((u, v))
         # Remove all edges in the sub-graph from the primary graph
-        print(get_obj_size(graph))
         graph.remove_edges_from(edges_to_remove)
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
@@ -558,7 +554,6 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
-        print(get_obj_size(graph))
         graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
@@ -574,12 +569,8 @@ class Network(object):
             merged = merger.merged
             self.cached_mergers.append(merger)
         # Add merged node
-        print(get_obj_size(graph))
         graph.nodes[multi_node]['properties'] = merged
-        print(get_obj_size(graph))
         graph.nodes[multi_node]['sample_index'] = sample_indices
-        print(get_obj_size(graph))
-        print(1)
 
     @classmethod
     def interprocess_comm_schedule(cls, num_procs):
