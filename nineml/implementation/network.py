@@ -24,6 +24,21 @@ from pprint import pprint, pformat
 logger = getLogger('nineml')
 
 
+graph_size = 0
+prev_incr = 0
+
+
+def gs(graph, msg):
+
+    global graph_size, prev_incr
+    new_graph_size = get_obj_size(graph)
+    incr = new_graph_size - graph_size
+    graph_size = new_graph_size
+    if incr != prev_incr:
+        print('{}: {}'.format(msg, incr))
+        prev_incr = incr
+
+
 class Network(object):
     """
     An implementation of Network model in pure Python. All populations and
@@ -84,6 +99,7 @@ class Network(object):
             desc="Adding nodes to network graph",
             disable=not show_progress)
         graph = nx.MultiDiGraph()
+        gs(graph, 'initial')
         # Add nodes (2-tuples consisting of <component-array-name> and
         # <cell-index>) for each component in each array
         ca_dict = {}
@@ -93,6 +109,7 @@ class Network(object):
             for i in range(comp_array.size):
                 graph.add_node((comp_array.name, i),
                                sample_index=i, properties=props)
+                gs(graph, 'node')
                 progress_bar.update()
         progress_bar.close()
         # Add connections between components from connection groups
@@ -115,6 +132,7 @@ class Network(object):
                     delay=delay,
                     src_port=conn_group.source_port,
                     dest_port=conn_group.destination_port)
+                gs(graph, 'edge')
                 if delay and delay < self.min_delay:
                     self.min_delay = delay
                 progress_bar.update()
@@ -140,6 +158,7 @@ class Network(object):
                 delay=self.min_delay,
                 src_port=None,
                 dest_port=port_name)
+            gs(graph, 'source edge')
         # Replace default dict with a regular dict to allow it to be pickled
         self.sources = dict(self.sources)
         # Add sinks to network graph
@@ -171,12 +190,14 @@ class Network(object):
                 #     with other component arrays
                 sink_node_id = (sink_array_name, -(index + 1))
                 graph.add_node(sink_node_id, sink=sink)
+                gs(graph, 'sink node')
                 graph.add_edge(
                     (comp_array_name, index), sink_node_id,
                     communicates=port.communicates,
                     delay=self.min_delay,
                     src_port=port_name,
                     dest_port=None)
+                gs(graph, 'sink edge')
         # Replace default dict with regular dict to allow it to be pickled
         self.sinks = dict(self.sinks)
         # Merge dynamics definitions for nodes connected without delay
@@ -186,6 +207,7 @@ class Network(object):
             total=len(graph),
             desc="Merging sub-graphs with delayless connections",
             disable=not show_progress)
+        self.cached_merged = {}
         self.cached_mergers = []
         for node in list(graph.nodes):
             if node not in graph:
@@ -484,6 +506,7 @@ class Network(object):
         multi_name = sub_graph.nodes[central_node][
             'properties'].component_class.name + '_multi'
         graph.add_node(multi_node)
+        gs(graph, 'multi node')
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
         # should make the generated multi-dynamics class equalcla
@@ -519,6 +542,7 @@ class Network(object):
                 edges_to_remove.append((u, v))
         # Remove all edges in the sub-graph from the primary graph
         graph.remove_edges_from(edges_to_remove)
+        gs(graph, 'multi edge removal')
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
         port_exposures = set()
@@ -532,6 +556,7 @@ class Network(object):
             port_exposures.add(exposure)
             conn['src_port'] = exposure.name
             graph.add_edge(multi_node, v, **conn)
+            gs(graph, 'multi out edge add')
         # Redirect edges to merged multi-node from nodes external to the sub-
         # graph
         for u, v, conn in graph.in_edges(sub_graph, data=True):
@@ -544,6 +569,7 @@ class Network(object):
             port_exposures.add(exposure)
             conn['dest_port'] = exposure.name
             graph.add_edge(u, multi_node, **conn)
+            gs(graph, 'multi in edge add')
         # Create multi-dynamics object and set it as the properties object of
         # the new multi node
         multi_props = MultiDynamicsProperties(
@@ -555,22 +581,29 @@ class Network(object):
             validate=False)
         # Remove merged nodes and their edges
         graph.remove_nodes_from(sub_graph)
+        gs(graph, 'multi remove nodes')
         # Attempt to merge linear sub-components to limit the number of
         # states
-        merged = None
-        for cached_merger in self.cached_mergers:
-            try:
-                merged = cached_merger.merge(multi_props)
-            except NineMLCannotMergeException:
-                continue
-        if merged is None:
-            merger = DynamicsMergeStatesOfLinearSubComponents(multi_props,
-                                                              validate=False)
-            merged = merger.merged
-            self.cached_mergers.append(merger)
+        try:
+            merged = self.cached_merged[multi_props]
+        except KeyError:
+            merged = None
+            for cached_merger in self.cached_mergers:
+                try:
+                    merged = cached_merger.merge(multi_props)
+                except NineMLCannotMergeException:
+                    continue
+            if merged is None:
+                merger = DynamicsMergeStatesOfLinearSubComponents(
+                    multi_props, validate=False)
+                merged = merger.merged
+                self.cached_mergers.append(merger)
+            self.cached_merged[multi_props] = merged
         # Add merged node
         graph.nodes[multi_node]['properties'] = merged
+        gs(graph, 'multi properties')
         graph.nodes[multi_node]['sample_index'] = sample_indices
+        gs(graph, 'multi sample index')
 
     @classmethod
     def interprocess_comm_schedule(cls, num_procs):
@@ -724,4 +757,3 @@ class RemoteEventSendPort(EventSendPort):
     def update(self, events):
         for event in events:
             self.send(event)
-

@@ -1,6 +1,5 @@
 import re
 import math
-from collections import defaultdict
 from itertools import chain
 from .component import Property
 import nineml.units as un
@@ -14,8 +13,7 @@ from nineml.utils import validate_identifier
 from .component_array import ComponentArray
 from .connection_group import BaseConnectionGroup
 from nineml.values import RandomDistributionValue
-from nineml.exceptions import (NineMLRandomDistributionDelayException,
-                               NineMLUsageError)
+from nineml.exceptions import NineMLRandomDistributionDelayException
 
 
 class Network(BaseULObject, DocumentLevelObject, ContainerObject):
