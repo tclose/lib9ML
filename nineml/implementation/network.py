@@ -18,12 +18,25 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
     DynamicsMergeStatesOfLinearSubComponents)
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException, NineMLInternalError)
+from nineml.utils import get_obj_size
+from pprint import pprint, pformat
 
 logger = getLogger('nineml')
 
 
 graph_size = 0
 prev_incr = 0
+
+
+def gs(graph, msg):
+
+    global graph_size, prev_incr
+    new_graph_size = get_obj_size(graph)
+    incr = new_graph_size - graph_size
+    graph_size = new_graph_size
+    if incr != prev_incr:
+        print('{}: {}'.format(msg, incr))
+        prev_incr = incr
 
 
 class Network(object):
@@ -190,6 +203,7 @@ class Network(object):
             disable=not show_progress)
         self.cached_merged = {}
         self.cached_mergers = []
+        gs(graph, 'before merge')
         for node in list(graph.nodes):
             if node not in graph:
                 continue  # If node has already been merged
@@ -198,6 +212,7 @@ class Network(object):
             if num_to_merge > 1:
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
+        gs(graph, 'after merge')
         progress_bar.close()
         if self.num_procs == 1:
             # Initialise all dynamics components in graph
