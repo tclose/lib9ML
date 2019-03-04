@@ -53,7 +53,7 @@ class Network(object):
         If node indices are not provided then sinks are added to all nodes
     show_progress : bool
         Whether to show progress of network construction
-    num_procs : int
+    num_processes : int
         The number of processes to create the network over. If != 1 then
         initialisation of the network is delayed until the first (and only
         allowable) call to simulate.
@@ -182,6 +182,7 @@ class Network(object):
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
+#         print(get_obj_size(graph))
         progress_bar = tqdm(
             total=len(graph),
             desc="Merging sub-graphs with delayless connections",
@@ -196,6 +197,7 @@ class Network(object):
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
+#         print(get_obj_size(graph))
         if self.num_procs == 1:
             # Initialise all dynamics components in graph
             self.components = self._initialise_components(graph, start_t,
@@ -424,13 +426,13 @@ class Network(object):
             except KeyError:
                 from_port = u_attr['source']
             else:
-                from_port = dyn.ports[conn['src_port']]
+                from_port = dyn.port(conn['src_port'])
             try:
                 dyn = v_attr['dynamics']
             except KeyError:
                 to_port = v_attr['sink']
             else:
-                to_port = dyn.ports[conn['dest_port']]
+                to_port = dyn.port(conn['dest_port'])
             from_port.connect_to(to_port, delay=conn['delay'])
         return components
 
@@ -483,6 +485,7 @@ class Network(object):
         multi_node = (central_node[0] + '_multi', central_node[1])
         multi_name = sub_graph.nodes[central_node][
             'properties'].component_class.name + '_multi'
+        print(get_obj_size(graph))
         graph.add_node(multi_node)
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
@@ -518,6 +521,7 @@ class Network(object):
                     receiver_name=sub_graph.nodes[v]['sub_comp']))
                 edges_to_remove.append((u, v))
         # Remove all edges in the sub-graph from the primary graph
+        print(get_obj_size(graph))
         graph.remove_edges_from(edges_to_remove)
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
@@ -554,6 +558,7 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
+        print(get_obj_size(graph))
         graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
@@ -569,8 +574,12 @@ class Network(object):
             merged = merger.merged
             self.cached_mergers.append(merger)
         # Add merged node
+        print(get_obj_size(graph))
         graph.nodes[multi_node]['properties'] = merged
+        print(get_obj_size(graph))
         graph.nodes[multi_node]['sample_index'] = sample_indices
+        print(get_obj_size(graph))
+        print(1)
 
     @classmethod
     def interprocess_comm_schedule(cls, num_procs):
@@ -626,8 +635,8 @@ class RemoteSender(RemoteCommunicator):
     end = 'receive'
 
     def send_data(self):
-        data = tuple((k, p.data) for k, p in self.ports.items())
-        self.pipe_end.send(data)
+        self.pipe_end.send([(k, p.data) for k, p in self.ports.items()
+                            if p.data])
 
     def connect(self, network_id, port, delay):
         key = (network_id, port.name)
@@ -724,3 +733,4 @@ class RemoteEventSendPort(EventSendPort):
     def update(self, events):
         for event in events:
             self.send(event)
+
