@@ -102,7 +102,7 @@ if __name__ == '__main__':
                               "the network is scaled accordingly "
                               "(original=1000)"))
     parser.add_argument('--duration', default=50.0, type=float,
-                        help="The duration of the simulation")
+                        help="The duration of the simulation (ms)")
     parser.add_argument('--save_figs', default=None, type=str, metavar='PATH',
                         help=("The location of the directory to save the "
                               "generated figures"))

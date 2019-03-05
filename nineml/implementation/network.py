@@ -189,7 +189,7 @@ class Network(object):
             total=len(graph),
             desc="Merging sub-graphs with delayless connections",
             disable=not show_progress)
-        self.cached_merged = {}
+        self.cached_merged = []
         self.cached_mergers = []
         for node in list(graph.nodes):
             if node not in graph:
@@ -320,6 +320,7 @@ class Network(object):
             # Join all child processes
             for p in processes:
                 p.join()
+                p.close()
         self.t = stop_t
         return self.sinks
 
@@ -561,21 +562,25 @@ class Network(object):
         graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
-        try:
-            merged = self.cached_merged[multi_props]
-        except KeyError:
-            merged = None
+        merged = None
+        for prev_props, cached in self.cached_merged:
+            if prev_props == multi_props:
+                merged = cached
+                break
+        if merged is None:
             for cached_merger in self.cached_mergers:
                 try:
                     merged = cached_merger.merge(multi_props)
                 except NineMLCannotMergeException:
                     continue
-            if merged is None:
-                merger = DynamicsMergeStatesOfLinearSubComponents(
-                    multi_props, validate=False)
-                merged = merger.merged
-                self.cached_mergers.append(merger)
-            self.cached_merged[multi_props] = merged
+                else:
+                    break
+        if merged is None:
+            merger = DynamicsMergeStatesOfLinearSubComponents(
+                multi_props, validate=False)
+            merged = merger.merged
+            self.cached_mergers.append(merger)
+        self.cached_merged.append((multi_props,merged))
         # Add merged node
         graph.nodes[multi_node]['properties'] = merged
         graph.nodes[multi_node]['sample_index'] = sample_indices
