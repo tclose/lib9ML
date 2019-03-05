@@ -32,6 +32,8 @@ class EqualityChecker(BaseDualVisitor):
         return True
 
     def action(self, obj1, obj2, nineml_cls, **kwargs):
+        if obj1 is obj2:
+            return  # No point checking if obj 1 and 2 are the same object
         if self.annotations_ns:
             try:
                 annotations_keys = set(chain(obj1.annotations.branch_keys,
@@ -53,8 +55,7 @@ class EqualityChecker(BaseDualVisitor):
                             self._raise_annotations_exception(
                                 nineml_cls, obj1, obj2, key)
                         self.visit(annot1, annot2, **kwargs)
-        return super(EqualityChecker, self).action(obj1, obj2, nineml_cls,
-                                                   **kwargs)
+        super(EqualityChecker, self).action(obj1, obj2, nineml_cls, **kwargs)
 
     def default_action(self, obj1, obj2, nineml_cls, **kwargs):  # @UnusedVariable @IgnorePep8
         for attr_name in nineml_cls.nineml_attr:
