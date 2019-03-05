@@ -320,7 +320,6 @@ class Network(object):
             # Join all child processes
             for p in processes:
                 p.join()
-                p.close()
         self.t = stop_t
         return self.sinks
 
@@ -580,7 +579,7 @@ class Network(object):
                 multi_props, validate=False)
             merged = merger.merged
             self.cached_mergers.append(merger)
-        self.cached_merged.append((multi_props,merged))
+        self.cached_merged.append((multi_props, merged))
         # Add merged node
         graph.nodes[multi_node]['properties'] = merged
         graph.nodes[multi_node]['sample_index'] = sample_indices
