@@ -203,7 +203,7 @@ class Network(object):
             disable=not show_progress)
         self.cached_merged = {}
         self.cached_mergers = []
-        gs(graph, 'before merge')
+#         gs(graph, 'before merge')
         for node in list(graph.nodes):
             if node not in graph:
                 continue  # If node has already been merged
@@ -212,7 +212,7 @@ class Network(object):
             if num_to_merge > 1:
                 self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
-        gs(graph, 'after merge')
+#         gs(graph, 'after merge')
         progress_bar.close()
         if self.num_procs == 1:
             # Initialise all dynamics components in graph
