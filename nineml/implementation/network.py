@@ -1,5 +1,5 @@
 from operator import itemgetter
-from collections import defaultdict, deque
+from collections import defaultdict
 from itertools import chain, repeat
 from copy import copy
 from logging import getLogger
