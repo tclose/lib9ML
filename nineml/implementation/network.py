@@ -580,6 +580,7 @@ class Network(object):
             merged = merger.merged
             self.cached_mergers.append(merger)
         self.cached_merged.append((multi_props, merged))
+        del multi_props
         # Add merged node
         graph.nodes[multi_node]['properties'] = merged
         graph.nodes[multi_node]['sample_index'] = sample_indices

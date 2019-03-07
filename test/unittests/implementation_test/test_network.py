@@ -117,6 +117,8 @@ if __name__ == '__main__':
     parser.add_argument('--loglevel', default='warning', type=str,
                         help=("The level at which to display logging. Can be "
                               "one of 'debug', 'info', warning or 'error'"))
+    parser.add_argument('--nplot', default=False, type=int,
+                        help=("The number of neurons to plot"))
     args = parser.parse_args()
 
     if args.loglevel.lower() == 'debug':
@@ -166,6 +168,8 @@ if __name__ == '__main__':
         logger.info("Saved sinks to '{}'".format(args.save_sinks))
     else:
         for pop_sinks in sinks.values():
+            if args.nplot:
+                pop_sinks = pop_sinks[:args.nplot]
             fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
             if args.save_figs:
                 common_prefix = op.commonprefix([s.name for s in pop_sinks])
