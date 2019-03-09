@@ -85,19 +85,6 @@ class TestQuantityExceptions(unittest.TestCase):
             value=1.0,
             units=un.time)
 
-    def test___getitem___ninemlruntimeerror(self):
-        """
-        line #: 482
-        message: Cannot get item from random distribution
-        """
-
-        random_value = next(iter(instances_of_all_types['RandomDistributionValue'].values()))
-        qty = Quantity(random_value, un.ms)
-        self.assertRaises(
-            NineMLUsageError,
-            qty.__getitem__,
-            index=0)
-
     def test_set_units_ninemldimensionerror(self):
         """
         line #: 487

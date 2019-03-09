@@ -3,7 +3,7 @@ Contains an example document with every type 9ML element in it for use in
 comprehensive testing over all 9ML elements
 """
 from __future__ import absolute_import
-from past.builtins import basestring
+from past.builtins import basestring, long
 import pkgutil
 from collections import defaultdict
 from itertools import chain
@@ -537,7 +537,7 @@ def add_with_sub_elements(element):
     """
     if isinstance(element, (basestring, Document)) or element in loading:
         return
-    if not isinstance(element, (dict, list, tuple, int, float, str,
+    if not isinstance(element, (dict, list, tuple, int, float, str, long,
                                 sympy.Basic, Connectivity)):
         # If element has an attribute called 'nineml_type' add it to the
         # dictionary of all 9ML elements
@@ -562,6 +562,7 @@ def add_with_sub_elements(element):
                 return
         for elem in sub_elem_iter:
             add_with_sub_elements(elem)
+
 
 v1_safe_docs = [doc2]
 

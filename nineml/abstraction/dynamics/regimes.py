@@ -283,8 +283,8 @@ class Regime(BaseALObject, ContainerObject):
             If outputs is None all expressions are checked.
         """
         return visitors.queriers.DynamicsAreLinear(
-            check_state_assignments=False).is_linear(
-                self.parent, regime_name=self.name)
+            self.parent, check_state_assignments=False,
+            regime_name=self.name).linear
 
     # Regime Properties:
     # ------------------

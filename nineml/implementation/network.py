@@ -19,6 +19,10 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException, NineMLInternalError)
 from pprint import pprint, pformat
+# from pympler import muppy, summary
+# from nineml.utils import get_obj_size
+# import resource
+
 
 logger = getLogger('nineml')
 
@@ -197,7 +201,7 @@ class Network(object):
             conn_without_delay = self.connected_without_delay(node, graph)
             num_to_merge = len(conn_without_delay)
             if num_to_merge > 1:
-                self.merge_nodes(conn_without_delay, graph)
+                graph = self.merge_nodes(conn_without_delay, graph)
             progress_bar.update(num_to_merge)
         progress_bar.close()
         if self.num_procs == 1:
@@ -584,6 +588,7 @@ class Network(object):
         # Add merged node
         graph.nodes[multi_node]['properties'] = merged
         graph.nodes[multi_node]['sample_index'] = sample_indices
+        return graph
 
     @classmethod
     def interprocess_comm_schedule(cls, num_procs):

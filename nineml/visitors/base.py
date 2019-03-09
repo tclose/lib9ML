@@ -263,8 +263,11 @@ class BaseDualVisitor(BaseVisitor):
         keys1 = set(parent1._member_keys_iter(children_type))
         keys2 = set(parent2._member_keys_iter(children_type))
         if keys1 != keys2:
-            self._raise_keys_mismatch_exception(children_type, parent1,
-                                                parent2, keys1, keys2)
+            try:
+                self._raise_keys_mismatch_exception(children_type, parent1,
+                                                    parent2, keys1, keys2)
+            except:
+                raise
         for key in keys1:
             child1 = parent1._member_accessor(children_type)(key)
             child2 = parent2._member_accessor(children_type)(key)

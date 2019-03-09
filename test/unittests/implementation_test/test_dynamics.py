@@ -33,8 +33,12 @@ else:
     from unittest import TestCase, skipIf
 
 
+DISABLE_SIM_TESTS = True
+
+
 class TestDynamics(TestCase):
 
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
     def test_liaf(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         properties = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
@@ -58,6 +62,7 @@ class TestDynamics(TestCase):
                          [0.055, 0.061, 0.068, 0.075, 0.081, 0.088, 0.095])
         return v_out
 
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
     def test_izhikevich(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         properties = ninemlcatalog.load('neuron/Izhikevich',
@@ -82,6 +87,7 @@ class TestDynamics(TestCase):
                           0.08, 0.083, 0.087, 0.091, 0.095, 0.098])
         return v_out
 
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
     def test_izhikevich_fs(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         properties = ninemlcatalog.load('neuron/Izhikevich',
@@ -105,7 +111,9 @@ class TestDynamics(TestCase):
                          [0.058, 0.081])
         return v_out
 
-    @skipIf(PY2, "Generated equations for HodgkinHuxley overflow on Python 2")
+    @skipIf(DISABLE_SIM_TESTS or PY2,
+            "Simulation tests disabled" if DISABLE_SIM_TESTS else
+            "Generated equations for HodgkinHuxley overflow on Python 2")
     def test_hodgkin_huxley(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
 
         properties = ninemlcatalog.load('neuron/HodgkinHuxley',
@@ -130,6 +138,7 @@ class TestDynamics(TestCase):
                          [0.038, 0.058, 0.07, 0.082, 0.094])
         return v_out
 
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
     def test_liaf_alpha_syn(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
         liaf = ninemlcatalog.load(
             'neuron/LeakyIntegrateAndFire/',
@@ -180,7 +189,7 @@ class TestDynamics(TestCase):
                          [0.071])
         return v_out
 
-
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
     def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms, **kwargs):  # @UnusedVariable @IgnorePep8
 
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')

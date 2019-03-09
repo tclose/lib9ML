@@ -214,7 +214,7 @@ class TestAccessors(unittest.TestCase):
                     regimes = list(elem.regimes)
                     regimes[0].on_conditions
                     regimes[1].on_conditions
-                flat_elem = elem.flatten(elem.name)
+                flat_elem = elem.flatten(name=elem.name)
                 for child_type in cls.nineml_children:
                     accessor_name = child_type._child_accessor_name()
                     if accessor_name.endswith('_port'):

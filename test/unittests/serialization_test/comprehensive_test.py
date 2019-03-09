@@ -37,7 +37,7 @@ class TestComprehensiveSerialization(TestCase):
                 for i, document in enumerate(docs):
                     try:
                         doc = document.clone()
-                    except:
+                    except Exception:
                         document.clone()
                         raise
                     url = os.path.join(

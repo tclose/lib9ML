@@ -31,9 +31,13 @@ class EqualityChecker(BaseDualVisitor):
             return False
         return True
 
-    def action(self, obj1, obj2, nineml_cls, **kwargs):
+    def visit(self, obj1, obj2, nineml_cls=None, **kwargs):
         if obj1 is obj2:
             return  # No point checking if obj 1 and 2 are the same object
+        return super(EqualityChecker, self).visit(
+            obj1, obj2, nineml_cls=nineml_cls, **kwargs)
+
+    def action(self, obj1, obj2, nineml_cls, **kwargs):
         if self.annotations_ns:
             try:
                 annotations_keys = set(chain(obj1.annotations.branch_keys,
@@ -292,7 +296,8 @@ class MismatchFinder(DualWithContextMixin, EqualityChecker):
         raise NineMLDualVisitNoneChildException(
             child_name, child1, child2, self.contexts1, self.contexts2)
 
-    def _raise_keys_mismatch_exception(self, children_type, obj1, obj2):
+    def _raise_keys_mismatch_exception(self, children_type, obj1, obj2,
+                                       keys1=None, keys2=None):
         raise NineMLDualVisitKeysMismatchException(
             children_type, obj1, obj2, self.contexts1, self.contexts2)
 
