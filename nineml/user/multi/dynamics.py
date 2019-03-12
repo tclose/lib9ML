@@ -4,6 +4,7 @@ from past.builtins import basestring
 from itertools import chain
 import collections
 from copy import copy
+import weakref
 from .. import BaseULObject
 import sympy
 from collections import defaultdict
@@ -894,8 +895,18 @@ class _MultiRegime(Regime):
         # MultiRegime will have the same hash values, but the equivalent object
         # in a different multi regime will have a different hash object
         for sub_regime in self.sub_regimes:
-            sub_regime._parent = self
-        self._parent = parent
+            sub_regime._parent = weakref.ref(self)
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _MultiRegime(self.sub_regimes.values(), self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:  # parent has been garbage collected
+            return None
 
     @property
     def sub_regimes(self):
@@ -935,7 +946,7 @@ class _MultiRegime(Regime):
         port exposure
         """
         list_of_args = []
-        for port_exposure in self._parent.event_receive_ports:
+        for port_exposure in self.parent.event_receive_ports:
             exposed_on_events = [
                 oe for oe in self._all_sub_on_events
                 if oe.src_port_name == port_exposure.local_port_name]
@@ -954,7 +965,7 @@ class _MultiRegime(Regime):
         # time period
         nonzero_delay_receive_ports = [
             pc.receive_port.name
-            for pc in self._parent.nonzero_delay_event_port_connections]
+            for pc in self.parent.nonzero_delay_event_port_connections]
         for output_event in self._all_sub_on_events:
             if output_event.src_port_name in nonzero_delay_receive_ports:
                 yield _MultiOnCondition([_DelayedOnEvent(output_event)], self)
@@ -975,7 +986,7 @@ class _MultiRegime(Regime):
         return self.sub_regime(comp_name).alias(name)
 
     def on_event(self, port_name):
-        port_exposure = self._parent.event_receive_port(port_name)
+        port_exposure = self.parent.event_receive_port(port_name)
         sub_on_events = [oe for oe in self._all_sub_on_events
                          if oe.src_port_name == port_exposure.local_port_name]
         if not sub_on_events:
@@ -1374,20 +1385,30 @@ class _MultiTransition(BaseALObject, ContainerObject):
                     "Transition loop with non-zero delay found in on-event "
                     "chain beggining with {}".format(chained_event.key))
             self._sub_transitions[namespace] = chained_event
-        self._parent = parent
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _MultiTransition(self._sub_transitions.values(), self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def target_regime(self):
-        sub_regimes = copy(self._parent._sub_regimes)
+        sub_regimes = copy(self.parent._sub_regimes)
         sub_regimes.update(
             (k, t.target_regime)
             for k, t in self._sub_transitions.items())
-        return self._parent._parent._create_multi_regime(
+        return self.parent.parent._create_multi_regime(
             iter(sub_regimes.values()))
 
     @property
     def target_regime_name(self):
-        sub_regime_names = copy(self._parent._sub_regimes)
+        sub_regime_names = copy(self.parent._sub_regimes)
         sub_regime_names.update(
             (k, t.target_regime) for k, t in self._sub_transitions.items())
         return make_regime_name(sub_regime_names)
@@ -1411,7 +1432,7 @@ class _MultiTransition(BaseALObject, ContainerObject):
         # local event port connections with non-zero delay
         delayed_on_event_assignments = (
             _DelayedOnEventStateAssignment(pc) for pc in (
-                self._parent._parent.nonzero_delay_event_port_connections)
+                self.parent.parent.nonzero_delay_event_port_connections)
             if pc.port in self._sub_output_event_ports)
         sub_trans_assigns = (
             _MultiStateAssignment(sa, self)
@@ -1434,11 +1455,11 @@ class _MultiTransition(BaseALObject, ContainerObject):
         # Return all output events that are exposed by port exposures
         return (
             _ExposedOutputEvent(pe, self)
-            for pe in self._parent._parent.event_send_ports
+            for pe in self.parent.parent.event_send_ports
             if pe.port.id in self._sub_output_event_port_ids())
 
     def output_event(self, name):
-        exposure = self._parent._parent.event_send_port(name)
+        exposure = self.parent.parent.event_send_port(name)
         if exposure.port.id not in self._sub_output_event_port_ids():
             raise NineMLNameError(
                 "Output event for '{}' port is not present in transition"
@@ -1522,7 +1543,17 @@ class _MultiStateAssignment(StateAssignment):
 
     def __init__(self, state_assignment, parent):
         self._state_assignment = state_assignment
-        self._parent = parent
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _MultiStateAssignment(self._state_assignment, self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def name(self):

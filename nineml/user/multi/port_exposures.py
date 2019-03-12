@@ -1,4 +1,5 @@
 from past.builtins import basestring
+import weakref
 from itertools import chain
 from nineml.base import BaseNineMLObject
 from .. import BaseULObject
@@ -43,6 +44,13 @@ class BasePortExposure(BaseULObject):
             name = self._default_name()
         self._name = validate_identifier(name)
 
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except (ReferenceError, TypeError):
+            return None
+
     def __repr__(self):
         return "{}(comp={}, port={}, name={})".format(
             self.nineml_type, self.sub_component_name, self.port_name,
@@ -54,11 +62,11 @@ class BasePortExposure(BaseULObject):
 
     @property
     def sub_component(self):
-        if self._parent is None:
+        if self.parent is None:
             raise NineMLNotBoundException(
                 "Port exposure is not bound")
         try:
-            return self._parent[self.sub_component_name]
+            return self.parent[self.sub_component_name]
         except NineMLNameError:
             raise NineMLTargetMissingError(
                 "Did not find sub-component '{}' the target sub-component "
@@ -69,7 +77,7 @@ class BasePortExposure(BaseULObject):
 
     @property
     def port(self):
-        if self._parent is None:
+        if self.parent is None:
             raise NineMLNotBoundException(
                 "Port exposure is not bound")
         try:
@@ -156,7 +164,7 @@ class BasePortExposure(BaseULObject):
         container : MultiDynamics
             The MultiDynamics object the port exposure will belong to
         """
-        self._parent = container
+        self._parent = weakref.ref(container)
         self.port  # This will check to see whether the path to the port exists
 
 
@@ -182,8 +190,11 @@ class _PortExposureAlias(Alias):
     def __init__(self, exposure):
         self._exposure = exposure
 
+    def clone(self):
+        return _PortExposureAlias(self._exposure)
+
     @property
-    def _parent(self):
+    def parent(self):
         "To get the 'id' property in BaseNineMLObject to work"
         return self._exposure
 
@@ -283,7 +294,17 @@ class _ExposedOutputEvent(OutputEvent):
     def __init__(self, port_exposure, parent):
         BaseNineMLObject.__init__(self)
         self._port_exposure = port_exposure
-        self._parent = parent
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _ExposedOutputEvent(self._port_exposure, self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def key(self):

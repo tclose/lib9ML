@@ -5,6 +5,7 @@ name clashes in the global scope
 """
 from builtins import next
 from builtins import object
+import weakref
 import re
 import sympy
 from ..component import Property
@@ -103,7 +104,17 @@ class _NamespaceObject(BaseNineMLObject):
     def __init__(self, sub_component, element, parent=None):
         self._sub_component = sub_component
         self._object = element
-        self._parent = parent
+        self._parent = weakref.ref(parent) if parent is not None else None
+
+    def clone(self):
+        return type(self)(self._sub_component, self._object, self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def sub_component(self):
@@ -216,7 +227,7 @@ class _NamespaceTransition(_NamespaceNamed):
     def target_regime(self):
         return _NamespaceRegime(self.sub_component,
                                 self._object.target_regime,
-                                self._parent._parent)
+                                self.parent.parent)
 
     @property
     def target_regime_name(self):

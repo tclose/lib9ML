@@ -1,3 +1,4 @@
+import weakref
 import sympy
 from nineml.base import BaseNineMLObject
 import nineml.units as un
@@ -31,6 +32,9 @@ class _DelayedOnEvent(_NamespaceOnCondition):
         state_var = make_delay_trigger_name(self._port_connection)
         return Trigger('t > {}'.format(state_var))
 
+    def clone(self):
+        return _DelayedOnEvent(self._sub_component, self._port_connection)
+
 
 class _UnconnectedAnalogReducePort(Constant):
     """
@@ -43,11 +47,21 @@ class _UnconnectedAnalogReducePort(Constant):
     def __init__(self, port, sub_component):
         BaseNineMLObject.__init__(self)
         self._port = port
-        self._parent = sub_component
+        self._parent = weakref.ref(sub_component)
+
+    def clone(self):
+        return _UnconnectedAnalogReducePort(self._port, self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def name(self):
-        return append_namespace(self._port.name, self._parent.name)
+        return append_namespace(self._port.name, self.parent.name)
 
     @property
     def value(self):
@@ -64,11 +78,21 @@ class _DelayedOnEventStateVariable(StateVariable):
 
     def __init__(self, port_connection):
         BaseNineMLObject.__init__(self)
-        self._parent = port_connection
+        self._parent = weakref.ref(port_connection)
+
+    def clone(self):
+        return _DelayedOnEventStateVariable(self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def name(self):
-        return make_delay_trigger_name(self._parent)
+        return make_delay_trigger_name(self.parent)
 
     @property
     def dimension(self):
@@ -81,15 +105,25 @@ class _DelayedOnEventStateAssignment(StateAssignment):
 
     def __init__(self, port_connection):
         BaseNineMLObject.__init__(self)
-        self._parent = port_connection
+        self._parent = weakref.ref(port_connection)
+
+    def clone(self):
+        return _DelayedOnEventStateAssignment(self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def variable(self):
-        return make_delay_trigger_name(self._parent)
+        return make_delay_trigger_name(self.parent)
 
     @property
     def rhs(self):
-        return sympy.sympify('t + {}'.format(self._parent.delay))
+        return sympy.sympify('t + {}'.format(self.parent.delay))
 
 
 class _LocalAnalogReceivePortConnection(Alias):
@@ -101,7 +135,18 @@ class _LocalAnalogReceivePortConnection(Alias):
         self._port = receive_port
         self._receiver = receiver
         self._port_conn = port_connection
-        self._parent = parent
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _LocalAnalogReceivePortConnection(self._port, self._receiver,
+                                                 self._port_conn, self.parent)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def port_name(self):
@@ -149,7 +194,6 @@ class _LocalAnalogReducePortConnections(_LocalAnalogReceivePortConnection):
         self._port = reduce_port
         self._receiver = receiver
         self._port_connections = port_connections
-        self._parent = parent
         self._exposure = exposure
         if exposure is not None and exposure.name == exposure.local_port_name:
             raise NineMLUsageError(
@@ -157,6 +201,19 @@ class _LocalAnalogReducePortConnections(_LocalAnalogReceivePortConnection):
                 "'{}' as it is locally connected by {}".format(
                     exposure.name, ', '.join(str(pc)
                                              for pc in port_connections)))
+        self._parent = weakref.ref(parent)
+
+    def clone(self):
+        return _LocalAnalogReducePortConnections(
+            self._port, self._receiver, self._port_connections, self.parent,
+            self._exposure)
+
+    @property
+    def parent(self):
+        try:
+            return self._parent()
+        except ReferenceError:
+            return None
 
     @property
     def port_connections(self):

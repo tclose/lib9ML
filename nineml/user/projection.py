@@ -22,7 +22,7 @@ V1_DELAY_VALUE_TYPES = ('SingleValue', 'ArrayValue', 'ExternalArrayValue',
                         'RandomDistributionValue')
 
 
-class Projection(BaseULObject, ContainerObject, DocumentLevelObject):
+class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
     """
     A collection of connections between two :class:`Population`\s.
 

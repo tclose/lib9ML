@@ -1,6 +1,7 @@
 from past.builtins import basestring
 from builtins import object
 from itertools import chain
+import weakref
 import re
 # from copy import copy
 import operator
@@ -82,9 +83,9 @@ class BaseNineMLObject(object):
             # be anchored in the memory location of a "non-temporary" object)
             # plus the name of the type and its key.
             try:
-                parent_id = hex(self._parent.id)
+                parent_id = hex(self.parent.id)
             except TypeError:
-                parent_id = self._parent.id  # Temporary object ID
+                parent_id = self.parent.id  # Temporary object ID
             id_ = parent_id + type(self).__name__ + '_' + str(self.key)
         else:
             id_ = id(self)
@@ -290,7 +291,18 @@ class DocumentLevelObject(BaseNineMLObject):
 
     @property
     def document(self):
-        return self._document
+        try:
+            return self._document()
+        except TypeError:
+            return None
+
+    @document.setter
+    def document(self, document):
+        if document is not None:
+            doc_ref = weakref.ref(document)
+        else:
+            doc_ref = None
+        self._document = doc_ref
 
     @property
     def url(self):
@@ -492,7 +504,7 @@ class ContainerObject(BaseNineMLObject):
             dct[element.key] = element
             # Set parent if a property of the child element to add
             if hasattr(element, 'parent'):
-                element._parent = self
+                element._parent = weakref.ref(self)
             # Add nested references to document
             if self.document is not None:
                 add_to_doc_visitor.visit(element)
@@ -684,13 +696,14 @@ class ContainerObject(BaseNineMLObject):
 
     @property
     def parent(self):
-        return self._parent
+        try:
+            return self._parent()
+        except (ReferenceError, TypeError):  # Parent has been gc'd or is None
+            return None
 
     @property
     def document(self):
-        if isinstance(self, DocumentLevelObject):
-            document = self._document
-        elif self.parent is not None:
+        if self.parent is not None:
             # Otherwise return parent's document if set
             document = self.parent.document
         else:

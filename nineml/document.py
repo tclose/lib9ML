@@ -132,7 +132,7 @@ class Document(AnnotatedNineMLObject, dict):
                     "Could not find '{}' element to remove from document '{}'"
                     .format(nineml_obj.name, self.url))
         assert nineml_obj.document is self
-        nineml_obj._document = None
+        nineml_obj.document = None
 
     def pop(self, name):
         element = self[name]
@@ -325,7 +325,10 @@ class AddToDocumentVisitor(BaseVisitorWithContext):
                 obj = doc_obj
             else:
                 dict.__setitem__(self.document, obj.name, obj)
-                obj._document = self.document
+                try:
+                    obj.document = self.document
+                except:
+                    raise
         return obj
 
     def post_action(self, *args, **kwargs):

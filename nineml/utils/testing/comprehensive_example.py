@@ -6,6 +6,7 @@ from __future__ import absolute_import
 from past.builtins import basestring, long
 import pkgutil
 from collections import defaultdict
+import weakref
 from itertools import chain
 import nineml
 import nineml.units as un
@@ -538,7 +539,7 @@ def add_with_sub_elements(element):
     if isinstance(element, (basestring, Document)) or element in loading:
         return
     if not isinstance(element, (dict, list, tuple, int, float, str, long,
-                                sympy.Basic, Connectivity)):
+                                sympy.Basic, Connectivity, weakref.ref)):
         # If element has an attribute called 'nineml_type' add it to the
         # dictionary of all 9ML elements
         if element.nineml_type == 'Annotations':

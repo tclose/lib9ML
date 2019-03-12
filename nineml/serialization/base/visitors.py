@@ -80,10 +80,7 @@ class BaseVisitor(with_metaclass(ABCMeta, object)):
 
     @classmethod
     def standardize_version(cls, version):
-        try:
-            version = float(version)
-        except:
-            pass
+        version = float(version)
         if isinstance(version, float):
             version = str(version)
         if isinstance(version, str):
