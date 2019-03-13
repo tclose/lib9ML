@@ -898,7 +898,7 @@ class _MultiRegime(Regime):
             sub_regime._parent = weakref.ref(self)
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _MultiRegime(self.sub_regimes.values(), self.parent)
 
     @property
@@ -1387,7 +1387,7 @@ class _MultiTransition(BaseALObject, ContainerObject):
             self._sub_transitions[namespace] = chained_event
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _MultiTransition(self._sub_transitions.values(), self.parent)
 
     @property
@@ -1545,7 +1545,7 @@ class _MultiStateAssignment(StateAssignment):
         self._state_assignment = state_assignment
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _MultiStateAssignment(self._state_assignment, self.parent)
 
     @property

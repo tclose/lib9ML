@@ -32,7 +32,7 @@ class _DelayedOnEvent(_NamespaceOnCondition):
         state_var = make_delay_trigger_name(self._port_connection)
         return Trigger('t > {}'.format(state_var))
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _DelayedOnEvent(self._sub_component, self._port_connection)
 
 
@@ -49,7 +49,7 @@ class _UnconnectedAnalogReducePort(Constant):
         self._port = port
         self._parent = weakref.ref(sub_component)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _UnconnectedAnalogReducePort(self._port, self.parent)
 
     @property
@@ -80,7 +80,7 @@ class _DelayedOnEventStateVariable(StateVariable):
         BaseNineMLObject.__init__(self)
         self._parent = weakref.ref(port_connection)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _DelayedOnEventStateVariable(self.parent)
 
     @property
@@ -107,7 +107,7 @@ class _DelayedOnEventStateAssignment(StateAssignment):
         BaseNineMLObject.__init__(self)
         self._parent = weakref.ref(port_connection)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _DelayedOnEventStateAssignment(self.parent)
 
     @property
@@ -137,7 +137,7 @@ class _LocalAnalogReceivePortConnection(Alias):
         self._port_conn = port_connection
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _LocalAnalogReceivePortConnection(self._port, self._receiver,
                                                  self._port_conn, self.parent)
 
@@ -203,7 +203,7 @@ class _LocalAnalogReducePortConnections(_LocalAnalogReceivePortConnection):
                                              for pc in port_connections)))
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _LocalAnalogReducePortConnections(
             self._port, self._receiver, self._port_connections, self.parent,
             self._exposure)

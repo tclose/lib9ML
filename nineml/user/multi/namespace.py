@@ -106,7 +106,7 @@ class _NamespaceObject(BaseNineMLObject):
         self._object = element
         self._parent = weakref.ref(parent) if parent is not None else None
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return type(self)(self._sub_component, self._object, self.parent)
 
     @property

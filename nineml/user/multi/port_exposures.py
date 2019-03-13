@@ -190,7 +190,7 @@ class _PortExposureAlias(Alias):
     def __init__(self, exposure):
         self._exposure = exposure
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _PortExposureAlias(self._exposure)
 
     @property
@@ -296,7 +296,7 @@ class _ExposedOutputEvent(OutputEvent):
         self._port_exposure = port_exposure
         self._parent = weakref.ref(parent)
 
-    def clone(self):
+    def clone(self, **kwargs):  # @UnusedVariable
         return _ExposedOutputEvent(self._port_exposure, self.parent)
 
     @property
