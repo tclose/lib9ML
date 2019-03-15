@@ -325,10 +325,7 @@ class AddToDocumentVisitor(BaseVisitorWithContext):
                 obj = doc_obj
             else:
                 dict.__setitem__(self.document, obj.name, obj)
-                try:
-                    obj.document = self.document
-                except:
-                    raise
+                obj.document = self.document
         return obj
 
     def post_action(self, *args, **kwargs):

@@ -80,20 +80,13 @@ class BaseVisitor(with_metaclass(ABCMeta, object)):
 
     @classmethod
     def standardize_version(cls, version):
-        version = float(version)
-        if isinstance(version, float):
-            version = str(version)
-        if isinstance(version, str):
-            try:
-                version = tuple(int(i)
-                                for i in version_re.match(version).groups())
-            except AttributeError:
-                raise NineMLSerializationError(
-                    "Invalid NineML version string '{}'".format(version))
-        if not isinstance(version, (tuple, list)) and len(version) != 3:
-            raise NineMLSerializationError(
-                "Unrecognised version - {}".format(version))
-        return version
+        if not isinstance(version, (tuple, list)):
+            parts = str(version).split('.')
+        else:
+            parts = list(version)
+        if len(parts) == 1:
+            parts.append(0)
+        return tuple(int(i) for i in parts)
 
     def later_version(self, version, equal=False):
         for s, o in zip(self._version, self.standardize_version(version)):

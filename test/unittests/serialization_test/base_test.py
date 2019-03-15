@@ -232,7 +232,7 @@ class H(AnnotatedNineMLObject):
         return cls(node.child(G))
 
 
-class Container(ContainerObject, DocumentLevelObject):
+class Container(DocumentLevelObject, ContainerObject):
 
     nineml_type = 'Container'
     nineml_type_v1 = 'Cunfaener'

@@ -113,7 +113,7 @@ class _NamespaceObject(BaseNineMLObject):
     def parent(self):
         try:
             return self._parent()
-        except ReferenceError:
+        except (TypeError, ReferenceError):
             return None
 
     @property
