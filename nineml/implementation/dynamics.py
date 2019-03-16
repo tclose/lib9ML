@@ -633,6 +633,10 @@ class AnalogSendPort(Port):
         Buffers the value of the port for reference by receivers
         """
         if self.receivers:
+            values = self.parent.all_values()
+            self.buffer.append(
+                (self.parent.t,
+                 self.expr(*[values[i] for i in self.expr.arg_inds])))
             # Drop buffer values that are no longer required
             if len(self.buffer) > 1:
                 min_t = self.parent.t - self.max_delay
@@ -640,13 +644,7 @@ class AnalogSendPort(Port):
                     while self.buffer[1][0] <= min_t:
                         self.buffer.popleft()
                 except IndexError:
-                    raise NineMLInternalError(
-                        "Buffer of {} does not have at least two "
-                        "values in it: {}".format(self, self.buffer))
-            values = self.parent.all_values()
-            self.buffer.append(
-                (self.parent.t,
-                 self.expr(*[values[i] for i in self.expr.arg_inds])))
+                    pass  # Only one value left in buffer
             # If receiver is a sink then we need to update the buffer
             for receiver in self.receivers:
                 receiver.update_buffer()

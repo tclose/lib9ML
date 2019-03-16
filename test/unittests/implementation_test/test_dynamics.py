@@ -1,3 +1,4 @@
+import os
 from future.utils import PY2
 import ninemlcatalog
 import numpy.random
@@ -32,14 +33,17 @@ if __name__ == '__main__':
 else:
     from unittest import TestCase, skipIf
 
-
-DISABLE_SIM_TESTS = True
+try:
+    DISABLE_SIM_TESTS = os.environ['DISABLE_SIM_TESTS']
+except KeyError:
+    DISABLE_SIM_TESTS = False
 
 
 class TestDynamics(TestCase):
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
-    def test_liaf(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
+    def test_liaf(self, dt=0.001 * un.ms, duration=100.0 * un.ms,
+                  show_progress=False):
 
         properties = ninemlcatalog.load('neuron/LeakyIntegrateAndFire',
                                         'PyNNLeakyIntegrateAndFireProperties')
@@ -57,13 +61,14 @@ class TestDynamics(TestCase):
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.055, 0.061, 0.068, 0.075, 0.081, 0.088, 0.095])
         return v_out
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
-    def test_izhikevich(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
+    def test_izhikevich(self, dt=0.001 * un.ms, duration=100.0 * un.ms,
+                        show_progress=False):
 
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevich')
@@ -81,14 +86,15 @@ class TestDynamics(TestCase):
         dynamics.analog_send_ports['V'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike'].connect_to(spike_out,
                                                              0 * un.s)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.054, 0.057, 0.061, 0.065, 0.068, 0.072, 0.076,
                           0.08, 0.083, 0.087, 0.091, 0.095, 0.098])
         return v_out
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
-    def test_izhikevich_fs(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
+    def test_izhikevich_fs(self, dt=0.001 * un.ms, duration=100.0 * un.ms,
+                           show_progress=False):
 
         properties = ninemlcatalog.load('neuron/Izhikevich',
                                         'SampleIzhikevichFastSpiking')
@@ -106,7 +112,7 @@ class TestDynamics(TestCase):
         dynamics.analog_send_ports['V'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spikeOutput'].connect_to(spike_out,
                                                             0 * un.s)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.058, 0.081])
         return v_out
@@ -114,7 +120,8 @@ class TestDynamics(TestCase):
     @skipIf(DISABLE_SIM_TESTS or PY2,
             "Simulation tests disabled" if DISABLE_SIM_TESTS else
             "Generated equations for HodgkinHuxley overflow on Python 2")
-    def test_hodgkin_huxley(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
+    def test_hodgkin_huxley(self, dt=0.001 * un.ms, duration=100.0 * un.ms,
+                            show_progress=False):
 
         properties = ninemlcatalog.load('neuron/HodgkinHuxley',
                                         'PyNNHodgkinHuxleyProperties')
@@ -133,13 +140,14 @@ class TestDynamics(TestCase):
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['outgoingSpike'].connect_to(spike_out,
                                                               0 * un.s)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.038, 0.058, 0.07, 0.082, 0.094])
         return v_out
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
-    def test_liaf_alpha_syn(self, dt=0.001 * un.ms, duration=100.0 * un.ms):
+    def test_liaf_alpha_syn(self, dt=0.001 * un.ms, duration=100.0 * un.ms,
+                            show_progress=False):
         liaf = ninemlcatalog.load(
             'neuron/LeakyIntegrateAndFire/',
             'PyNNLeakyIntegrateAndFireProperties')
@@ -184,13 +192,14 @@ class TestDynamics(TestCase):
         dynamics.analog_send_ports['v'].connect_to(v_out, 0 * un.s)
         dynamics.event_send_ports['spike_out'].connect_to(spike_out,
                                                           0 * un.s)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.071])
         return v_out
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests disabled")
-    def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms, **kwargs):  # @UnusedVariable @IgnorePep8
+    def test_poisson(self, duration=100 * un.ms, dt=0.1 * un.ms,
+                     show_progress=False, **kwargs):  # @UnusedVariable @IgnorePep8
 
         definition = ninemlcatalog.load('input/Poisson', 'Poisson')
         properties = DynamicsProperties('PoissonProps', definition,
@@ -206,7 +215,7 @@ class TestDynamics(TestCase):
                                                              0 * un.s)
         # Set to fixed seed
         numpy.random.seed(12345)
-        dynamics.simulate(duration, dt=dt)
+        dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.0, 0.027, 0.03, 0.032, 0.035, 0.043, 0.052, 0.085,
                           0.096])
