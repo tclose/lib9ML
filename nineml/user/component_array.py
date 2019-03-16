@@ -20,9 +20,6 @@ class ComponentArray(BaseULObject, DocumentLevelObject):
         BaseULObject.__init__(self)
         DocumentLevelObject.__init__(self)
         self.size = size
-        if not dynamics_properties.component_class.is_flat:
-            dynamics_properties = dynamics_properties.flatten(
-                name + '_flat_dyn')
         self._dynamics_properties = dynamics_properties
 
     @property

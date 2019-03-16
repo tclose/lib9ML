@@ -181,17 +181,17 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
             comp_arrays.append(ComponentArray(
                 population.name + ComponentArray.suffix['post'],
                 len(population),
-                population.cell))
+                population.cell.flatten()))
         for projection in self.projections:
             comp_arrays.append(ComponentArray(
                 projection.name + ComponentArray.suffix['response'],
                 len(projection),
-                projection.response))
+                projection.response.flatten()))
             if projection.plasticity is not None:
                 comp_arrays.append(ComponentArray(
                     projection.name + ComponentArray.suffix['plasticity'],
                     len(projection),
-                    projection.plasticity))
+                    projection.plasticity.flatten()))
         comp_array_dict = {c.name: c for c in comp_arrays}
         conn_groups = []
         for projection in self.projections:
