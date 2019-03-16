@@ -277,7 +277,7 @@ class Network(object):
             self.sub_graphs = []
             for rank in range(self.num_procs):
                 sub_graph = graph.subgraph(n for n, a in graph.nodes(data=True)
-                                           if a['rank'] == i)
+                                           if a['rank'] == rank)
                 # Copy nodes in the sub to a new graph to avoid referencing the
                 # original graph when it is pickled and sent to a new process
                 self.sub_graphs.append(nx.MultiDiGraph(sub_graph))
