@@ -282,7 +282,7 @@ class Network(object):
                 # original graph when it is pickled and sent to a new process
                 self.sub_graphs.append(nx.MultiDiGraph(sub_graph))
                 # Delete sub_graph nodes from original graph to free up memory
-                graph.remove_nodes_from(sub_graph)
+                graph.remove_nodes_from(list(sub_graph.nodes))
 
     @property
     def name(self):
