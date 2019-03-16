@@ -274,10 +274,15 @@ class Network(object):
                          delay,
                          self.remote_receivers[v_rank][u_rank]))
             # Divide up network graph between available processes
-            self.sub_graphs = [
-                graph.subgraph(n for n, a in graph.nodes(data=True)
-                               if a['rank'] == i)
-                for i in range(self.num_procs)]
+            self.sub_graphs = []
+            for rank in range(self.num_procs):
+                sub_graph = graph.subgraph(n for n, a in graph.nodes(data=True)
+                                           if a['rank'] == i)
+                # Copy nodes in the sub to a new graph to avoid referencing the
+                # original graph when it is pickled and sent to a new process
+                self.sub_graphs.append(nx.MultiDiGraph(sub_graph))
+                # Delete sub_graph nodes from original graph to free up memory
+                graph.remove_nodes_from(sub_graph)
 
     @property
     def name(self):
