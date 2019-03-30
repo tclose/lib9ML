@@ -1,8 +1,9 @@
 from operator import itemgetter
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from itertools import chain, repeat
 from copy import copy
 from logging import getLogger
+import weakref
 import multiprocessing as mp
 import networkx as nx
 import nineml.units as un
@@ -19,7 +20,7 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException, NineMLInternalError)
 from pprint import pprint, pformat
-# from pympler import muppy, summary
+#from pympler import muppy, summary
 # from nineml.utils import get_obj_size
 # import resource
 
@@ -29,6 +30,8 @@ logger = getLogger('nineml')
 
 graph_size = 0
 prev_incr = 0
+
+debug_merge_mem = True
 
 
 class Network(object):
@@ -567,6 +570,8 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
+        # if debug_merge_mem:
+            # num_objects = len(muppy.get_objects())
         graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
@@ -649,6 +654,8 @@ class RemoteSender(RemoteCommunicator):
     end = 'receive'
 
     def send_data(self):
+        logger.debug("Sending data from {} to {}'".format(self.send_rank,
+                                                          self.receive_rank))
         self.pipe_end.send([(k, p.data) for k, p in self.ports.items()
                             if p.data])
 
@@ -656,9 +663,9 @@ class RemoteSender(RemoteCommunicator):
         key = (network_id, port.name)
         assert key not in self.ports
         if port.communicates == 'analog':
-            remote_port = RemoteAnalogReceivePort()
+            remote_port = RemoteAnalogReceivePort(key)
         else:
-            remote_port = RemoteEventReceivePort()
+            remote_port = RemoteEventReceivePort(key)
         self.ports[key] = remote_port
         port.connect_to(remote_port, delay)
 
@@ -668,6 +675,8 @@ class RemoteReceiver(RemoteCommunicator):
     end = 'send'
 
     def receive_data(self):
+        logger.debug("Receiving data at {} from {}'".format(self.receive_rank,
+                                                            self.send_rank))
         for key, data in self.pipe_end.recv():
             try:
                 self.ports[key].update(data)
@@ -681,9 +690,9 @@ class RemoteReceiver(RemoteCommunicator):
             remote_port = self.ports[remote_key]
         except KeyError:
             if port.communicates == 'analog':
-                remote_port = RemoteAnalogSendPort()
+                remote_port = RemoteAnalogSendPort(remote_key)
             else:
-                remote_port = RemoteEventSendPort()
+                remote_port = RemoteEventSendPort(remote_key)
             self.ports[remote_key] = remote_port
         else:
             assert port.communicates == remote_port.communicates
@@ -695,7 +704,8 @@ class RemoteEventReceivePort(object):
 
     communicates = 'event'
 
-    def __init__(self):
+    def __init__(self, name):
+        self._name = name
         self.events = []
 
     def receive(self, t):
@@ -708,12 +718,17 @@ class RemoteEventReceivePort(object):
     def update_buffer(self):
         pass
 
+    @property
+    def name(self):
+        return self._name
+
 
 class RemoteAnalogReceivePort(object):
 
     communicates = 'analog'
 
-    def __init__(self):
+    def __init__(self, name):
+        self._name = name
         self.send_port = None
 
     def connect_from(self, send_port, delay=None):  # @UnusedVariable
@@ -727,10 +742,15 @@ class RemoteAnalogReceivePort(object):
     def update_buffer(self):
         pass
 
+    @property
+    def name(self):
+        return self._name
+
 
 class RemoteAnalogSendPort(AnalogSendPort):
 
-    def __init__(self):
+    def __init__(self, name):
+        self._name = name
         self.receivers = []
         self.buffer = None
         self.max_delay = 0.0
@@ -738,12 +758,85 @@ class RemoteAnalogSendPort(AnalogSendPort):
     def update(self, buffer):
         self.buffer = buffer
 
+    @property
+    def name(self):
+        return self._name
+
 
 class RemoteEventSendPort(EventSendPort):
 
-    def __init__(self):
+    def __init__(self, name):
+        self._name = name
         self.receivers = []
 
     def update(self, events):
         for event in events:
             self.send(event)
+
+    @property
+    def name(self):
+        return self._name
+
+
+class NetworkGraph(object):
+
+    def __init__(self, nodes=None, edges=None):
+        self.nodes = {} if nodes is None else nodes
+        self.edges = {} if edges is None else edges
+
+    def add_component(self, comp_array, index, sample_index, props, rank):
+        self.nodes[(comp_array, index)] = Node(
+            comp_array, index, sample_index, props, [], [], rank)
+
+    def add_connection(self, src_comp, src_index, dest_comp, dest_index,
+                       src_port, dest_port, communicates, delay):
+        src_node = self.nodes[(src_comp, src_index)]
+        dest_node = self.nodes[(dest_comp, dest_index)]
+        # Use weak refs to reference nodes and edges to allow them to be
+        # garbage collected
+        edge = Edge(weakref.ref(src_node), weakref.ref(dest_comp),
+                    src_port, dest_port, communicates, delay)
+        src_node.out_edges.append(weakref.ref(edge))
+        dest_node.in_edges.append(weakref.ref(edge))
+        self.edges[id(edge)] = edge
+
+    def remove_components(self, nodes):
+        # Remove edges that connect to nodes
+        self.remove_edges(chain(*(n.out_edges for n in nodes)))
+        self.remove_edges(chain(*(n.in_edges for n in nodes)))
+        # Delete nodes from dictionary
+        for node in nodes:
+            del self.nodes[(node.comp_array, node.index)]
+
+    def remove_edges(self, edges):
+        for edge in edges:
+            try:
+                del self.edges[id(edge)]
+            except KeyError:
+                pass
+
+    def sub_graph(self, nodes):
+        ndict = {(n.comp_array, n.index): Node(
+            n.comp_array, n.comp_index, n.sample_index, n.props, [], [],
+            n.rank)
+            for n in nodes}
+        edict = {}
+        for old_node in nodes:
+            new_node = ndict[(old_node.comp_array, old_node.comp_index)]
+            out_edges = [
+                e for e in new_node.out_edges
+                if (e.dest_node.comp_array, e.dest_node.comp_index) in ndict]
+            in_edges = [
+                e for e in new_node.in_edges
+                if (e.src_node.comp_array, e.src_node.comp_index) in ndict]
+            new_node.out_edges.extend(weakref.ref(e) for e in out_edges)
+            new_node.in_edges.extend(weakref.ref(e) for e in in_edges)
+            edict.update((id(e), e) for e in chain(out_edges, in_edges))
+        return NetworkGraph(ndict, edict)
+
+
+Edge = namedtuple('Edge',
+                  'src_node dest_node src_port dest_port communicates delay')
+
+Node = namedtuple(
+    'Node', 'comp_array comp_index sample_index props out_edges in_edges rank')

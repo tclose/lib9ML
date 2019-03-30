@@ -1,11 +1,19 @@
-from collections import defaultdict
+import os
 import ninemlcatalog
 import math
 import random
+import logging
+from itertools import chain
 from nineml import units as un
 from nineml.user import Property as Property
-from nineml.implementation import Network, EventSink, AnalogSink
+from nineml.implementation import Network
 from nineml.exceptions import NineMLNameError
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
+
+logger = logging.getLogger('nineml')
 
 
 if __name__ == '__main__':
@@ -21,35 +29,71 @@ if __name__ == '__main__':
             return test
         return decorator
 
+    def skipIf(condition, reason):
+        """Dummy skipIf that just returns original function"""
+        def decorator(test):
+            if condition:
+                def error_message(*args, **kwargs):
+                    raise Exception(reason)
+            else:
+                # Else return plain test function
+                return test
+        return decorator
 
 else:
-    from unittest import TestCase, skip
+    from unittest import TestCase, skipIf
 
 LARGE_INT = 2 ** 31 - 1
+
+try:
+    DISABLE_SIM_TESTS = os.environ['DISABLE_SIM_TESTS']
+except KeyError:
+    DISABLE_SIM_TESTS = False
 
 
 class TestNetwork(TestCase):
 
-    @skip("Network test isn't ready yet")
+    ref_rate = {'Exc__cell_spike_output': (11612.0 * un.per_ms, 0.075),
+                'Inh__cell_spike_output': (11604.0 * un.per_ms, 0.075),
+                'Ext__cell_spike_output': (2622584.0 * un.per_ms, 0.075)}
+
+    @skipIf(DISABLE_SIM_TESTS, "Simulation tests have been disabled")
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
-                    dt=0.01 * un.ms, random_seed=None, num_processes=1,
+                    dt=0.01 * un.ms, random_seed=None, num_processes=4,
+                    nrecord=50, record_v=False, nrecord_v=5, record_ext=True,
                     **kwargs):
         random.seed(random_seed)
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         if order is not None:
             model = self._reduced_brunel(model, order, random_seed=random_seed)
+        sink_specs = [('Exc__cell', 'spike_output', range(nrecord)),
+                      ('Inh__cell', 'spike_output', range(nrecord))]
+        if record_v:
+            sink_specs.append(('Exc__cell', 'v', range(nrecord_v)))
+        if record_ext:
+            sink_specs.append(('Ext__cell', 'spike_output', range(nrecord)))
         network = Network(model, start_t=0 * un.s, num_processes=num_processes,
-                          sinks=[('Exc__cell', 'spike_output', range(250)),
-                                 ('Inh__cell', 'spike_output', range(250)),
-#                                  ('Ext__cell', 'spike_output', range(250)),
-#                                  ('Exc__cell', 'v', range(10)),
-#                                  ('Inh__cell', 'v', range(10))
-                                 ])
+                          sinks=sink_specs)
         network.simulate(duration, dt=dt, **kwargs)
+        sinks = {name: [s.detach() for s in sink_group]
+                 for name, sink_group in network.sinks.items()}
+        event_sink_names = ['Exc__cell_spike_output', 'Inh__cell_spike_output']
+        if record_ext:
+            event_sink_names.append('Ext__cell_spike_output')
+#        for sink_name in event_sink_names:
+#            spike_times = list(chain(*(s.events for s in sinks[sink_name])))
+#            rate = len(spike_times) / (duration * nrecord)
+#            ref_rate, rate_tol = self.ref_rate[sink_name]
+#            rate_error = (abs((rate - ref_rate).in_si_units()) /
+#                          ref_rate.in_si_units())
+#            self.assertLess(rate_error, rate_tol,
+#                            "Spike rate of '{}' ({}) is not within the "
+#                            "given tolerance ({}%) of the reference ({})"
+#                            .format(sink_name, rate, 100 * rate_tol,
+#                                    ref_rate))
         # Detach sinks and return
-        return {name: [s.detach() for s in sink_group]
-                for name, sink_group in network.sinks.items()}
+        return sinks
 
     def _reduced_brunel(self, model, order, random_seed=None):
         model = model.clone()
@@ -81,11 +125,9 @@ if __name__ == '__main__':
     except ImportError:
         plt = None
     import os.path as op
-    import os
     import errno
     import sys
     from argparse import ArgumentParser
-    import logging
     import pickle as pkl
     # Disable tqdm locking, which causes issues with PyPy
     from tqdm import tqdm
@@ -117,8 +159,18 @@ if __name__ == '__main__':
     parser.add_argument('--loglevel', default='warning', type=str,
                         help=("The level at which to display logging. Can be "
                               "one of 'debug', 'info', warning or 'error'"))
-    parser.add_argument('--nplot', default=False, type=int,
-                        help=("The number of neurons to plot"))
+    parser.add_argument('--record_ext', action='store_true', default=False,
+                        help=("Whether to record the external stimulation "
+                              "events or not"))
+    parser.add_argument('--record_v', action='store_true', default=False,
+                        help=("Whether to record the voltage traces of the "
+                              "excitatory cell or not"))
+    parser.add_argument('--nrecord', default=False, type=int,
+                        help=("The number of neurons to record spikes from"))
+    parser.add_argument('--nrecord_v', default=False, type=int,
+                        help=("The number of neurons to record v from"))
+    parser.add_argument('--logfile', default=None, type=str,
+                        help="The path of a file to write the log to")
     args = parser.parse_args()
 
     if args.loglevel.lower() == 'debug':
@@ -133,7 +185,10 @@ if __name__ == '__main__':
         raise Exception("Unrecognised log-level '{}'".format(args.loglevel))
 
     logger.setLevel(loglevel)
-    handler = logging.StreamHandler(sys.stdout)
+    if args.logfile is None:
+        handler = logging.StreamHandler(sys.stdout)
+    else:
+        handler = logging.FileHandler(args.logfile)
     formatter = logging.Formatter('%(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -161,18 +216,19 @@ if __name__ == '__main__':
         sinks = test(dt=dt, duration=duration, case=args.case,
                      order=args.order, random_seed=12345,
                      show_progress=(not args.hide_progress),
-                     num_processes=num_processes)
+                     num_processes=num_processes, nrecord=args.nrecord,
+                     record_v=args.record_v, nrecord_v=args.nrecord_v,
+                     record_ext=args.record_ext)
     if args.save_sinks:
         with open(args.save_sinks, 'wb') as f:
             pkl.dump(sinks, f)
         logger.info("Saved sinks to '{}'".format(args.save_sinks))
     else:
         for pop_sinks in sinks.values():
-            if args.nplot:
-                pop_sinks = pop_sinks[:args.nplot]
+            common_prefix = op.commonprefix([s.name for s in pop_sinks])
             fig = pop_sinks[0].combined_plot(pop_sinks, show=False)
+            print("plotted {}".format(common_prefix))
             if args.save_figs:
-                common_prefix = op.commonprefix([s.name for s in pop_sinks])
                 filename = common_prefix + '.png'
                 fig.set_size_inches(10, 10)
                 fig_path = op.join(args.save_figs, filename)

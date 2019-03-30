@@ -152,6 +152,8 @@ class Dynamics(object):
             try:
                 self.regime.update(self, stop_t, dt)
             except RegimeTransition as transition:
+                logger.debug("Transitioning from '{}' regime to '{}'"
+                             .format(self.regime.name, transition.target))
                 self.regime = self.dynamics_class.regimes[transition.target]
         self.progress_bar.close()
 
@@ -305,6 +307,7 @@ class Regime(object):
                 step_dt = min(
                     min(self.time_of_next_handled_event(dynamics), stop_t) -
                     dynamics.t, dt)
+                logger.debug("Stepping dynamics {} s".format(step_dt))
                 proposed_state, proposed_t = self.step(dynamics, step_dt)
             # Detect transitions that have occured during the update step (NB:
             # on- conditions that aren't triggered or ports with no upcoming
@@ -321,6 +324,7 @@ class Regime(object):
             new_regime = None
             remaining_transitions_valid = True
             for transition, transition_t in transitions:
+                logger.debug("Transitioning {}".format(transition))
                 # Send output events
                 for port_name in transition.defn.output_event_keys:
                     dynamics.event_send_ports[port_name].send(transition_t)
@@ -532,6 +536,7 @@ class EventSendPort(Port):
         self.receivers = []
 
     def send(self, t):
+        logger.debug("Sending events from '{}'".format(self.name))
         for receiver, delay in self.receivers:
             receiver.receive(t + delay)
 
@@ -632,6 +637,7 @@ class AnalogSendPort(Port):
         """
         Buffers the value of the port for reference by receivers
         """
+        logger.debug("Updating analog buffer of '{}'".format(self.name))
         if self.receivers:
             values = self.parent.all_values()
             self.buffer.append(
@@ -682,6 +688,7 @@ class AnalogReceivePort(Port):
         self.delay = delay
 
     def value(self, t):
+        logger.debug("Receiving analog value at '{}'".format(self.name))
         try:
             return self.sender.value(t - self.delay)
         except AttributeError:

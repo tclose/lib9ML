@@ -25,7 +25,7 @@ class AnalogSource(ExperimentNode, AnalogSendPort):
     An input source that can be connected to an AnalogReceivePort or
     AnalogSendPort
     """
-    
+
     communicates = 'analog'
 
     def __init__(self, name, signal):
@@ -57,7 +57,7 @@ class AnalogSource(ExperimentNode, AnalogSendPort):
 
 class AnalogSink(ExperimentNode, AnalogReceivePort):
 
-    DEFAULT_PLOT_STEPS = 100    
+    DEFAULT_PLOT_STEPS = 100
     communicates = 'analog'
 
     def __init__(self, name):
