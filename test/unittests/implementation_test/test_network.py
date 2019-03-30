@@ -165,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--record_v', action='store_true', default=False,
                         help=("Whether to record the voltage traces of the "
                               "excitatory cell or not"))
-    parser.add_argument('--nrecord', default=False, type=int,
+    parser.add_argument('--nrecord', default=50, type=int,
                         help=("The number of neurons to record spikes from"))
     parser.add_argument('--nrecord_v', default=False, type=int,
                         help=("The number of neurons to record v from"))
