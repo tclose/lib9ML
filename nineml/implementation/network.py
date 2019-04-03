@@ -5,7 +5,6 @@ from copy import copy
 from logging import getLogger
 import weakref
 import multiprocessing as mp
-import networkx as nx
 import nineml.units as un
 from nineml.user import (
     MultiDynamicsProperties, AnalogPortConnection, EventPortConnection,
@@ -93,7 +92,7 @@ class Network(object):
             total=sum(ca.size for ca in component_arrays),
             desc="Adding nodes to network graph",
             disable=not show_progress)
-        graph = nx.MultiDiGraph()
+        graph = NetworkGraph()
         # Add nodes (2-tuples consisting of <component-array-name> and
         # <cell-index>) for each component in each array
         ca_dict = {}
@@ -101,9 +100,8 @@ class Network(object):
             ca_dict[comp_array.name] = comp_array
             props = comp_array.dynamics_properties
             for i in range(comp_array.size):
-                graph.add_node((comp_array.name, i),
-                               sample_index=i, properties=props,
-                               rank=(i % self.num_procs))
+                graph.add_node(comp_array.name, i, i, props,
+                               (i % self.num_procs))
                 progress_bar.update()
         progress_bar.close()
         # Add connections between components from connection groups
@@ -120,12 +118,12 @@ class Network(object):
                 delays = (float(d) for d in delay_qty.in_si_units())
             for (src_i, dest_i), delay in zip(conn_group.connections, delays):
                 graph.add_edge(
-                    (conn_group.source.name, int(src_i)),
-                    (conn_group.destination.name, int(dest_i)),
-                    communicates=conn_group.communicates,
-                    delay=delay,
+                    conn_group.source.name, int(src_i),
+                    conn_group.destination.name, int(dest_i),
                     src_port=conn_group.source_port,
-                    dest_port=conn_group.destination_port)
+                    dest_port=conn_group.destination_port,
+                    communicates=conn_group.communicates,
+                    delay=delay)
                 if delay and delay < self.min_delay:
                     self.min_delay = delay
                 progress_bar.update()
@@ -143,11 +141,10 @@ class Network(object):
             self.sources[source_array_name].append(source)
             # NB: Use negative index to avoid any (unlikely) name-clashes
             #     with other component arrays
-            graph.add_node((source_array_name, -(index + 1)), source=source,
-                           rank=0)
+            graph.add_node(source_array_name, -(index + 1), source, 0)
             graph.add_edge(
-                (source_array_name, -(index + 1)),
-                (comp_array_name, index),
+                source_array_name, -(index + 1),
+                comp_array_name, index,
                 communicates=port.communicates,
                 delay=self.min_delay,
                 src_port=None,
@@ -182,14 +179,13 @@ class Network(object):
                 # NB: Use negative index to avoid any (unlikely) name-clashes
                 #     with other component arrays
                 sink_node_id = (sink_array_name, -(index + 1))
-                graph.add_node(sink_node_id, sink=sink,
-                               rank=0)
+                graph.add_node(sink_node_id, sink, 0)
                 graph.add_edge(
-                    (comp_array_name, index), sink_node_id,
-                    communicates=port.communicates,
-                    delay=self.min_delay,
+                    comp_array_name, index, sink_node_id,
                     src_port=port_name,
-                    dest_port=None)
+                    dest_port=None,
+                    communicates=port.communicates,
+                    delay=self.min_delay)
         # Replace default dict with regular dict to allow it to be pickled
         self.sinks = dict(self.sinks)
         # Merge dynamics definitions for nodes connected without delay
@@ -233,23 +229,11 @@ class Network(object):
                             i, j, send_end)
                         self.remote_receivers[j][i] = RemoteReceiver(
                             i, j, receive_end)
-            # Assign nodes to nodes in round robin fashion to balance loads
-            # between processes
-            for i, (node, attr) in enumerate(sorted(graph.nodes(data=True),
-                                                    key=itemgetter(0))):
-                if 'properties' in attr:
-                    rank = i % self.num_procs
-                else:
-                    # Sources and sinks are placed on the master node for i/o
-                    rank = 0
-                attr['rank'] = rank
             # Record remote send/receivers to replace edges that will span
             # processes
-            for u, v, attr in graph.edges(data=True):
-                u_attr = graph.nodes[u]
-                v_attr = graph.nodes[v]
-                u_rank = u_attr['rank']
-                v_rank = v_attr['rank']
+            for edge in graph.edges:
+                u_rank = edge.src_node().rank
+                v_rank = edge.dest_node().rank
                 if u_rank != v_rank:
                     try:
                         remote_receive_ports = u_attr['remote_receive_ports']
@@ -260,14 +244,13 @@ class Network(object):
                     # send it to when the node is constructed as well as the
                     # max delay (for determining the length of the required
                     # buffer
-                    key = (attr['src_port'],
-                           self.remote_senders[u_rank][v_rank])
+                    key = (edge.src_port, self.remote_senders[u_rank][v_rank])
                     try:
                         delay = remote_receive_ports[key]
                     except KeyError:
                         delay = 0.0
-                    if attr['delay'] >= delay:
-                        remote_receive_ports[key] = attr['delay']
+                    if edge.delay >= delay:
+                        remote_receive_ports[key] = edge.delay
                     try:
                         remote_send_ports = v_attr['remote_send_ports']
                     except KeyError:
@@ -275,8 +258,8 @@ class Network(object):
                     # Record port to receive to, the remote senders object to
                     # receive it from and the key of the sending component/port
                     remote_send_ports.append(
-                        ((u, attr['src_port']),
-                         attr['dest_port'],
+                        ((u, edge.src_port),
+                         edge.dest_port,
                          delay,
                          self.remote_receivers[v_rank][u_rank]))
             # Divide up network graph between available processes
@@ -286,9 +269,9 @@ class Network(object):
                                            if a['rank'] == rank)
                 # Copy nodes in the sub to a new graph to avoid referencing the
                 # original graph when it is pickled and sent to a new process
-                self.sub_graphs.append(nx.MultiDiGraph(sub_graph))
+                self.sub_graphs.append(sub_graph)
                 # Delete sub_graph nodes from original graph to free up memory
-                graph.remove_nodes_from(list(sub_graph.nodes))
+                graph.remove_nodes(sub_graph.nodes)
 
     @property
     def name(self):
@@ -798,8 +781,8 @@ class NetworkGraph(object):
         self._nodes[(comp_array, index)] = Node(
             comp_array, index, sample_index, props, [], [], rank)
 
-    def add_edge(self, src_comp, src_index, dest_comp, dest_index,
-                       src_port, dest_port, communicates, delay):
+    def add_edge(self, src_comp, src_index, dest_comp, dest_index, src_port,
+                 dest_port, communicates, delay):
         src_node = self._nodes[(src_comp, src_index)]
         dest_node = self._nodes[(dest_comp, dest_index)]
         # Use weak refs to reference nodes and edges to allow them to be
