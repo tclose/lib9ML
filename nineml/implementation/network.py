@@ -102,7 +102,8 @@ class Network(object):
             props = comp_array.dynamics_properties
             for i in range(comp_array.size):
                 graph.add_node((comp_array.name, i),
-                               sample_index=i, properties=props)
+                               sample_index=i, properties=props,
+                               rank=(i % self.num_procs))
                 progress_bar.update()
         progress_bar.close()
         # Add connections between components from connection groups
@@ -142,7 +143,8 @@ class Network(object):
             self.sources[source_array_name].append(source)
             # NB: Use negative index to avoid any (unlikely) name-clashes
             #     with other component arrays
-            graph.add_node((source_array_name, -(index + 1)), source=source)
+            graph.add_node((source_array_name, -(index + 1)), source=source,
+                           rank=0)
             graph.add_edge(
                 (source_array_name, -(index + 1)),
                 (comp_array_name, index),
@@ -180,7 +182,8 @@ class Network(object):
                 # NB: Use negative index to avoid any (unlikely) name-clashes
                 #     with other component arrays
                 sink_node_id = (sink_array_name, -(index + 1))
-                graph.add_node(sink_node_id, sink=sink)
+                graph.add_node(sink_node_id, sink=sink,
+                               rank=0)
                 graph.add_edge(
                     (comp_array_name, index), sink_node_id,
                     communicates=port.communicates,
@@ -780,59 +783,52 @@ class RemoteEventSendPort(EventSendPort):
 
 class NetworkGraph(object):
 
-    def __init__(self, nodes=None, edges=None):
-        self.nodes = {} if nodes is None else nodes
-        self.edges = {} if edges is None else edges
+    def __init__(self, nodes=None):
+        self._nodes = {} if nodes is None else nodes
 
-    def add_component(self, comp_array, index, sample_index, props, rank):
-        self.nodes[(comp_array, index)] = Node(
+    @property
+    def nodes(self):
+        return self._nodes.itervalues()
+
+    @property
+    def edges(self):
+        return chain(n.out_edges for n in self.nodes)
+
+    def add_node(self, comp_array, index, sample_index, props, rank):
+        self._nodes[(comp_array, index)] = Node(
             comp_array, index, sample_index, props, [], [], rank)
 
-    def add_connection(self, src_comp, src_index, dest_comp, dest_index,
+    def add_edge(self, src_comp, src_index, dest_comp, dest_index,
                        src_port, dest_port, communicates, delay):
-        src_node = self.nodes[(src_comp, src_index)]
-        dest_node = self.nodes[(dest_comp, dest_index)]
+        src_node = self._nodes[(src_comp, src_index)]
+        dest_node = self._nodes[(dest_comp, dest_index)]
         # Use weak refs to reference nodes and edges to allow them to be
         # garbage collected
         edge = Edge(weakref.ref(src_node), weakref.ref(dest_comp),
                     src_port, dest_port, communicates, delay)
-        src_node.out_edges.append(weakref.ref(edge))
+        src_node.out_edges.append(edge)
         dest_node.in_edges.append(weakref.ref(edge))
-        self.edges[id(edge)] = edge
 
-    def remove_components(self, nodes):
-        # Remove edges that connect to nodes
-        self.remove_edges(chain(*(n.out_edges for n in nodes)))
-        self.remove_edges(chain(*(n.in_edges for n in nodes)))
+    def remove_nodes(self, nodes):
         # Delete nodes from dictionary
         for node in nodes:
-            del self.nodes[(node.comp_array, node.index)]
-
-    def remove_edges(self, edges):
-        for edge in edges:
-            try:
-                del self.edges[id(edge)]
-            except KeyError:
-                pass
+            del self._nodes[(node.comp_array, node.index)]
+            for edge in node.in_edges:
+                edge.src_node().out_edges.remove(edge)
 
     def sub_graph(self, nodes):
-        ndict = {(n.comp_array, n.index): Node(
+        sgraph = {(n.comp_array, n.index): Node(
             n.comp_array, n.comp_index, n.sample_index, n.props, [], [],
-            n.rank)
-            for n in nodes}
-        edict = {}
+            n.rank) for n in nodes}
         for old_node in nodes:
-            new_node = ndict[(old_node.comp_array, old_node.comp_index)]
-            out_edges = [
+            new_node = sgraph[(old_node.comp_array, old_node.comp_index)]
+            new_node.out_edges.extend(
                 e for e in new_node.out_edges
-                if (e.dest_node.comp_array, e.dest_node.comp_index) in ndict]
-            in_edges = [
-                e for e in new_node.in_edges
-                if (e.src_node.comp_array, e.src_node.comp_index) in ndict]
-            new_node.out_edges.extend(weakref.ref(e) for e in out_edges)
-            new_node.in_edges.extend(weakref.ref(e) for e in in_edges)
-            edict.update((id(e), e) for e in chain(out_edges, in_edges))
-        return NetworkGraph(ndict, edict)
+                if (e.dest_node.comp_array, e.dest_node.comp_index) in sgraph)
+            new_node.in_edges.extend(
+                weakref.ref(e) for e in new_node.in_edges
+                if (e.src_node.comp_array, e.src_node.comp_index) in sgraph)
+        return NetworkGraph(sgraph)
 
 
 Edge = namedtuple('Edge',
