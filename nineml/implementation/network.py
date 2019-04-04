@@ -548,8 +548,6 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
-        # if debug_merge_mem:
-            # num_objects = len(muppy.get_objects())
         graph.remove_nodes_from(sub_graph)
         # Attempt to merge linear sub-components to limit the number of
         # states
@@ -773,13 +771,13 @@ class NetworkGraph(object):
         self._nodes[(comp_array, index)] = Node(
             comp_array, index, sample_index, props, [], [], rank, [], {})
 
-    def add_sink(self, comp_array, comp_index, src_port, in_edges):
+    def add_sink(self, comp_array, comp_index, src_port):
         self._nodes[(comp_array, comp_index, 'sink')] = SinkNode(
-            comp_array, comp_index, src_port, in_edges)
+            comp_array, comp_index, src_port, [], [])
 
-    def add_source(self, comp_array, comp_index, dest_port, out_edges):
-        self._nodes[(comp_array, comp_index, 'source')] = SinkNode(
-            comp_array, comp_index, dest_port, out_edges)
+    def add_source(self, comp_array, comp_index, dest_port):
+        self._nodes[(comp_array, comp_index, 'source')] = SourceNode(
+            comp_array, comp_index, dest_port, [], {})
 
     def add_edge(self, src_comp, src_index, dest_comp, dest_index, src_port,
                  dest_port, communicates, delay):
@@ -795,7 +793,7 @@ class NetworkGraph(object):
     def remove_nodes(self, nodes):
         # Delete nodes from dictionary
         for node in nodes:
-            del self._nodes[(node.comp_array, node.index)]
+            del self._nodes[node[:2]]
             for edge in node.in_edges:
                 edge.src_node().out_edges.remove(edge)
 
@@ -807,7 +805,8 @@ class NetworkGraph(object):
         for old_node in nodes:
             new_node = sgraph[(old_node.comp_array, old_node.comp_index)]
             new_node.out_edges.extend(
-                e for e in new_node.out_edges if e.dest_node()[:2] in sgraph)
+                e for e in new_node.out_edges
+                if e.dest_node()[:2] in sgraph)
             new_node.in_edges.extend(
                 weakref.ref(e) for e in new_node.in_edges
                 if e.src_node()[:2] in sgraph)
@@ -823,7 +822,13 @@ Node = namedtuple(
     'remote_send_ports remote_receive_ports')
 
 SinkNode = namedtuple(
-    'SinkNode', 'comp_array comp_index in_edges')
+    'SinkNode', 'comp_array comp_index in_edges remote_send_ports')
 
 SourceNode = namedtuple(
-    'SourceNode', 'comp_array comp_index out_edges')
+    'SourceNode', 'comp_array comp_index out_edges remote_receive_ports')
+
+RemoteSendPortNode = namedtuple(
+    'RemoteSendPortNode', '')
+
+RemoteReceivePortNode = namedtuple(
+    'RemoteReceivePortNode', '')
