@@ -141,7 +141,7 @@ class Network(object):
             self.sources[source_array_name].append(source)
             # NB: Use negative index to avoid any (unlikely) name-clashes
             #     with other component arrays
-            graph.add_node(source_array_name, -(index + 1), source, 0)
+            graph.add_source_node(source_array_name, index, source)
             graph.add_edge(
                 source_array_name, -(index + 1),
                 comp_array_name, index,
@@ -232,41 +232,33 @@ class Network(object):
             # Record remote send/receivers to replace edges that will span
             # processes
             for edge in graph.edges:
-                u_rank = edge.src_node().rank
-                v_rank = edge.dest_node().rank
-                if u_rank != v_rank:
-                    try:
-                        remote_receive_ports = u_attr['remote_receive_ports']
-                    except KeyError:
-                        remote_receive_ports = {}
-                        u_attr['remote_receive_ports'] = remote_receive_ports
+                src_node = edge.src_node()
+                dest_node = edge.dest_node()
+                if src_node.rank != dest_node.rank:
                     # Record port to send from and remote receivers object to
                     # send it to when the node is constructed as well as the
                     # max delay (for determining the length of the required
                     # buffer
-                    key = (edge.src_port, self.remote_senders[u_rank][v_rank])
+                    key = (edge.src_port, self.remote_senders[
+                        src_node.rank][dest_node.rank])
                     try:
-                        delay = remote_receive_ports[key]
+                        delay = src_node.remote_receive_ports[key]
                     except KeyError:
                         delay = 0.0
                     if edge.delay >= delay:
-                        remote_receive_ports[key] = edge.delay
-                    try:
-                        remote_send_ports = v_attr['remote_send_ports']
-                    except KeyError:
-                        remote_send_ports = v_attr['remote_send_ports'] = []
+                        src_node.remote_receive_ports[key] = edge.delay
                     # Record port to receive to, the remote senders object to
                     # receive it from and the key of the sending component/port
-                    remote_send_ports.append(
-                        ((u, edge.src_port),
+                    dest_node.remote_send_ports.append(
+                        ((src_node[:2], edge.src_port),
                          edge.dest_port,
                          delay,
-                         self.remote_receivers[v_rank][u_rank]))
+                         self.remote_receivers[src_node.rank][dest_node.rank]))
             # Divide up network graph between available processes
             self.sub_graphs = []
             for rank in range(self.num_procs):
-                sub_graph = graph.subgraph(n for n, a in graph.nodes(data=True)
-                                           if a['rank'] == rank)
+                sub_graph = graph.subgraph(n for n in graph.nodes
+                                           if n.rank == rank)
                 # Copy nodes in the sub to a new graph to avoid referencing the
                 # original graph when it is pickled and sent to a new process
                 self.sub_graphs.append(sub_graph)
@@ -779,7 +771,15 @@ class NetworkGraph(object):
 
     def add_node(self, comp_array, index, sample_index, props, rank):
         self._nodes[(comp_array, index)] = Node(
-            comp_array, index, sample_index, props, [], [], rank)
+            comp_array, index, sample_index, props, [], [], rank, [], {})
+
+    def add_sink(self, comp_array, comp_index, src_port, in_edges):
+        self._nodes[(comp_array, comp_index, 'sink')] = SinkNode(
+            comp_array, comp_index, src_port, in_edges)
+
+    def add_source(self, comp_array, comp_index, dest_port, out_edges):
+        self._nodes[(comp_array, comp_index, 'source')] = SinkNode(
+            comp_array, comp_index, dest_port, out_edges)
 
     def add_edge(self, src_comp, src_index, dest_comp, dest_index, src_port,
                  dest_port, communicates, delay):
@@ -802,15 +802,15 @@ class NetworkGraph(object):
     def sub_graph(self, nodes):
         sgraph = {(n.comp_array, n.index): Node(
             n.comp_array, n.comp_index, n.sample_index, n.props, [], [],
-            n.rank) for n in nodes}
+            n.rank, n.remote_send_ports, n.remote_receive_ports)
+            for n in nodes}
         for old_node in nodes:
             new_node = sgraph[(old_node.comp_array, old_node.comp_index)]
             new_node.out_edges.extend(
-                e for e in new_node.out_edges
-                if (e.dest_node.comp_array, e.dest_node.comp_index) in sgraph)
+                e for e in new_node.out_edges if e.dest_node()[:2] in sgraph)
             new_node.in_edges.extend(
                 weakref.ref(e) for e in new_node.in_edges
-                if (e.src_node.comp_array, e.src_node.comp_index) in sgraph)
+                if e.src_node()[:2] in sgraph)
         return NetworkGraph(sgraph)
 
 
@@ -818,4 +818,12 @@ Edge = namedtuple('Edge',
                   'src_node dest_node src_port dest_port communicates delay')
 
 Node = namedtuple(
-    'Node', 'comp_array comp_index sample_index props out_edges in_edges rank')
+    'Node',
+    'comp_array comp_index sample_index props out_edges in_edges rank '
+    'remote_send_ports remote_receive_ports')
+
+SinkNode = namedtuple(
+    'SinkNode', 'comp_array comp_index in_edges')
+
+SourceNode = namedtuple(
+    'SourceNode', 'comp_array comp_index out_edges')
