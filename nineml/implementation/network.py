@@ -1,9 +1,8 @@
-from operator import itemgetter
+from future.utils import PY2
+from operator import attrgetter
 from collections import defaultdict, namedtuple
 from itertools import chain, repeat
-from copy import copy
 from logging import getLogger
-import weakref
 import multiprocessing as mp
 import nineml.units as un
 from nineml.user import (
@@ -19,9 +18,6 @@ from nineml.abstraction.dynamics.visitors.modifiers import (
 from nineml.exceptions import (
     NineMLUsageError, NineMLCannotMergeException, NineMLInternalError)
 from pprint import pprint, pformat
-#from pympler import muppy, summary
-# from nineml.utils import get_obj_size
-# import resource
 
 
 logger = getLogger('nineml')
@@ -118,8 +114,8 @@ class Network(object):
                 delays = (float(d) for d in delay_qty.in_si_units())
             for (src_i, dest_i), delay in zip(conn_group.connections, delays):
                 graph.add_edge(
-                    conn_group.source.name, int(src_i),
-                    conn_group.destination.name, int(dest_i),
+                    graph.node(conn_group.source.name, int(src_i)),
+                    graph.node(conn_group.destination.name, int(dest_i)),
                     src_port=conn_group.source_port,
                     dest_port=conn_group.destination_port,
                     communicates=conn_group.communicates,
@@ -132,22 +128,9 @@ class Network(object):
         self.sources = defaultdict(list)
         for comp_array_name, port_name, index, signal in sources:
             port = ca_dict[comp_array_name].dynamics_properties.port[port_name]
-            if port.communicates == 'analog':
-                source_cls = AnalogSource
-            else:
-                source_cls = EventSource
-            source_array_name = '{}_{}' .format(comp_array_name, port_name)
-            source = source_cls(source_array_name + str(index), signal)
-            self.sources[source_array_name].append(source)
-            # NB: Use negative index to avoid any (unlikely) name-clashes
-            #     with other component arrays
-            graph.add_source_node(source_array_name, index, source)
-            graph.add_edge(
-                source_array_name, -(index + 1),
-                comp_array_name, index,
+            graph.add_source(
+                comp_array_name, index, signal,
                 communicates=port.communicates,
-                delay=self.min_delay,
-                src_port=None,
                 dest_port=port_name)
         # Replace default dict with a regular dict to allow it to be pickled
         self.sources = dict(self.sources)
@@ -166,24 +149,12 @@ class Network(object):
                         "'{}'".format(comp_array_name))
             comp_array = ca_dict[comp_array_name]
             port = comp_array.dynamics_properties.port(port_name)
-            if port.communicates == 'analog':
-                sink_cls = AnalogSink
-            else:
-                sink_cls = EventSink
-            sink_array_name = '{}_{}' .format(comp_array_name, port_name)
             for index in indices:
                 if index >= comp_array.size:
                     continue  # Skip this sink as it is out of bounds
-                sink = sink_cls(sink_array_name + str(index))
-                self.sinks[sink_array_name].append(sink)
-                # NB: Use negative index to avoid any (unlikely) name-clashes
-                #     with other component arrays
-                sink_node_id = (sink_array_name, -(index + 1))
-                graph.add_node(sink_node_id, sink, 0)
-                graph.add_edge(
-                    comp_array_name, index, sink_node_id,
+                graph.add_sink(
+                    comp_array_name, index,
                     src_port=port_name,
-                    dest_port=None,
                     communicates=port.communicates,
                     delay=self.min_delay)
         # Replace default dict with regular dict to allow it to be pickled
@@ -200,7 +171,7 @@ class Network(object):
         for node in list(graph.nodes):
             if node not in graph:
                 continue  # If node has already been merged
-            conn_without_delay = self.connected_without_delay(node, graph)
+            conn_without_delay = self.connected_without_delay(node)
             num_to_merge = len(conn_without_delay)
             if num_to_merge > 1:
                 graph = self.merge_nodes(conn_without_delay, graph)
@@ -232,8 +203,8 @@ class Network(object):
             # Record remote send/receivers to replace edges that will span
             # processes
             for edge in graph.edges:
-                src_node = edge.src_node()
-                dest_node = edge.dest_node()
+                src_node = edge.src_node
+                dest_node = edge.dest_node
                 if src_node.rank != dest_node.rank:
                     # Record port to send from and remote receivers object to
                     # send it to when the node is constructed as well as the
@@ -263,7 +234,7 @@ class Network(object):
                 # original graph when it is pickled and sent to a new process
                 self.sub_graphs.append(sub_graph)
                 # Delete sub_graph nodes from original graph to free up memory
-                graph.remove_nodes(sub_graph.nodes)
+                graph.remove_nodes(n.key for n in sub_graph.nodes)
 
     @property
     def name(self):
@@ -370,20 +341,12 @@ class Network(object):
     def _initialise_components(cls, graph, start_t, show_progress):
         components = []
         dyn_class_cache = []  # Cache for storing previously analysed classes
-        for node, attr in tqdm(graph.nodes(data=True),
-                               desc="Iniitalising dynamics",
-                               disable=not show_progress):
+        for node in tqdm(graph.nodes, desc="Iniitalising dynamics",
+                         disable=not show_progress):
             # Attempt to reuse DynamicsClass objects between Dynamics objects
             # to save reanalysing their equations
-            try:
-                model = attr['properties'].component_class
-            except KeyError:
-                # Sources and sinks have already been initialised
-                try:
-                    component = attr['source']
-                except KeyError:
-                    component = attr['sink']
-            else:
+            if node.type == 'node':
+                model = node.props.component_class
                 try:
                     dyn_class = next(dc for m, dc in dyn_class_cache
                                      if m == model)
@@ -391,44 +354,53 @@ class Network(object):
                     dyn_class = DynamicsClass(model)
                     dyn_class_cache.append((model, dyn_class))
                 # Create dynamics object
-                attr['dynamics'] = component = Dynamics(
-                    attr['properties'], start_t, dynamics_class=dyn_class,
-                    name='{}_{}'.format(*node),
-                    sample_index=attr['sample_index'],
-                    rank=attr.get('rank', None))
-                components.append(component)
+                node.component = Dynamics(
+                    node.props, start_t, dynamics_class=dyn_class,
+                    name='{}_{}'.format(*node.key),
+                    sample_index=node.sample_index,
+                    rank=node.rank)
+                components.append(node.component)
+            elif node.type == 'source':
+                if node.edge.communicates == 'analog':
+                    cls = AnalogSource
+                else:
+                    cls = EventSource
+                connected_to = node.connected_to
+                source_name = '{}_{}_{}' .format(
+                    connected_to.comp_array, node.edge.dest_port,
+                    connected_to.index)
+                node.component = cls(source_name, node.signal)
+            elif node.type == 'sink':
+                if node.edge.communicates == 'analog':
+                    cls = AnalogSink
+                else:
+                    cls = EventSink
+                connected_to = node.connected_to
+                sink_name = '{}_{}_{}' .format(
+                    connected_to.comp_array, node.edge.src_port,
+                    connected_to.index)
+                node.component = cls(sink_name)
+            else:
+                assert False, "Unrecognised node type '{}'".format(node.type)
             # Make all remote connections from send ports (if applicable)
-            for (port_name, remote_sender), max_delay in attr.get(
-                    'remote_receive_ports', {}).items():
-                remote_sender.connect(node, component.port(port_name),
+            for ((port_name, remote_sender),
+                 max_delay) in node.remote_receive_ports.items():
+                remote_sender.connect(node, node.component.port(port_name),
                                       max_delay)
             # Make all remote connections to receive ports (if applicable)
-            for remote_key, port_name, delay, remote_receiver in attr.get(
-                    'remote_send_ports', []):
-                remote_receiver.connect(remote_key, component.port(port_name),
-                                        delay)
+            for (remote_key, port_name,
+                 delay, remote_receiver) in node.remote_send_ports:
+                remote_receiver.connect(remote_key,
+                                        node.component.port(port_name), delay)
         # Make all connections between dynamics components, sources and sinks
-        for u, v, conn in tqdm(graph.out_edges(data=True),
-                               desc="Connecting components",
-                               disable=not show_progress):
-            u_attr = graph.nodes[u]
-            v_attr = graph.nodes[v]
-            try:
-                dyn = u_attr['dynamics']
-            except KeyError:
-                from_port = u_attr['source']
-            else:
-                from_port = dyn.port(conn['src_port'])
-            try:
-                dyn = v_attr['dynamics']
-            except KeyError:
-                to_port = v_attr['sink']
-            else:
-                to_port = dyn.port(conn['dest_port'])
-            from_port.connect_to(to_port, delay=conn['delay'])
+        for edge in tqdm(graph.edges, desc="Connecting components",
+                         disable=not show_progress):
+            from_port = edge.src_node.component.port(edge.src_port)
+            to_port = edge.dest_node.component.port(edge.dest_port)
+            from_port.connect_to(to_port, delay=edge.delay)
         return components
 
-    def connected_without_delay(self, start_node, graph, connected=None):
+    def connected_without_delay(self, start_node):
         """
         Returns the sub-graph of nodes connected to the start node by a chain
         of delayless connections.
@@ -443,21 +415,22 @@ class Network(object):
             The set eventually returned by the method, passed as a arg to
             recursive calls of this method
         """
-        if connected is None:
-            connected = set()
-        connected.add(start_node)
+        connected = set([start_node])
+        stack = [start_node]
         # Iterate all in-coming and out-going edges and check for
         # any zero delays. If so, add to set of nodes to merge
-        for neigh, conn in chain(
-            ((n, c) for n, _, c in graph.in_edges(start_node, data=True)),
-            ((n, c) for _, n, c in graph.out_edges(start_node,
-                                                   data=True))):
-            if not conn['delay'] and neigh not in connected:
-                # Recurse through neighbours edges
-                self.connected_without_delay(neigh, graph, connected)
+        while stack:
+            node = stack.pop()
+            for neighbour, edge in chain(((e.src_node, e)
+                                          for e in node.in_edges),
+                                         ((e.dest_node, e)
+                                          for e in node.out_edges)):
+                if not edge.delay and neighbour not in connected:
+                    connected.add(neighbour)
+                    stack.append(neighbour)
         return connected
 
-    def merge_nodes(self, nodes, graph):
+    def merge_nodes(self, nodes_to_merge, graph):
         """
         Merges a sub-graph of nodes into a single node represented by a
         multi-dynamics object. Used to merge nodes that are connected without
@@ -469,86 +442,87 @@ class Network(object):
         nodes : iterable(2-tuple(str, int))
             The indices of the nodes to merge into a single sub-component
         """
-        sub_graph = graph.subgraph(nodes)
         # Create name for new combined multi-dynamics node from node
         # with the higest degree
-        central_node = max(graph.degree(sub_graph.nodes),
-                           key=itemgetter(1))[0]
-        multi_node = (central_node[0] + '_multi', central_node[1])
-        multi_name = sub_graph.nodes[central_node][
-            'properties'].component_class.name + '_multi'
-        graph.add_node(multi_node)
+        central_node = None
+        max_degree = -1
+        for node in nodes_to_merge:
+            degree = (len([e for e in node.out_edges
+                           if e.dest_node in nodes_to_merge]) +
+                      len([e for e in node.in_edges
+                           if e.src_node in nodes_to_merge]))
+            if degree > max_degree:
+                central_node = node
+                max_degree = degree
+        multi_name = central_node.props.component_class.name + '_multi'
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
         # should make the generated multi-dynamics class equalcla
         sub_components = defaultdict(list)
         sample_indices = {}
-        for _, attr in sorted(sub_graph.nodes(data=True),
-                              key=itemgetter(0)):
+        for node in sorted(nodes_to_merge, key=attrgetter('key')):
             # Add node to list of matching components
-            component_class = attr['properties'].component_class
-            matching = sub_components[component_class]
-            matching.append(attr)
+            component_class = node.props.component_class
+            matching_sub_comps = sub_components[component_class]
+            matching_sub_comps.append(node)
             # Get a uniuqe name for the sub-component based on its
             # dynamics class name + index
-            attr['sub_comp'] = component_class.name
-            if len(matching) > 1:
-                attr['sub_comp'] += str(len(matching))
-            sample_indices[attr['sub_comp']] = attr['sample_index']
+            node.sub_comp_name = component_class.name
+            if len(matching_sub_comps) > 1:
+                node.sub_comp_name += str(len(matching_sub_comps))
+            sample_indices[node.sub_comp_name] = node.sample_index
+        # Add node but delay setting its props until after they are merged
+        multi_node = graph.add_node(
+            central_node.comp_array + '_multi', central_node.index,
+            sample_indices, None, central_node.rank)
         # Map graph edges onto internal port connections of the new multi-
         # dynamics object
         port_connections = []
-        edges_to_remove = []
-        for u, v, conn in sub_graph.edges(data=True):
-            if not conn['delay']:
-                if conn['communicates'] == 'analog':
-                    PortConnectionClass = AnalogPortConnection
-                else:
-                    PortConnectionClass = EventPortConnection
-                port_connections.append(PortConnectionClass(
-                    send_port_name=conn['src_port'],
-                    receive_port_name=conn['dest_port'],
-                    sender_name=sub_graph.nodes[u]['sub_comp'],
-                    receiver_name=sub_graph.nodes[v]['sub_comp']))
-                edges_to_remove.append((u, v))
-        # Remove all edges in the sub-graph from the primary graph
-        graph.remove_edges_from(edges_to_remove)
+        port_exposures = set()
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
-        port_exposures = set()
-        for u, v, conn in graph.out_edges(sub_graph, data=True):
-            attr = graph.nodes[u]
-            # Create a copy of conn dictionary so we can modify it
-            conn = copy(conn)
-            exposure = BasePortExposure.from_port(
-                attr['properties'].component_class.port(conn['src_port']),
-                attr['sub_comp'])
-            port_exposures.add(exposure)
-            conn['src_port'] = exposure.name
-            graph.add_edge(multi_node, v, **conn)
-        # Redirect edges to merged multi-node from nodes external to the sub-
-        # graph
-        for u, v, conn in graph.in_edges(sub_graph, data=True):
-            attr = graph.nodes[v]
-            # Create a copy of conn dictionary so we can modify it
-            conn = copy(conn)
-            exposure = BasePortExposure.from_port(
-                attr['properties'].component_class.port(conn['dest_port']),
-                attr['sub_comp'])
-            port_exposures.add(exposure)
-            conn['dest_port'] = exposure.name
-            graph.add_edge(u, multi_node, **conn)
+        for node in nodes_to_merge:
+            old_node = graph.node(*node.key)
+            for edge in old_node.out_edges:
+                if edge.dest_node in nodes_to_merge:
+                    if edge.communicates == 'analog':
+                        PortConnectionClass = AnalogPortConnection
+                    else:
+                        PortConnectionClass = EventPortConnection
+                    port_connections.append(PortConnectionClass(
+                        send_port_name=edge.src_port,
+                        receive_port_name=edge.dest_port,
+                        sender_name=edge.src_node.sub_comp_name,
+                        receiver_name=edge.dest_node.sub_comp_name))
+                else:
+                    # Create a copy of conn dictionary so we can modify it
+                    exposure = BasePortExposure.from_port(
+                        node.props.component_class.port(edge.src_port),
+                        node.sub_comp_name)
+                    port_exposures.add(exposure)
+                    graph.add_edge(multi_node, edge.dest_node,
+                                   exposure.name, edge.dest_port,
+                                   edge.communicates, edge.delay)
+            for edge in old_node.in_edges:
+                # If incoming edge to sub-graph
+                if edge.src_node not in nodes_to_merge:
+                    exposure = BasePortExposure.from_port(
+                        node.props.component_class.port(edge.dest_port),
+                        node.sub_comp_name)
+                    port_exposures.add(exposure)
+                    graph.add_edge(edge.src_node, multi_node,
+                                   edge.src_port, exposure.name,
+                                   edge.communicates, edge.delay)
         # Create multi-dynamics object and set it as the properties object of
         # the new multi node
         multi_props = MultiDynamicsProperties(
             multi_name,
-            sub_components={c['sub_comp']: c['properties']
-                            for c in chain(*sub_components.values())},
+            sub_components={n.sub_comp_name: n.props for n in nodes_to_merge},
             port_connections=port_connections,
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
-        graph.remove_nodes_from(sub_graph)
+        graph.remove_nodes(n.key for n in nodes_to_merge)
         # Attempt to merge linear sub-components to limit the number of
         # states
         merged = None
@@ -572,8 +546,8 @@ class Network(object):
         self.cached_merged.append((multi_props, merged))
         del multi_props
         # Add merged node
-        graph.nodes[multi_node]['properties'] = merged
-        graph.nodes[multi_node]['sample_index'] = sample_indices
+        # Set multi props
+        multi_node.props = merged
         return graph
 
     @classmethod
@@ -757,78 +731,169 @@ class RemoteEventSendPort(EventSendPort):
 class NetworkGraph(object):
 
     def __init__(self, nodes=None):
-        self._nodes = {} if nodes is None else nodes
+        if nodes is None:
+            self._nodes = {}
+        else:
+            self._nodes = {n.key: n for n in nodes}
+
+    def __contains__(self, node):
+        return node.key in self._nodes
+
+    def __len__(self):
+        return len(self._nodes)
 
     @property
     def nodes(self):
-        return self._nodes.itervalues()
+        if PY2:
+            return self._nodes.itervalues()
+        else:
+            return self._nodes.values()
+
+    def node(self, comp_array, index):
+        return self._nodes[(comp_array, index)]
 
     @property
     def edges(self):
-        return chain(n.out_edges for n in self.nodes)
+        return chain(*(n.out_edges for n in self.nodes))
 
     def add_node(self, comp_array, index, sample_index, props, rank):
-        self._nodes[(comp_array, index)] = Node(
-            comp_array, index, sample_index, props, [], [], rank, [], {})
+        node = Node(comp_array, index, sample_index, props, rank)
+        self._nodes[node.key] = node
+        return node
 
-    def add_sink(self, comp_array, comp_index, src_port):
-        self._nodes[(comp_array, comp_index, 'sink')] = SinkNode(
-            comp_array, comp_index, src_port, [], [])
+    def add_sink(self, comp_array, index, src_port, communicates, delay):
+        sink = SinkNode()
+        self.add_edge(self.node(comp_array, index), sink, src_port, None,
+                      communicates, delay)
+        self._nodes[sink.key] = sink
+        return sink
 
-    def add_source(self, comp_array, comp_index, dest_port):
-        self._nodes[(comp_array, comp_index, 'source')] = SourceNode(
-            comp_array, comp_index, dest_port, [], {})
+    def add_source(self, comp_array, index, signal, dest_port, communicates,
+                   delay):
+        source = SourceNode(signal)
+        self.add_edge(self.node(comp_array, index), source, None,
+                      dest_port, communicates, delay)
+        self._nodes[source.key] = source
+        return source
 
-    def add_edge(self, src_comp, src_index, dest_comp, dest_index, src_port,
-                 dest_port, communicates, delay):
-        src_node = self._nodes[(src_comp, src_index)]
-        dest_node = self._nodes[(dest_comp, dest_index)]
+    def add_edge(self, src_node, dest_node, src_port, dest_port, communicates,
+                 delay):
         # Use weak refs to reference nodes and edges to allow them to be
         # garbage collected
-        edge = Edge(weakref.ref(src_node), weakref.ref(dest_comp),
-                    src_port, dest_port, communicates, delay)
+        edge = Edge(src_node, dest_node, src_port, dest_port, communicates,
+                    delay)
         src_node.out_edges.append(edge)
-        dest_node.in_edges.append(weakref.ref(edge))
+        dest_node.in_edges.append(edge)
+        return edge
 
-    def remove_nodes(self, nodes):
+    def remove_nodes(self, node_keys):
         # Delete nodes from dictionary
-        for node in nodes:
-            del self._nodes[node[:2]]
-            for edge in node.in_edges:
-                edge.src_node().out_edges.remove(edge)
-
-    def sub_graph(self, nodes):
-        sgraph = {(n.comp_array, n.index): Node(
-            n.comp_array, n.comp_index, n.sample_index, n.props, [], [],
-            n.rank, n.remote_send_ports, n.remote_receive_ports)
-            for n in nodes}
-        for old_node in nodes:
-            new_node = sgraph[(old_node.comp_array, old_node.comp_index)]
-            new_node.out_edges.extend(
-                e for e in new_node.out_edges
-                if e.dest_node()[:2] in sgraph)
-            new_node.in_edges.extend(
-                weakref.ref(e) for e in new_node.in_edges
-                if e.src_node()[:2] in sgraph)
-        return NetworkGraph(sgraph)
+        for key in node_keys:
+            old_node = self._nodes[key]
+            del self._nodes[key]
+            # Delete edges connected from this node
+            for edge in old_node.in_edges:
+                edge.src_node.out_edges.remove(edge)
+            for edge in old_node.out_edges:
+                edge.dest_node.in_edges.remove(edge)
 
 
 Edge = namedtuple('Edge',
                   'src_node dest_node src_port dest_port communicates delay')
 
-Node = namedtuple(
-    'Node',
-    'comp_array comp_index sample_index props out_edges in_edges rank '
-    'remote_send_ports remote_receive_ports')
 
-SinkNode = namedtuple(
-    'SinkNode', 'comp_array comp_index in_edges remote_send_ports')
+class Node(object):
 
-SourceNode = namedtuple(
-    'SourceNode', 'comp_array comp_index out_edges remote_receive_ports')
+    type = 'node'
 
-RemoteSendPortNode = namedtuple(
-    'RemoteSendPortNode', '')
+    def __init__(self, comp_array, index, sample_index, props, rank):
+        self.comp_array = comp_array
+        self.index = index
+        self.sample_index = sample_index
+        self.props = props
+        self.rank = rank
+        self.out_edges = []
+        self.in_edges = []
+        self.remote_send_ports = []
+        self.remote_receive_ports = {}
 
-RemoteReceivePortNode = namedtuple(
-    'RemoteReceivePortNode', '')
+    @property
+    def edges(self):
+        return chain(self.out_edges, self.in_edges)
+
+    def unconnected(self):
+        return Node(
+            self.comp_array,
+            self.index,
+            self.sample_index,
+            self.props,
+            self.rank)
+
+    @property
+    def key(self):
+        return (self.comp_array, self.index)
+
+    @property
+    def degree(self):
+        return len(self.in_edges) + len(self.out_edges)
+
+
+class SourceNode(object):
+
+    type = 'source'
+
+    def __init__(self, signal):
+        self.signal = signal
+        self.out_edges = []
+        self.remote_send_ports = []
+        self.remote_receive_ports = {}
+
+    @property
+    def key(self):
+        edge = self.edge
+        return edge.dest_node.key + (edge.dest_port,)
+
+    @property
+    def degree(self):
+        return len(self.out_edges)
+
+    @property
+    def edge(self):
+        assert len(self.out_edges) == 1, "Connect Source before accessing key"
+        return self.out_edges[0]
+
+    @property
+    def connected_to(self):
+        return self.edge.dest_node
+
+
+class SinkNode(object):
+
+    type = 'sink'
+
+    def __init__(self):
+        self.in_edges = []
+        self.remote_send_ports = []
+        self.remote_receive_ports = {}
+
+    @property
+    def key(self):
+        edge = self.edge
+        return edge.src_node.key + (edge.src_port,)
+
+    @property
+    def edge(self):
+        assert len(self.in_edges) == 1, "Connect Sink before accessing key"
+        return self.in_edges[0]
+
+    @property
+    def connected_to(self):
+        return self.edge.src_node
+
+    @property
+    def degree(self):
+        return len(self.in_edges)
+
+    @property
+    def out_edges(self):
+        return []
