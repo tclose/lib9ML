@@ -1,6 +1,6 @@
 from future.utils import PY2
 from operator import attrgetter
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, Counter
 from itertools import chain, repeat
 from logging import getLogger
 import multiprocessing as mp
@@ -132,10 +132,6 @@ class Network(object):
                 comp_array_name, index, signal,
                 communicates=port.communicates,
                 dest_port=port_name)
-        # Replace default dict with a regular dict to allow it to be pickled
-        self.sources = dict(self.sources)
-        # Add sinks to network graph
-        self.sinks = defaultdict(list)
         for sink_tuple in sinks:
             try:
                 comp_array_name, port_name, indices = sink_tuple
@@ -157,8 +153,6 @@ class Network(object):
                     src_port=port_name,
                     communicates=port.communicates,
                     delay=self.min_delay)
-        # Replace default dict with regular dict to allow it to be pickled
-        self.sinks = dict(self.sinks)
         # Merge dynamics definitions for nodes connected without delay
         # connections into multi-dynamics definitions. We save the iterator
         # into a list as we will be removing nodes as they are merged.
@@ -179,8 +173,9 @@ class Network(object):
         progress_bar.close()
         if self.num_procs == 1:
             # Initialise all dynamics components in graph
-            self.components = self._initialise_components(graph, start_t,
-                                                          show_progress)
+            (self.components, self.sources,
+             self.sinks) = self._initialise_components(graph, start_t,
+                                                       show_progress)
         else:
             # Split network over number of specified processes
 
@@ -200,8 +195,8 @@ class Network(object):
                             i, j, send_end)
                         self.remote_receivers[j][i] = RemoteReceiver(
                             i, j, receive_end)
-            # Record remote send/receivers to replace edges that will span
-            # processes
+            # Replace edges that span processes with remote send/receivers
+            edges_to_remove = []
             for edge in graph.edges:
                 src_node = edge.src_node
                 dest_node = edge.dest_node
@@ -215,7 +210,7 @@ class Network(object):
                     try:
                         delay = src_node.remote_receive_ports[key]
                     except KeyError:
-                        delay = 0.0
+                        delay = -1
                     if edge.delay >= delay:
                         src_node.remote_receive_ports[key] = edge.delay
                     # Record port to receive to, the remote senders object to
@@ -225,16 +220,17 @@ class Network(object):
                          edge.dest_port,
                          delay,
                          self.remote_receivers[src_node.rank][dest_node.rank]))
+            graph.remove_edges(edges_to_remove)
             # Divide up network graph between available processes
             self.sub_graphs = []
             for rank in range(self.num_procs):
-                sub_graph = graph.subgraph(n for n in graph.nodes
-                                           if n.rank == rank)
                 # Copy nodes in the sub to a new graph to avoid referencing the
                 # original graph when it is pickled and sent to a new process
+                sub_graph = NetworkGraph(n for n in graph.nodes
+                                         if n.rank == rank)
                 self.sub_graphs.append(sub_graph)
                 # Delete sub_graph nodes from original graph to free up memory
-                graph.remove_nodes(n.key for n in sub_graph.nodes)
+                graph.remove_nodes(sub_graph.nodes)
 
     @property
     def name(self):
@@ -274,7 +270,7 @@ class Network(object):
             for p in processes:
                 p.start()
             # Simulate the first sub-graph on the master process
-            self._simulate_sub_graph(
+            self.sinks = self._simulate_sub_graph(
                 self.sub_graphs[0], self.t, stop_t, dt, self.min_delay,
                 self.model.name, show_progress, self.remote_senders[0],
                 self.remote_receivers[0], 0)
@@ -333,33 +329,37 @@ class Network(object):
     def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
                             model_name, show_progress, remote_senders,
                             remote_receivers, rank):
-        components = cls._initialise_components(sub_graph, t, show_progress)
+        components, sinks, _ = cls._initialise_components(
+            sub_graph, t, show_progress)
         cls._simulate(components, t, stop_t, dt, min_delay, model_name,
                       show_progress, remote_senders, remote_receivers, rank)
+        return sinks
 
     @classmethod
     def _initialise_components(cls, graph, start_t, show_progress):
         components = []
+        sources = defaultdict(list)
+        sinks = defaultdict(list)
         dyn_class_cache = []  # Cache for storing previously analysed classes
         for node in tqdm(graph.nodes, desc="Iniitalising dynamics",
                          disable=not show_progress):
-            # Attempt to reuse DynamicsClass objects between Dynamics objects
-            # to save reanalysing their equations
             if node.type == 'node':
                 model = node.props.component_class
                 try:
+                    # Attempt to reuse DynamicsClass objects between Dynamics
+                    # objects to save reanalysing their equations
                     dyn_class = next(dc for m, dc in dyn_class_cache
                                      if m == model)
                 except StopIteration:
                     dyn_class = DynamicsClass(model)
                     dyn_class_cache.append((model, dyn_class))
                 # Create dynamics object
-                node.component = Dynamics(
+                component = Dynamics(
                     node.props, start_t, dynamics_class=dyn_class,
                     name='{}_{}'.format(*node.key),
                     sample_index=node.sample_index,
                     rank=node.rank)
-                components.append(node.component)
+                components.append(component)
             elif node.type == 'source':
                 if node.edge.communicates == 'analog':
                     cls = AnalogSource
@@ -369,7 +369,8 @@ class Network(object):
                 source_name = '{}_{}_{}' .format(
                     connected_to.comp_array, node.edge.dest_port,
                     connected_to.index)
-                node.component = cls(source_name, node.signal)
+                component = cls(source_name, node.signal)
+                sources[connected_to.comp_array].append(component)
             elif node.type == 'sink':
                 if node.edge.communicates == 'analog':
                     cls = AnalogSink
@@ -379,9 +380,11 @@ class Network(object):
                 sink_name = '{}_{}_{}' .format(
                     connected_to.comp_array, node.edge.src_port,
                     connected_to.index)
-                node.component = cls(sink_name)
+                component = cls(sink_name)
+                sinks[connected_to.comp_array].append(component)
             else:
                 assert False, "Unrecognised node type '{}'".format(node.type)
+            node.component = component
             # Make all remote connections from send ports (if applicable)
             for ((port_name, remote_sender),
                  max_delay) in node.remote_receive_ports.items():
@@ -398,7 +401,7 @@ class Network(object):
             from_port = edge.src_node.component.port(edge.src_port)
             to_port = edge.dest_node.component.port(edge.dest_port)
             from_port.connect_to(to_port, delay=edge.delay)
-        return components
+        return components, sources, sinks
 
     def connected_without_delay(self, start_node):
         """
@@ -458,18 +461,18 @@ class Network(object):
         # Group components with equivalent dynamics in order to assign
         # generic sub-component names based on sub-dynamics classes. This
         # should make the generated multi-dynamics class equalcla
-        sub_components = defaultdict(list)
+        sub_comp_counters = Counter()
         sample_indices = {}
         for node in sorted(nodes_to_merge, key=attrgetter('key')):
             # Add node to list of matching components
             component_class = node.props.component_class
-            matching_sub_comps = sub_components[component_class]
-            matching_sub_comps.append(node)
+            sub_comp_counters.update([component_class])
+            count = sub_comp_counters[component_class]
             # Get a uniuqe name for the sub-component based on its
             # dynamics class name + index
             node.sub_comp_name = component_class.name
-            if len(matching_sub_comps) > 1:
-                node.sub_comp_name += str(len(matching_sub_comps))
+            if count > 1:
+                node.sub_comp_name += str(count)
             sample_indices[node.sub_comp_name] = node.sample_index
         # Add node but delay setting its props until after they are merged
         multi_node = graph.add_node(
@@ -482,8 +485,7 @@ class Network(object):
         # Redirect edges from merged multi-node to nodes external to the sub-
         # graph
         for node in nodes_to_merge:
-            old_node = graph.node(*node.key)
-            for edge in old_node.out_edges:
+            for edge in node.out_edges:
                 if edge.dest_node in nodes_to_merge:
                     if edge.communicates == 'analog':
                         PortConnectionClass = AnalogPortConnection
@@ -503,7 +505,7 @@ class Network(object):
                     graph.add_edge(multi_node, edge.dest_node,
                                    exposure.name, edge.dest_port,
                                    edge.communicates, edge.delay)
-            for edge in old_node.in_edges:
+            for edge in node.in_edges:
                 # If incoming edge to sub-graph
                 if edge.src_node not in nodes_to_merge:
                     exposure = BasePortExposure.from_port(
@@ -522,7 +524,7 @@ class Network(object):
             port_exposures=port_exposures,
             validate=False)
         # Remove merged nodes and their edges
-        graph.remove_nodes(n.key for n in nodes_to_merge)
+        graph.remove_nodes(nodes_to_merge)
         # Attempt to merge linear sub-components to limit the number of
         # states
         merged = None
@@ -742,6 +744,9 @@ class NetworkGraph(object):
     def __len__(self):
         return len(self._nodes)
 
+    def __repr__(self):
+        return pformat(list(self.nodes))
+
     @property
     def nodes(self):
         if PY2:
@@ -786,15 +791,15 @@ class NetworkGraph(object):
         dest_node.in_edges.append(edge)
         return edge
 
-    def remove_nodes(self, node_keys):
+    def remove_nodes(self, nodes):
         # Delete nodes from dictionary
-        for key in node_keys:
-            old_node = self._nodes[key]
-            del self._nodes[key]
-            # Delete edges connected from this node
-            for edge in old_node.in_edges:
+        for node in nodes:
+            # Remove node from graph dict
+            del self._nodes[node.key]
+            # Delete edges connected to/from this node
+            for edge in node.in_edges:
                 edge.src_node.out_edges.remove(edge)
-            for edge in old_node.out_edges:
+            for edge in node.out_edges:
                 edge.dest_node.in_edges.remove(edge)
 
 
@@ -816,6 +821,10 @@ class Node(object):
         self.in_edges = []
         self.remote_send_ports = []
         self.remote_receive_ports = {}
+
+    def __repr__(self):
+        return 'Node({}, {}, {}, {})'.format(self.comp_array, self.index,
+                                             self.sample_index, self.props)
 
     @property
     def edges(self):
@@ -848,6 +857,9 @@ class SourceNode(object):
         self.remote_send_ports = []
         self.remote_receive_ports = {}
 
+    def __repr__(self):
+        return "Source('{}')".format(self.key)
+
     @property
     def key(self):
         edge = self.edge
@@ -875,6 +887,9 @@ class SinkNode(object):
         self.in_edges = []
         self.remote_send_ports = []
         self.remote_receive_ports = {}
+
+    def __repr__(self):
+        return "Sink('{}')".format(self.key)
 
     @property
     def key(self):
