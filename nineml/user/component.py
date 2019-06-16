@@ -1,4 +1,5 @@
 # encoding: utf-8
+from copy import deepcopy
 from past.builtins import basestring
 from itertools import chain
 from abc import ABCMeta, abstractmethod
@@ -53,6 +54,13 @@ class Property(BaseULObject):
 
     Numerical values may either be numbers, or a component_class that generates
     numbers, e.g. a RandomDistribution instance.
+
+    Parameters
+    ----------
+    name : str
+        The name of the property
+    quantity : Quantity
+        The quantity of the property
     """
     nineml_type = "Property"
     nineml_attr = ('name',)
@@ -86,8 +94,12 @@ class Property(BaseULObject):
                     self.name, qty, qty.units.dimension, self.units.dimension))
         self._quantity = qty
 
-    def sample(self, index=None):
-        return type(self)(self.name, self.quantity.sample(index))
+    def sample(self, index, state):
+        if self.quantity.is_random and state is None:
+            raise NineMLUsageError(
+                "Cannot sample from {} without providing a random state"
+                .format(self.rule))
+        return self.quantity.sample(index, state)
 
     @property
     def value(self):
@@ -156,6 +168,8 @@ class Component(with_metaclass(
     properties : List[Property]|Dict[str,Quantity]
         a dictionary containing (value,units) pairs or a
         for the component_class's properties.
+    random_state : RandomState | None
+        The random state used to generate random-distribution properties
     """
     nineml_type_v1 = 'Component'
     nineml_attr = ('name',)
@@ -165,7 +179,7 @@ class Component(with_metaclass(
     # initial_values is temporary, the idea longer-term is to use a separate
     # library such as SEDML
     def __init__(self, name, definition, properties=(),
-                 check_properties=True):
+                 check_properties=True, random_state=None):
         """
         Create a new component_class with the given name, definition and
         properties, or create a prototype to another component_class that will
@@ -205,6 +219,11 @@ class Component(with_metaclass(
         self.add(*properties)
         if check_properties:
             self.check_properties()
+        self.set_state(random_state)
+
+    def set_state(self, state):
+        for prop in self.properties:
+            prop.set_state(state)
 
     @property
     def name(self):

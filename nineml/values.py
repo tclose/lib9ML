@@ -116,7 +116,7 @@ class SingleValue(BaseValue):
     def is_single(self):
         return True
 
-    def sample(self, index=None):  # @UnusedVariable
+    def sample(self, index=None, state=None):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -284,7 +284,7 @@ class ArrayValue(BaseValue):
     def values(self):
         return self._values
 
-    def sample(self, index=None):
+    def sample(self, index=None, state=None):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -553,7 +553,7 @@ class RandomDistributionValue(BaseValue):
         # FIXME: This should include a hash of the properties
         return self._distribution.name
 
-    def sample(self, index=None):  # @UnusedVariable
+    def sample(self, index=None, state=None):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -562,6 +562,8 @@ class RandomDistributionValue(BaseValue):
         ----------
         index : int
             The index of the value to return
+        state : RandomState
+            A random state used to draw values from the distribution from
 
         Returns
         -------
@@ -570,7 +572,7 @@ class RandomDistributionValue(BaseValue):
         """
         if self._generator is None:
             # Uses builtin numpy functions
-            value = self.distribution.sample()
+            value = self.distribution.sample(state)
         else:
             next(self._generator())
         return SingleValue(value)

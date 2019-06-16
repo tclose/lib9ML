@@ -60,6 +60,9 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         event_port_connections : list(EventPortConnection)
             A list of event port connections between pre, post, response,
             plasticity dynamics
+        random_state : RandomState
+            The random state used to generate random connections and draw
+            samples from random properties
     """
     nineml_type = "Projection"
     nineml_attr = ('name',)
@@ -79,7 +82,8 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
                  connection_rule_properties=None,
                  plasticity=None, port_connections=None,
                  analog_port_connections=None, event_port_connections=None,
-                 connectivity_class=Connectivity, **kwargs):
+                 connectivity_class=Connectivity, random_state=None,
+                 **kwargs):
         """
         Create a new projection.
         """
@@ -122,6 +126,9 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
                     port_connection, self)
             port_connection.bind(self, to_roles=True)
             self.add(port_connection)
+        for pop in self.popultations:
+            pop.set_state(state)
+        
 
     def __len__(self):
         return sum(1 for _ in self.connectivity.connections())

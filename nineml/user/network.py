@@ -30,13 +30,15 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         An iterable containing the projections contained in the network.
     selections : iterable(Selection)
         An iterable containing the selections contained in the network.
+    random_state : RandomState
+        The random state used to generate random connections and properties
     """
     nineml_type = "Network"
     nineml_children = (Population, Projection, Selection)
     nineml_attr = ('name',)
 
     def __init__(self, name, populations=[], projections=[],
-                 selections=[]):
+                 selections=[], random_state=None):
         # better would be *items, then sort by type, taking the name from the
         # item
         self._name = validate_identifier(name)
@@ -46,6 +48,10 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         self.add(*populations)
         self.add(*projections)
         self.add(*selections)
+        for pop in self.populations:
+            pop.set_state(random_state)
+        for proj in self.projections:
+            proj.set_state(proj)
 
     @property
     def name(self):

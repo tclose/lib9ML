@@ -1,5 +1,7 @@
 import numpy.random
+from copy import deepcopy
 from nineml.user.component import Component
+from nineml.exceptions import NineMLUsageError
 
 
 class RandomDistributionProperties(Component):
@@ -22,6 +24,19 @@ class RandomDistributionProperties(Component):
         'exponential': numpy.random.exponential,
         'normal': numpy.random.normal}
 
+    def __init__(self, name, definition, properties=(),
+                 check_properties=True):
+        super(RandomDistributionProperties).__init__(
+            name=name, definition=definition, properties=properties,
+            check_properties=check_properties)
+
+    def set_state(self, state):
+        if not all(hasattr(state, a) for a in self.default_funcs):
+            raise NineMLUsageError(
+                "Cannot set state with {} that doesn't implement all methods "
+                .format(list(self.default_funcs)))
+        self._state = state
+
     @property
     def standard_library(self):
         return self.component_class.standard_library
@@ -29,20 +44,18 @@ class RandomDistributionProperties(Component):
     def get_nineml_type(self):
         return self.nineml_type
 
-    def sample(self):
+    def sample(self, state):
         if self.standard_library == self.UNCERTML_PREFIX + 'uniform':
-            value = numpy.random.uniform(self['minimum'].value,
-                                         self['maximum'].value)
+            value = state.uniform(self['minimum'].value, self['maximum'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'binomial':
-            value = numpy.random.binomial(self['numberOfTrials'].value,
-                                          self['probabilityOfSuccess'].value)
+            value = state.binomial(self['numberOfTrials'].value,
+                                   self['probabilityOfSuccess'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'poisson':
-            value = numpy.random.poisson(1.0 / self['rate'].value)
+            value = state.poisson(1.0 / self['rate'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'exponential':
-            value = numpy.random.exponential(1.0 / self['rate'].value)
+            value = state.exponential(1.0 / self['rate'].value)
         elif self.standard_library == self.UNCERTML_PREFIX + 'normal':
-            value = numpy.random.normal(self['mean'].value,
-                                         self['variannce'].value)
+            value = state.normal(self['mean'].value, self['variannce'].value)
         else:
             raise NotImplementedError(
                 "'{}' distributions are not support yet"

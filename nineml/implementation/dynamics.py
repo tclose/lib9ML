@@ -9,7 +9,7 @@ from logging import getLogger
 import sympy as sp
 from tqdm import tqdm
 from nineml.exceptions import (
-    NineMLUsageError, NineMLNameError, NineMLInternalError)
+    NineMLUsageError, NineMLNameError)
 from nineml.units import Quantity
 from nineml.user.multi import split_namespace
 

@@ -1,13 +1,13 @@
 from builtins import zip
 from builtins import range
-import sys
+from copy import deepcopy
 from itertools import chain, product
 import math
 from abc import ABCMeta, abstractmethod
 from itertools import repeat
 from random import Random, randint
 from nineml.base import BaseNineMLObject
-from nineml.exceptions import NineMLUsageError, NineMLUsageError
+from nineml.exceptions import NineMLUsageError
 from nineml.user.component import Component
 from future.utils import with_metaclass
 
@@ -106,9 +106,8 @@ class Connectivity(BaseConnectivity):
     """
     nineml_type = '_Connectivity'
 
-    def __init__(self, rule_properties, source_size,
-                 destination_size, random_seed=None, rng_cls=None,
-                 **kwargs):  # @UnusedVariable
+    def __init__(self, rule_properties, source_size, destination_size,
+                 random_state=None, **kwargs):  # @UnusedVariable @IgnorePep8
         """
         Parameters
         ----------
@@ -119,22 +118,14 @@ class Connectivity(BaseConnectivity):
             Size of the source component array
         destination_size : int
             Size of the destination component array
-        random_seed : int | None
-            Seed for the random generator (if required). If None then a
-            random integer is drawn from random.randint
-        rng_cls : random generator class (i.e. random.Random) | None
-            Class for the random generator. Can be any random generator that
+        random_state : random-state
+            A random generator object. Can be any random generator that
             implements the 'random' method to return a float between 0 and 1
-            (e.g. numpy.Random). If not supplied then random.Random is used
+            (e.g. numpy.Random).
         """
         super(Connectivity, self).__init__(
             rule_properties, source_size, destination_size)
-        if random_seed is None:
-            random_seed = randint(0, sys.maxsize)
-        self._seed = random_seed
-        if rng_cls is None:
-            rng_cls = Random
-        self._rng_cls = rng_cls
+        self._state = random_state
 
     def connections(self):
         """
@@ -143,6 +134,14 @@ class Connectivity(BaseConnectivity):
         `src`  -- the indices to get the connections from
         `dest` -- the indices to get the connections to
         """
+        if self._state is None:
+            raise NineMLUsageError(
+                "Cannot generate connectivity of {} as the random state has "
+                "not been set".format(self.rule))
+        state = self._state
+        # Create a snapshot of the random state in order to exactly recreate
+        # the conn generator if required
+        self._state = deepcopy(self._state)
         if self.lib_type == 'AllToAll':
             conn = self._all_to_all()
         elif self.lib_type == 'OneToOne':
@@ -150,14 +149,21 @@ class Connectivity(BaseConnectivity):
         elif self.lib_type == 'Explicit':
             conn = self._explicit_connection_list()
         elif self.lib_type == 'Probabilistic':
-            conn = self._probabilistic_connectivity()
+            conn = self._probabilistic_connectivity(state)
         elif self.lib_type == 'RandomFanIn':
-            conn = self._random_fan_in()
+            conn = self._random_fan_in(state)
         elif self.lib_type == 'RandomFanOut':
-            conn = self._random_fan_out()
+            conn = self._random_fan_out(state)
         else:
             assert False
         return conn
+
+    def set_state(self, state):
+        if not hasattr(state, 'rand'):
+            raise NineMLUsageError(
+                "Cannot set state with {} that doesn't implement 'rand' "
+                "method".format(state))
+        self._state = state
 
     def _all_to_all(self):  # @UnusedVariable
         return product(range(self._source_size),
@@ -172,32 +178,28 @@ class Connectivity(BaseConnectivity):
             self._rule_properties.property('sourceIndices').value.values,
             self._rule_properties.property('destinationIndices').value.values)
 
-    def _probabilistic_connectivity(self):  # @UnusedVariable
+    def _probabilistic_connectivity(self, state):  # @UnusedVariable
         # Reinitialize the connectivity generator with the same RNG so that
         # it selects the same numbers
-        rng = self._rng_cls(self._seed)
         p = float(self._rule_properties.property('probability').value)
         # Get an iterator over all of the source dest pairs to test
-        return chain(*(((s, d) for d in range(self._destination_size)
-                        if rng.random() < p)
-                       for s in range(self._source_size)))
-
-    def _random_fan_in(self):  # @UnusedVariable
-        N = int(self._rule_properties.property('number').value)
-        rng = self._rng_cls(self._seed)
         return chain(*(
-            zip((int(math.floor(rng.random() * self._source_size))
-                  for _ in range(N)),
-                 repeat(d))
+            ((s, d) for d in range(self._destination_size) if state.rand() < p)
+            for s in range(self._source_size)))
+
+    def _random_fan_in(self, state):  # @UnusedVariable
+        N = int(self._rule_properties.property('number').value)
+        return chain(*(
+            zip((int(math.floor(state.rand() * self._source_size))
+                 for _ in range(N)), repeat(d))
             for d in range(self._destination_size)))
 
-    def _random_fan_out(self):  # @UnusedVariable
+    def _random_fan_out(self, state):  # @UnusedVariable
         N = int(self._rule_properties.property('number').value)
-        rng = self._rng_cls(self._seed)
         return chain(*(
             zip(repeat(s),
-                 (int(math.floor(rng.random() * self._destination_size))
-                  for _ in range(N)))
+                (int(math.floor(state.rand() * self._destination_size))
+                 for _ in range(N)))
             for s in range(self._source_size)))
 
     @property

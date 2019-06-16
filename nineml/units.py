@@ -462,8 +462,8 @@ class Quantity(AnnotatedNineMLObject):
     def units(self):
         return self._units
 
-    def sample(self, index=None):
-        return Quantity(self.value.sample(index), self.units)
+    def sample(self, index=None, state=None):
+        return Quantity(self.value.sample(index, state), self.units)
 
 #     def __getitem__(self, index):
 #         if self.value.is_array():

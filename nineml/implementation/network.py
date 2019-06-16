@@ -823,8 +823,7 @@ class Node(object):
         self.remote_receive_ports = {}
 
     def __repr__(self):
-        return 'Node({}, {}, {}, {})'.format(self.comp_array, self.index,
-                                             self.sample_index, self.props)
+        return 'Node({}, {})'.format(self.comp_array, self.index)
 
     @property
     def edges(self):
