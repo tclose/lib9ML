@@ -1,4 +1,5 @@
 from future.utils import PY2
+import sys
 from operator import attrgetter
 from collections import defaultdict, namedtuple, Counter
 from itertools import chain, repeat
@@ -183,12 +184,14 @@ class Network(object):
             # Initialise all dynamics components in graph
             (self.components, self.sources,
              self.sinks) = self._initialise_components(graph, start_t,
-                                                       show_progress)
+                                                       show_progress,
+                                                       random_state)
         else:
             # Split network over number of specified processes
 
             # Construction of components is delayed until simulation step
             # so they can be constructed in child processes
+            self._random_state = random_state
             self.components = None
             # Construct inter-process pipes between each pair of processes and
             # wrap in remote receiver/sender objects to handle inter-process
@@ -272,7 +275,8 @@ class Network(object):
                     target=self._simulate_sub_graph,
                     args=(sg, self.t, stop_t, dt, self.min_delay,
                           self.model.name, False, self.remote_senders[i],
-                          self.remote_receivers[i], i))
+                          self.remote_receivers[i], i,
+                          self._random_state.randint(sys.maxsize)))
                 for i, sg in enumerate(self.sub_graphs[1:], start=1)]
             # Start all child processes
             for p in processes:
@@ -281,7 +285,7 @@ class Network(object):
             self.sinks = self._simulate_sub_graph(
                 self.sub_graphs[0], self.t, stop_t, dt, self.min_delay,
                 self.model.name, show_progress, self.remote_senders[0],
-                self.remote_receivers[0], 0)
+                self.remote_receivers[0], 0, self._random_state)
             # Join all child processes
             for p in processes:
                 p.join()
@@ -336,15 +340,18 @@ class Network(object):
     @classmethod
     def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
                             model_name, show_progress, remote_senders,
-                            remote_receivers, rank):
+                            remote_receivers, rank, random_state):
+        if not isinstance(random_state, RandomState):
+            random_state = RandomState(random_state)
         components, sinks, _ = cls._initialise_components(
-            sub_graph, t, show_progress)
+            sub_graph, t, show_progress, random_state)
         cls._simulate(components, t, stop_t, dt, min_delay, model_name,
                       show_progress, remote_senders, remote_receivers, rank)
         return sinks
 
     @classmethod
-    def _initialise_components(cls, graph, start_t, show_progress):
+    def _initialise_components(cls, graph, start_t, show_progress,
+                               random_state):
         components = []
         sources = defaultdict(list)
         sinks = defaultdict(list)
@@ -366,7 +373,7 @@ class Network(object):
                     node.props, start_t, dynamics_class=dyn_class,
                     name='{}_{}'.format(*node.key),
                     sample_index=node.sample_index,
-                    rank=node.rank)
+                    rank=node.rank, random_state=random_state)
                 components.append(component)
             elif node.type == 'source':
                 if node.edge.communicates == 'analog':

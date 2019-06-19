@@ -38,7 +38,7 @@ class Dynamics(object):
 
     def __init__(self, model, start_t, initial_state=None, sample_index=None,
                  initial_regime=None, dynamics_class=None, name=None,
-                 rank=None):
+                 rank=None, random_state=None):
 
         def sample_quantity(elem):
             # If sample index is a dictionary containing different indices for
@@ -51,7 +51,7 @@ class Dynamics(object):
                 qty = elem
             else:
                 qty = elem.quantity
-            return float(qty.sample(index).in_si_units())
+            return float(qty.sample(index, state=random_state).in_si_units())
 
         if dynamics_class is None:
             dynamics_class = DynamicsClass(model.component_class)
