@@ -33,7 +33,7 @@ class Connections(object):
     """
 
     def __init__(self, rule_properties, source_size,
-                 destination_size, random_state, **kwargs):  # @UnusedVariable
+                 destination_size, random_state=None, **kwargs):  # @UnusedVariable @IgnorePep8
         if (rule_properties.lib_type == 'OneToOne' and
                 source_size != destination_size):
             raise NineMLUsageError(
@@ -47,6 +47,10 @@ class Connections(object):
         self._rule_properties = rule_properties
         self._source_size = source_size
         self._destination_size = destination_size
+        if random_state is None and self.is_random():
+            raise NineMLUsageError(
+                "Random state needs to be provided for {} library type"
+                .format(self.lib_type))
         self._state = random_state
 
     def __eq__(self, other):
@@ -154,6 +158,10 @@ class Connections(object):
                 (int(math.floor(state.rand() * self._destination_size))
                  for _ in range(N)))
             for s in range(self._source_size)))
+
+    def is_random(self):
+        return self.lib_type in ('Probabilistic', 'RandomFanIn',
+                                 'RandomFanOut')
 
     @property
     def key(self):

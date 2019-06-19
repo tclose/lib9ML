@@ -3,6 +3,7 @@ from operator import attrgetter
 from collections import defaultdict, namedtuple, Counter
 from itertools import chain, repeat
 from logging import getLogger
+from numpy.random import RandomState
 import multiprocessing as mp
 import nineml.units as un
 from nineml.user import (
@@ -62,10 +63,15 @@ class Network(object):
         The number of processes to create the network over. If != 1 then
         initialisation of the network is delayed until the first (and only
         allowable) call to simulate.
+    random_state : int | None | RandomState
+        The random state used to sample random distributions and connection
+        rules
     """
 
     def __init__(self, model, start_t, sources=None, sinks=None,
-                 show_progress=True, num_processes=1):
+                 show_progress=True, num_processes=1, random_state=None):
+        if not isinstance(random_state, RandomState):
+            random_state = RandomState(random_state)
         if isinstance(start_t, Quantity):
             start_t = float(start_t.in_si_units())
         if sources is None:
@@ -82,7 +88,7 @@ class Network(object):
             self.num_procs = num_processes
         self.t = start_t
         self.model = model
-        component_arrays, connection_groups = model.flatten()
+        component_arrays, connection_groups = model.flatten(random_state)
         # Initialise a graph to represent the network
         progress_bar = tqdm(
             total=sum(ca.size for ca in component_arrays),
@@ -108,11 +114,13 @@ class Network(object):
             disable=not show_progress)
         for conn_group in connection_groups:
             delay_qty = conn_group.delay
-            if delay_qty is None:
-                delays = repeat(0.0)
+            if delay_qty is not None:
+                delays = delay_qty.in_si_units()
             else:
-                delays = (float(d) for d in delay_qty.in_si_units())
-            for (src_i, dest_i), delay in zip(conn_group.connections, delays):
+                delay = 0.0
+            for i, (src_i, dest_i) in enumerate(conn_group.connections()):
+                if delay_qty is not None:
+                    delay = delays.sample(index=i, state=random_state)
                 graph.add_edge(
                     graph.node(conn_group.source.name, int(src_i)),
                     graph.node(conn_group.destination.name, int(dest_i)),

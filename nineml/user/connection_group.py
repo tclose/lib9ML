@@ -5,7 +5,7 @@ from nineml.abstraction.connectionrule import (
     explicit_connection_rule, one_to_one_connection_rule)
 from nineml.user.port_connections import EventPortConnection
 from nineml.user.connectionrule import (
-    ConnectionRuleProperties)
+    ConnectionRuleProperties, Connections)
 from nineml.units import Quantity
 from nineml.abstraction.ports import (
     SendPort, ReceivePort, EventPort, AnalogPort, Port)
@@ -68,8 +68,21 @@ class BaseConnectionGroup(
     def delay(self):
         return self._delay
 
+    def connections(self):
+        return Connections(self.connectivity, self.source.size,
+                           self.destination.size)
+
     def __len__(self):
-        return len(self.connections)
+        rule_type = self.connectivity.lib_type
+        if rule_type == 'OneToOne':
+            length = self.source.size
+        elif rule_type == 'AllToAll':
+            length = self.source.size * self.destination.size
+        elif rule_type == 'Explicit':
+            length = len(self.connectivity['sourceIndices'].value)
+        else:
+            assert False, "Unrecognised conn rule type {}".format(rule_type)
+        return length
 
     @classmethod
     def from_port_connection(self, port_conn, projection, component_arrays,
@@ -124,19 +137,31 @@ class BaseConnectionGroup(
             # Get source and destination component arrays
             if port_conn.sender_role == 'pre':
                 source_pop = projection.pre
-                source_len = len(source_pop)
+                try:
+                    source_len = len(source_pop)
+                except TypeError:
+                    pass
             elif port_conn.sender_role == 'post':
                 source_pop = projection.post
-                source_len = len(source_pop)
+                try:
+                    source_len = len(source_pop)
+                except TypeError:
+                    pass
             else:
                 source_pop = projection  # The source comp-array is from syn.
                 source_len = num_connections
             if port_conn.receiver_role == 'pre':
                 dest_pop = projection.pre
-                dest_len = len(dest_pop)
+                try:
+                    dest_len = len(dest_pop)
+                except TypeError:
+                    pass
             elif port_conn.receiver_role == 'post':
                 dest_pop = projection.post
-                dest_len = len(dest_pop)
+                try:
+                    dest_len = len(dest_pop)
+                except TypeError:
+                    pass
             else:
                 dest_pop = projection
                 dest_len = num_connections

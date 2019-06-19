@@ -1,9 +1,8 @@
 import os
 import ninemlcatalog
 import math
-import random
+from numpy.random import RandomState
 import logging
-from itertools import chain
 from nineml import units as un
 from nineml.user import Property as Property
 from nineml.implementation import Network
@@ -62,7 +61,6 @@ class TestNetwork(TestCase):
                     dt=0.01 * un.ms, random_seed=None, num_processes=4,
                     nrecord=50, record_v=False, nrecord_v=5, record_ext=True,
                     **kwargs):
-        random.seed(random_seed)
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         if order is not None:
@@ -74,7 +72,7 @@ class TestNetwork(TestCase):
         if record_ext:
             sink_specs.append(('Ext__cell', 'spike_output', range(nrecord)))
         network = Network(model, start_t=0 * un.s, num_processes=num_processes,
-                          sinks=sink_specs)
+                          sinks=sink_specs, random_state=random_seed)
         network.simulate(duration, dt=dt, **kwargs)
         sinks = {name: [s.detach() for s in sink_group]
                  for name, sink_group in network.sinks.items()}
