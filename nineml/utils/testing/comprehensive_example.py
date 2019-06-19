@@ -7,6 +7,8 @@ from past.builtins import basestring, long
 import pkgutil
 from collections import defaultdict
 import weakref
+import os
+from numpy.random import RandomState
 from itertools import chain
 import nineml
 import nineml.units as un
@@ -31,8 +33,15 @@ from nineml.user.multi import (
     EventSendPortExposure, EventReceivePortExposure, AnalogSendPortExposure,
     AnalogReceivePortExposure, AnalogReducePortExposure)
 import sympy
-from nineml.user.projection import Connectivity
+# from nineml.user.projection import Connectivity
 from nineml.serialization import NINEML_V1_NS
+
+try:
+    RAND_SEED = os.environ['NINML_TEST_RAND_SEED']
+except KeyError:
+    RAND_SEED = None
+
+random_state = RandomState(RAND_SEED)
 
 
 ranDistrA = RandomDistribution(
@@ -420,7 +429,7 @@ projA = Projection(
     post=popB,
     response=dynPropG,
     delay=Quantity(3.1, un.ms),
-    connection_rule_properties=conPropA,
+    connectivity=conPropA,
     port_connections=[
         ('pre', 'ESP1', 'response', 'ERP1'),
         ('response', 'A1', 'post', 'ARP1')])
@@ -433,7 +442,7 @@ projB = Projection(
         name="dynFPropsA",
         definition=dynF,
         properties={'P1': 10.7 * un.ms, 'P2': 3.1 * un.nA}),
-    connection_rule_properties=ConnectionRuleProperties(
+    connectivity=ConnectionRuleProperties(
         name="conPropB2",
         definition=conB),
     delay=1 * un.ms,
@@ -455,7 +464,7 @@ projC = Projection(
     post=popB,
     response=dynPropG,
     delay=2.4 * un.ms,
-    connection_rule_properties=conPropA,
+    connectivity=conPropA,
     port_connections=[
         ('pre', 'ESP1', 'response', 'ERP1'),
         ('response', 'A1', 'post', 'ARP1')])
@@ -468,7 +477,7 @@ projD = Projection(
         name="dynFPropsB",
         definition=dynF,
         properties={'P1': -1.72 * un.ms, 'P2': 88.0 * un.nA}),
-    connection_rule_properties=conPropB1,
+    connectivity=conPropB1,
     delay=1 * un.ms,
     port_connections=[
         EventPortConnection(
@@ -488,7 +497,7 @@ projE = Projection(
     post=popMultiB,
     response=dynPropH,
     delay=0.5 * un.s,
-    connection_rule_properties=conPropB1,
+    connectivity=conPropB1,
     port_connections=[
         ('pre', 'ESP1__e', 'response', 'ERP1'),
         ('response', 'A1', 'post', 'ARP1')])
@@ -514,7 +523,8 @@ doc1 = Document(
     multiDynPropA, multiDynPropB, ranDistrA, ranDistrPropA, popA, popB, popC,
     popD, popE, selA, conA, conPropA, conB, projA, projB, projC, projD, projE,
     netA, netB,
-    *list(chain(*(netA.flatten() + netB.flatten() + netC.flatten()))))
+    *list(chain(*(netA.flatten(random_state) + netB.flatten(random_state) +
+                  netC.flatten(random_state)))))
 
 doc2 = Document(
     dynA, dynB, dynC, dynE, dynF, dynPropA, dynPropB, dynPropC, dynPropC2,
@@ -539,7 +549,7 @@ def add_with_sub_elements(element):
     if isinstance(element, (basestring, Document)) or element in loading:
         return
     if not isinstance(element, (dict, list, tuple, int, float, str, long,
-                                sympy.Basic, Connectivity, weakref.ref)):
+                                sympy.Basic, weakref.ref)):
         # If element has an attribute called 'nineml_type' add it to the
         # dictionary of all 9ML elements
         if element.nineml_type == 'Annotations':

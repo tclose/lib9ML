@@ -78,6 +78,7 @@ class BaseConnectionGroup(
             cls = EventConnectionGroup
         else:
             cls = AnalogConnectionGroup
+        num_connections = len(connections)
         name = '__'.join((
             projection.name, port_conn.sender_role,
             port_conn.send_port_name, port_conn.receiver_role,
@@ -123,25 +124,32 @@ class BaseConnectionGroup(
             # Get source and destination component arrays
             if port_conn.sender_role == 'pre':
                 source_pop = projection.pre
+                source_len = len(source_pop)
             elif port_conn.sender_role == 'post':
                 source_pop = projection.post
+                source_len = len(source_pop)
             else:
                 source_pop = projection  # The source comp-array is from syn.
+                source_len = num_connections
             if port_conn.receiver_role == 'pre':
                 dest_pop = projection.pre
+                dest_len = len(dest_pop)
             elif port_conn.receiver_role == 'post':
                 dest_pop = projection.post
+                dest_len = len(dest_pop)
             else:
                 dest_pop = projection
+                dest_len = num_connections
+            # Divide up selections into individual populations
             if source_pop.nineml_type == 'Selection':
                 sources = []
                 start_i = 0
                 for pop in source_pop.populations:
-                    end_i = start_i + len(pop)
+                    end_i = start_i + pop.size
                     sources.append((pop, start_i, end_i))
                     start_i = end_i
             else:
-                sources = [(source_pop, 0, len(source_pop))]
+                sources = [(source_pop, 0, source_len)]
             if dest_pop.nineml_type == 'Selection':
                 destinations = []
                 start_i = 0
@@ -150,7 +158,7 @@ class BaseConnectionGroup(
                     destinations.append((pop, start_i, end_i))
                     start_i = end_i
             else:
-                destinations = [(dest_pop, 0, len(dest_pop))]
+                destinations = [(dest_pop, 0, dest_len)]
             # Return separate connection groups between all combinations of
             # source and destination populations/synapses
             conn_groups = []
@@ -190,7 +198,7 @@ class BaseConnectionGroup(
                     cls(conn_group_name, source_array, dest_array,
                         source_port=port_conn.send_port_name,
                         destination_port=port_conn.receive_port_name,
-                        connection_rule_properties=conn_props, delay=delay))
+                        connectivity=conn_props, delay=delay))
             return conn_groups
 
     @abstractmethod
@@ -205,7 +213,7 @@ class BaseConnectionGroup(
         dest_elem = node.child(self.destination, within='Destination',
                                **options)
         node.visitor.set_attr(dest_elem, 'port', self.destination_port)
-        node.child(self.connectivity.rule_properties, within='Connectivity')
+        node.child(self.connectivity, within='Connectivity')
         if self.delay is not None:
             node.child(self.delay, within='Delay')
         node.attr('name', self.name)
@@ -233,7 +241,7 @@ class BaseConnectionGroup(
                            **options)
         return cls(name=name, source=source, destination=destination,
                    source_port=source_port, destination_port=destination_port,
-                   connection_rule_properties=connectivity, delay=delay)
+                   connectivity=connectivity, delay=delay)
 
 
 class AnalogConnectionGroup(BaseConnectionGroup):

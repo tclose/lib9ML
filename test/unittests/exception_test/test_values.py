@@ -1,7 +1,8 @@
 from builtins import next
 import unittest
 from nineml.values import ArrayValue
-from nineml.utils.testing.comprehensive_example import instances_of_all_types
+from nineml.utils.testing.comprehensive_example import (
+    instances_of_all_types, random_state)
 from nineml.exceptions import (NineMLValueError, NineMLUsageError)
 from nineml.document import Document
 from lxml.builder import ElementMaker
@@ -105,11 +106,11 @@ class TestRandomDistributionValueExceptions(unittest.TestCase):
         """
 
         randomvalue = next(iter(instances_of_all_types['RandomDistributionValue'].values()))
-        gen = iter(randomvalue)
         self.assertRaises(
             NineMLUsageError,
-            next,
-            gen)
+            randomvalue.sample,
+            index=0,
+            state=random_state)
 
     def test_inverse_notimplementederror(self):
         """

@@ -46,7 +46,7 @@ else:
 LARGE_INT = 2 ** 31 - 1
 
 try:
-    DISABLE_SIM_TESTS = os.environ['DISABLE_SIM_TESTS']
+    DISABLE_SIM_TESTS = 'NINEML_DISABLE_SIM_TESTS' in os.environ
 except KeyError:
     DISABLE_SIM_TESTS = False
 
@@ -66,7 +66,7 @@ class TestNetwork(TestCase):
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         if order is not None:
-            model = self._reduced_brunel(model, order, random_seed=random_seed)
+            model = self._reduced_brunel(model, order)
         sink_specs = [('Exc__cell', 'spike_output', range(nrecord)),
                       ('Inh__cell', 'spike_output', range(nrecord))]
         if record_v:
@@ -95,27 +95,20 @@ class TestNetwork(TestCase):
         # Detach sinks and return
         return sinks
 
-    def _reduced_brunel(self, model, order, random_seed=None):
+    def _reduced_brunel(self, model, order):
         model = model.clone()
-        if random_seed is not None:
-            for projection in model.projections:
-                projection.connectivity.seed = random.randint(0, LARGE_INT)
         scale = float(order) / model.population('Inh').size
         # rescale populations
         for pop in model.populations:
             pop.size = int(math.ceil(pop.size * scale))
         for proj in model.projections:
-            props = proj.connectivity.rule_properties
-            proj.connectivity._source_size = proj.pre.size
-            proj.connectivity._destination_size = proj.post.size
             try:
-                number = props.property('number')
-                props.set(Property(
+                number = proj.connectivity.property('number')
+                proj.connectivity.set(Property(
                     number.name,
                     int(math.ceil(float(number.value) * scale)) * un.unitless))
             except NineMLNameError:
                 pass
-
         return model
 
 

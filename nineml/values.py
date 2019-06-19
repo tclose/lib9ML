@@ -116,7 +116,7 @@ class SingleValue(BaseValue):
     def is_single(self):
         return True
 
-    def sample(self, index=None, state=None):  # @UnusedVariable
+    def sample(self, **kwargs):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -132,13 +132,6 @@ class SingleValue(BaseValue):
             The single value corresponding to the index
         """
         return self._value
-
-    def __iter__(self):
-        """Infinitely iterate the same value"""
-        return itertools.repeat(self._value)
-
-    def __len__(self):
-        return 0
 
     def __str__(self):
         return str(self._value)
@@ -284,7 +277,7 @@ class ArrayValue(BaseValue):
     def values(self):
         return self._values
 
-    def sample(self, index=None, state=None):  # @UnusedVariable
+    def sample(self, index, **kwargs):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -553,7 +546,7 @@ class RandomDistributionValue(BaseValue):
         # FIXME: This should include a hash of the properties
         return self._distribution.name
 
-    def sample(self, index=None, state=None):  # @UnusedVariable
+    def sample(self, state, **kwargs):  # @UnusedVariable
         """
         Returns the single-value corresponding to the index, which in the case
         of SingleValues is just itself
@@ -583,12 +576,6 @@ class RandomDistributionValue(BaseValue):
     @property
     def distribution(self):
         return self._distribution
-
-    def __len__(self):
-        return 0
-
-    def __iter__(self):
-        yield self.sample()
 
     def set_generator(self, generator_cls):
         """

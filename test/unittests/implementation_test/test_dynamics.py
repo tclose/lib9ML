@@ -34,7 +34,7 @@ else:
     from unittest import TestCase, skipIf
 
 try:
-    DISABLE_SIM_TESTS = os.environ['DISABLE_SIM_TESTS']
+    DISABLE_SIM_TESTS = 'NINEML_DISABLE_SIM_TESTS' in os.environ
 except KeyError:
     DISABLE_SIM_TESTS = False
 

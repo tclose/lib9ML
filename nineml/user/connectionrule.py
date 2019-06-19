@@ -57,6 +57,9 @@ class Connections(object):
         except AttributeError:
             return False
 
+    def __len__(self):
+        return sum(1 for _ in self)
+
     @property
     def rule_properties(self):
         return self._rule_properties

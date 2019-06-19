@@ -23,6 +23,7 @@ from nineml.user import (
     Projection, ConnectionRuleProperties, RandomDistributionProperties,
     Network, Selection, Concatenate)
 from nineml.values import RandomDistributionValue
+from nineml.utils.testing.comprehensive_example import random_state
 import nineml.units as un
 from nineml.exceptions import NineMLRandomDistributionDelayException
 
@@ -213,20 +214,20 @@ class TestNetwork(unittest.TestCase):
 
         ext_prj = Projection(
             "External", pre=ext, post=exc_and_inh, response=self.psr,
-            plasticity=self.static_ext, connection_rule_properties=self.one_to_one,
+            plasticity=self.static_ext, connectivity=self.one_to_one,
             delay=self.delay,
             port_connections=[('response', 'Isyn', 'post', 'Isyn'),
                               ('plasticity', 'weight', 'response', 'weight')])
 
         exc_prj = Projection(
             "Excitation", pre=exc, post=exc_and_inh, response=self.psr,
-            plasticity=static_exc, connection_rule_properties=exc_random_fan_in,
+            plasticity=static_exc, connectivity=exc_random_fan_in,
             delay=self.delay,
             port_connections=[('response', 'Isyn', 'post', 'Isyn'),
                               ('plasticity', 'weight', 'response', 'weight')])
         inh_prj = Projection(
             "Inhibition", pre=inh, post=exc_and_inh, response=self.psr,
-            plasticity=static_inh, connection_rule_properties=inh_random_fan_in,
+            plasticity=static_inh, connectivity=inh_random_fan_in,
             delay=self.delay,
             port_connections=[('response', 'Isyn', 'post', 'Isyn'),
                               ('plasticity', 'weight', 'response', 'weight')])
@@ -247,32 +248,18 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(scaled.population('Exc').size, new_order * 4)
         self.assertEqual(scaled.population('Inh').size, new_order)
         self.assertEqual(scaled.selection('All').size, new_order * 5)
-        self.assertEqual(
-            scaled.projection('External').connectivity.source_size,
+        self.assertEqual(len(list(
+            scaled.projection('External').sample_connections(random_state))),
             new_order * 5)
-        self.assertEqual(
-            scaled.projection('Excitation').connectivity.source_size,
-            new_order * 4)
-        self.assertEqual(
-            scaled.projection('Inhibition').connectivity.source_size,
-            new_order)
-        self.assertEqual(
-            scaled.projection('External').connectivity.destination_size,
-            new_order * 5)
-        self.assertEqual(
-            scaled.projection('Excitation').connectivity.destination_size,
-            new_order * 5)
-        self.assertEqual(
-            scaled.projection('Inhibition').connectivity.destination_size,
-            new_order * 5)
-        self.assertEqual(len(scaled.projection('External')), new_order * 5)
         # NB: The number of connections is scaled on both both by the number
         # of connections made in each "fan" and the number of neurons in
         # populations
-        self.assertEqual(len(scaled.projection('Excitation')),
-                         int(100 * scale) * new_order * 5)
-        self.assertEqual(len(scaled.projection('Inhibition')),
-                         int(200 * scale) * new_order * 5)
+        self.assertEqual(len(list(
+            scaled.projection('Excitation').sample_connections(random_state))),
+            int(100 * scale) * new_order * 5)
+        self.assertEqual(len(list(
+            scaled.projection('Inhibition').sample_connections(random_state))),
+            int(200 * scale) * new_order * 5)
 
     def test_delay_limits(self):
         limits = self.model.delay_limits()
@@ -308,7 +295,7 @@ class TestNetwork(unittest.TestCase):
 
         rand_delay_prj = Projection(
             "External", pre=pop1, post=pop2, response=self.psr,
-            plasticity=self.static_ext, connection_rule_properties=self.one_to_one,
+            plasticity=self.static_ext, connectivity=self.one_to_one,
             delay=RandomDistributionValue(rand_delay) * un.ms,
             port_connections=[('response', 'Isyn', 'post', 'Isyn'),
                               ('plasticity', 'weight', 'response', 'weight')])
@@ -325,8 +312,3 @@ class TestNetwork(unittest.TestCase):
             names, set(('ExternalPlasticity', 'ExcitatoryPlasticity',
                         'InhibitoryPlasticity', 'OneToOne',
                         'RandomFanInProps', 'liaf_props', 'stim', 'syn')))
-
-    def test_resample_connectivity(self):
-        scaled = self.model.scale(10 * self.order)
-        scaled.resample_connectivity()
-        self.assertTrue(scaled.connectivity_has_been_sampled())

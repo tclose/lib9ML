@@ -107,8 +107,8 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
             port_connection.bind(self, to_roles=True)
             self.add(port_connection)
 
-    def __len__(self):
-        return sum(1 for _ in self.connectivity.connections())
+#     def __len__(self):
+#         return sum(1 for _ in self.connectivity.connections())
 
     @property
     def name(self):
@@ -138,8 +138,8 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         """
         Sample the connectivity given a random_state
         """
-        return Connections(self.connection_rule_properties,
-                           self.pre.size, self.post.size, random_state)
+        return Connections(self.connectivity, self.pre.size, self.post.size,
+                           random_state)
 
     @property
     def delay(self):
@@ -181,13 +181,6 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
     def port_connections(self):
         return chain(self.analog_port_connections, self.event_port_connections)
 
-    def resample_connectivity(self, connectivity_class=None, **kwargs):
-        if connectivity_class is None:
-            connectivity_class = type(self.connectivity)
-        self._connectivity = connectivity_class(
-            self.connectivity.rule_properties, self.connectivity.source_size,
-            self.connectivity.destination_size, **kwargs)
-
     def __repr__(self):
         return ('Projection(name="{}", pre={}, post={}, '
                 'connectivity={}, response={}{}, delay={},'
@@ -206,7 +199,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         """
         Return a list of all components used by the projection.
         """
-        components = [self.connectivity.rule_properties, self.response]
+        components = [self.connectivity, self.response]
         if self.plasticity is not None:
             components.append(self.plasticity)
         return components

@@ -116,10 +116,6 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
             components.extend(p.all_components())
         return components
 
-    def resample_connectivity(self, *args, **kwargs):
-        for projection in self.projections:
-            projection.resample_connectivity(*args, **kwargs)
-
     def connectivity_has_been_sampled(self):
         return any(p.connectivity.has_been_sampled() for p in self.projections)
 
@@ -190,15 +186,18 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
                 population.name + ComponentArray.suffix['post'],
                 len(population),
                 population.cell.flatten()))
+        all_conns = {}
         for projection in self.projections:
+            conns = all_conns[projection.name] = projection.sample_connections(
+                random_state)
             comp_arrays.append(ComponentArray(
                 projection.name + ComponentArray.suffix['response'],
-                len(projection),
+                len(conns),
                 projection.response.flatten()))
             if projection.plasticity is not None:
                 comp_arrays.append(ComponentArray(
                     projection.name + ComponentArray.suffix['plasticity'],
-                    len(projection),
+                    len(conns),
                     projection.plasticity.flatten()))
         comp_array_dict = {c.name: c for c in comp_arrays}
         conn_groups = []
@@ -207,7 +206,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
                 conn_groups.extend(
                     BaseConnectionGroup.from_port_connection(
                         port_connection, projection, comp_array_dict,
-                        projection.sample_connections(random_state)))
+                        all_conns[projection.name]))
         return comp_arrays, conn_groups
 
     def scale(self, scale):
@@ -231,7 +230,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
             pop.size = int(math.ceil(pop.size * scale))
         for proj in scaled.projections:
             conn = proj.connectivity
-            props = conn.rule_properties
+            props = conn
             conn._source_size = proj.pre.size
             conn._destination_size = proj.post.size
             if 'number' in props.property_names:

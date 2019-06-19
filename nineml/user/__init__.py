@@ -5,8 +5,7 @@ from .component import (Property, Component, Definition,
 from .randomdistribution import RandomDistributionProperties
 from .population import Population
 from .dynamics import Initial, DynamicsProperties
-from .connectionrule import (
-    ConnectionRuleProperties, Connections, InverseConnections)
+from .connectionrule import ConnectionRuleProperties, Connections
 from .multi import (
     MultiDynamics, MultiDynamicsProperties, append_namespace,
     AnalogReceivePortExposure, AnalogReducePortExposure, BasePortExposure,

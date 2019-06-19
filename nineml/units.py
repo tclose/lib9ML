@@ -463,16 +463,8 @@ class Quantity(AnnotatedNineMLObject):
         return self._units
 
     def sample(self, index=None, state=None):
-        return Quantity(self.value.sample(index, state), self.units)
-
-#     def __getitem__(self, index):
-#         if self.value.is_array():
-#             return self._value.values[index] * self.units
-#         elif self.value.is_single():
-#             return self._value.value * self.units
-#         else:
-#             raise NineMLUsageError(
-#                 "Cannot get item from random distribution")
+        return Quantity(self.value.sample(index=index, state=state),
+                        self.units)
 
     def set_units(self, units):
         if units.dimension != self.units.dimension:

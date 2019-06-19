@@ -528,7 +528,7 @@ class TestQuantities(unittest.TestCase):
         qty_iter = cycle(quantities)
         for op in self.ops:
             if op in uniary_ops:
-                if len(result.value):
+                if isinstance(result.value, ArrayValue):
                     f_result = [op(float(v)) for v in result.value]
                 else:
                     f_result = op(float(result))
@@ -556,16 +556,16 @@ class TestQuantities(unittest.TestCase):
                     if op in div_ops:
                         qty._value = qty.value ** 2 + 0.1  # Ensure that not 0
                     val = qty.value
-                    len_val = len(val)
+                    len_val = len(val) if hasattr(val, '__len__') else 0
                     units = op(result.units, qty.units)
                 op_str = ("{}({}, {})".format(op.__name__, result, qty))
-                if len(result.value):
+                if isinstance(result.value, ArrayValue):
                     if len_val:
                         # Get the first value as we can't use two
                         # array values together
                         val = next(iter(val))
                         qty = un.Quantity(val, qty.units)
-                    result_iter = (float(v) for v in result.value)
+                    result_iter = (float(v) for v in result.values)
                     q_iter = repeat(float(val))
                     f_result = [op(r, q)
                                 for r, q in zip(result_iter, q_iter)]
@@ -581,7 +581,7 @@ class TestQuantities(unittest.TestCase):
                 self.assertIsInstance(
                     q_result, un.Quantity,
                     "{} did not return a Quantity".format(op_str))
-                if len(result.value) or len_val:
+                if isinstance(result.value, ArrayValue) or len_val:
                     self.assertTrue(
                         all(np.array(q_result.value) == np.array(f_result)),
                         "Value of {} quantity not equal between Quantity "
