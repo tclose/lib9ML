@@ -1,7 +1,5 @@
 import numpy.random
-from copy import deepcopy
 from nineml.user.component import Component
-from nineml.exceptions import NineMLUsageError
 
 
 class RandomDistributionProperties(Component):
@@ -23,19 +21,6 @@ class RandomDistributionProperties(Component):
         'poisson': numpy.random.poisson,
         'exponential': numpy.random.exponential,
         'normal': numpy.random.normal}
-
-    def __init__(self, name, definition, properties=(),
-                 check_properties=True):
-        super(RandomDistributionProperties).__init__(
-            name=name, definition=definition, properties=properties,
-            check_properties=check_properties)
-
-    def set_state(self, state):
-        if not all(hasattr(state, a) for a in self.default_funcs):
-            raise NineMLUsageError(
-                "Cannot set state with {} that doesn't implement all methods "
-                .format(list(self.default_funcs)))
-        self._state = state
 
     @property
     def standard_library(self):

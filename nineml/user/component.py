@@ -95,10 +95,19 @@ class Property(BaseULObject):
         self._quantity = qty
 
     def sample(self, index, state):
-        if self.quantity.is_random and state is None:
-            raise NineMLUsageError(
-                "Cannot sample from {} without providing a random state"
-                .format(self.rule))
+        """
+        Returns a dictionary containing the a sample of the quantities for
+        the array/random-distribution at 'index', given the random state
+        'state'
+
+        Parameters
+        ----------
+        index : int
+            The index of the quantities returned for array value properties
+        state : RandomState
+            The random state object (typically from NumPy) used to generate
+            distribution values
+        """
         return self.quantity.sample(index, state)
 
     @property
@@ -168,8 +177,6 @@ class Component(with_metaclass(
     properties : List[Property]|Dict[str,Quantity]
         a dictionary containing (value,units) pairs or a
         for the component_class's properties.
-    random_state : RandomState | None
-        The random state used to generate random-distribution properties
     """
     nineml_type_v1 = 'Component'
     nineml_attr = ('name',)
@@ -179,7 +186,7 @@ class Component(with_metaclass(
     # initial_values is temporary, the idea longer-term is to use a separate
     # library such as SEDML
     def __init__(self, name, definition, properties=(),
-                 check_properties=True, random_state=None):
+                 check_properties=True):
         """
         Create a new component_class with the given name, definition and
         properties, or create a prototype to another component_class that will
@@ -219,11 +226,6 @@ class Component(with_metaclass(
         self.add(*properties)
         if check_properties:
             self.check_properties()
-        self.set_state(random_state)
-
-    def set_state(self, state):
-        for prop in self.properties:
-            prop.set_state(state)
 
     @property
     def name(self):
@@ -263,13 +265,21 @@ class Component(with_metaclass(
             defn = defn.component.definition
         return defn.component_class
 
-    def sample(self, index=None, new_name=None):
-        if new_name is None:
-            name = self.name
-        else:
-            name = new_name
-        return type(self)(name, self.definition,
-                          [p.sample(index) for p in self.properties])
+    def sample(self, index, state):
+        """
+        Returns a dictionary containing the a sample of the quantities for
+        the array/random-distribution at 'index', given the random state
+        'state'
+
+        Parameters
+        ----------
+        index : int
+            The index of the quantities returned for array value properties
+        state : RandomState
+            The random state object (typically from NumPy) used to generate
+            distribution values
+        """
+        return {p.name: p.sample(index, state) for p in self.properties}
 
     def is_base_component(self):
         return isinstance(self.definition, Prototype)

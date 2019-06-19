@@ -38,7 +38,7 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     nineml_attr = ('name',)
 
     def __init__(self, name, populations=[], projections=[],
-                 selections=[], random_state=None):
+                 selections=[]):
         # better would be *items, then sort by type, taking the name from the
         # item
         self._name = validate_identifier(name)
@@ -48,10 +48,6 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
         self.add(*populations)
         self.add(*projections)
         self.add(*selections)
-        for pop in self.populations:
-            pop.set_state(random_state)
-        for proj in self.projections:
-            proj.set_state(proj)
 
     @property
     def name(self):

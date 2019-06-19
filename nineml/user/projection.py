@@ -42,15 +42,9 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
             plasticity rule for the synaptic weight/efficacy.
         delay
             a :class:`Quantity` object specifying the delay of the connections.
-        connectivity : Connectivity
-            a ` :class:`Connectivity` instance that defines
-            an instantiated connectivity from the algorithm defined by a
-            connection rule properties. Cannot be provided in conjunction with
-            `connection_rule_properties` parameter
         connection_rule_properties : ConnectionRuleProperties
             a :class:`ConnectionRuleProperties` that defines
-            an algorithm for wiring up the neurons. Cannot be provided in
-            conjunction with the `connectivity` parameter
+            an algorithm for wiring up the neurons.
         port_connections : list(AnalogPortConnection | EventPortConnection)
             A list of port connections between pre, post, response, plasticity
             dynamics
@@ -78,11 +72,10 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
 
     _component_roles = set(['pre', 'post', 'plasticity', 'response'])
 
-    def __init__(self, name, pre, post, response, delay, connectivity=None,
+    def __init__(self, name, pre, post, response, delay,
                  connection_rule_properties=None,
                  plasticity=None, port_connections=None,
                  analog_port_connections=None, event_port_connections=None,
-                 connectivity_class=Connectivity, random_state=None,
                  **kwargs):
         """
         Create a new projection.
@@ -101,16 +94,18 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         self._post = post
         self._response = response
         self._plasticity = plasticity
-        if connectivity is not None:
-            assert isinstance(connectivity, Connectivity)
-            if connection_rule_properties is not None:
-                raise NineMLUsageError(
-                    "Cannot provide both connectivty and "
-                    "connection_rule_properties as kwargs to projection class")
-            self._connectivity = connectivity
-        else:
-            self._connectivity = connectivity_class(
-                connection_rule_properties, pre.size, post.size, **kwargs)
+        self._connection_rule_properties = connection_rule_properties
+#         if connectivity is not None:
+#             assert isinstance(connectivity, Connectivity)
+#             if connection_rule_properties is not None:
+#                 raise NineMLUsageError(
+#                     "Cannot provide both connectivty and "
+#                     "connection_rule_properties as kwargs to projection class")
+#             self._connectivity = connectivity
+#         else:
+#             self._connectivity = connectivity_class(
+#                 connection_rule_properties, pre.size, post.size,
+#                 random_state=random_state, **kwargs)
         self._delay = delay
         if port_connections is None:
             port_connections = []
@@ -126,9 +121,6 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
                     port_connection, self)
             port_connection.bind(self, to_roles=True)
             self.add(port_connection)
-        for pop in self.popultations:
-            pop.set_state(state)
-        
 
     def __len__(self):
         return sum(1 for _ in self.connectivity.connections())
@@ -159,7 +151,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
 
     @property
     def connection_rule_properties(self):
-        return self.connectivity.rule_properties
+        return self._rule_properties
 
     def connections(self):
         return self.connectivity.connections()
