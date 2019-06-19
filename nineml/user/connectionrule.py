@@ -3,13 +3,9 @@ from builtins import range
 from copy import deepcopy
 from itertools import chain, product
 import math
-from abc import ABCMeta, abstractmethod
 from itertools import repeat
-from random import Random, randint
-from nineml.base import BaseNineMLObject
 from nineml.exceptions import NineMLUsageError
 from nineml.user.component import Component
-from future.utils import with_metaclass
 
 
 class ConnectionRuleProperties(Component):
@@ -30,17 +26,14 @@ class ConnectionRuleProperties(Component):
         return self.component_class.lib_type
 
 
-class BaseConnectivity(with_metaclass(ABCMeta, BaseNineMLObject)):
+class Connections(object):
     """
-    An abstract base classes for instances of connectivity
-    (i.e. connection-rule + properties + random seed)
+    A group of connections between a source and destination array, sampled
+    from a connection rule properties
     """
-
-    nineml_attr = ('source_size', 'destination_size')
-    nineml_child = {'rule_properties': ConnectionRuleProperties}
 
     def __init__(self, rule_properties, source_size,
-                 destination_size, **kwargs):  # @UnusedVariable
+                 destination_size, random_state, **kwargs):  # @UnusedVariable
         if (rule_properties.lib_type == 'OneToOne' and
                 source_size != destination_size):
             raise NineMLUsageError(
@@ -54,6 +47,7 @@ class BaseConnectivity(with_metaclass(ABCMeta, BaseNineMLObject)):
         self._rule_properties = rule_properties
         self._source_size = source_size
         self._destination_size = destination_size
+        self._state = random_state
 
     def __eq__(self, other):
         try:
@@ -91,56 +85,16 @@ class BaseConnectivity(with_metaclass(ABCMeta, BaseNineMLObject)):
                 .format(self.__class__.__name__, self.lib_type,
                         self.source_size, self.destination_size))
 
-    @abstractmethod
-    def connections(self):
-        pass
-
-    @abstractmethod
-    def has_been_sampled(self):
-        pass
-
-
-class Connectivity(BaseConnectivity):
-    """
-    A reference implementation of the Connectivity class.
-    """
-    nineml_type = '_Connectivity'
-
-    def __init__(self, rule_properties, source_size, destination_size,
-                 random_state=None, **kwargs):  # @UnusedVariable @IgnorePep8
-        """
-        Parameters
-        ----------
-        rule_properties: ConnectionRuleProperties
-            Connection rule and properties that define the connectivity
-            instance
-        source_size : int
-            Size of the source component array
-        destination_size : int
-            Size of the destination component array
-        random_state : random-state
-            A random generator object. Can be any random generator that
-            implements the 'random' method to return a float between 0 and 1
-            (e.g. numpy.Random).
-        """
-        super(Connectivity, self).__init__(
-            rule_properties, source_size, destination_size)
-        self._state = random_state
-
-    def connections(self):
+    def __iter__(self):
         """
         Returns an iterator over all the source/destination index pairings
         with a connection.
         `src`  -- the indices to get the connections from
         `dest` -- the indices to get the connections to
         """
-        if self._state is None:
-            raise NineMLUsageError(
-                "Cannot generate connectivity of {} as the random state has "
-                "not been set".format(self.rule))
-        state = self._state
         # Create a snapshot of the random state in order to exactly recreate
         # the conn generator if required
+        state = self._state
         self._state = deepcopy(self._state)
         if self.lib_type == 'AllToAll':
             conn = self._all_to_all()
@@ -158,12 +112,8 @@ class Connectivity(BaseConnectivity):
             assert False
         return conn
 
-    def set_state(self, state):
-        if not hasattr(state, 'rand'):
-            raise NineMLUsageError(
-                "Cannot set state with {} that doesn't implement 'rand' "
-                "method".format(state))
-        self._state = state
+    def inverse(self):
+        return ((j, i) for i, j in self)
 
     def _all_to_all(self):  # @UnusedVariable
         return product(range(self._source_size),
@@ -208,60 +158,3 @@ class Connectivity(BaseConnectivity):
                                        self.source_size,
                                        self.destination_size,
                                        self._seed)
-
-    def has_been_sampled(self):
-        return True  # Because seed and RNG class is set at start
-
-
-class InverseConnectivity(BaseNineMLObject):
-    """
-    Inverts the connectivity so that the source and destination are effectively
-    flipped. Used when mapping a projection connectivity to a reverse
-    connection to from the synapse or post-synaptic cell to the pre-synaptic
-    cell
-    """
-    nineml_type = '_InverseConnectivity'
-    nineml_child = {'connectivity': Connectivity}
-
-    def __init__(self, connectivity):  # @UnusedVariable
-        self._connectivity = connectivity
-
-    @property
-    def connectivity(self):
-        return self._connectivity
-
-    def __eq__(self, other):
-        return self._connectivity == other._connectivity
-
-    @property
-    def rule_properties(self):
-        return self._connectivity._rule_props
-
-    @property
-    def rule(self):
-        return self.rule_properties.component_class
-
-    @property
-    def lib_type(self):
-        return self.rule_properties.lib_type
-
-    @property
-    def source_size(self):
-        return self._connectivity.destination_size
-
-    @property
-    def destination_size(self):
-        return self._connectivity.source_size
-
-    def __repr__(self):
-        return ("{}(rule={}, src_size={}, dest_size={})"
-                .format(self.__class__.__name__, self.lib_type,
-                        self.source_size, self.destination_size))
-
-    @abstractmethod
-    def connections(self):
-        return ((j, i) for i, j in self._connectivity.connections)
-
-    @abstractmethod
-    def has_been_sampled(self):
-        return self._connectivity.has_been_sampled

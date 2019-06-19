@@ -5,13 +5,12 @@ from nineml.abstraction.connectionrule import (
     explicit_connection_rule, one_to_one_connection_rule)
 from nineml.user.port_connections import EventPortConnection
 from nineml.user.connectionrule import (
-    ConnectionRuleProperties, Connectivity, BaseConnectivity)
+    ConnectionRuleProperties)
 from nineml.units import Quantity
 from nineml.abstraction.ports import (
     SendPort, ReceivePort, EventPort, AnalogPort, Port)
 from nineml.user.component_array import ComponentArray
 from nineml.base import DocumentLevelObject
-from nineml.exceptions import NineMLUsageError
 from future.utils import with_metaclass
 from nineml.utils import validate_identifier
 
@@ -24,13 +23,11 @@ class BaseConnectionGroup(
     nineml_attr = ('name', 'source_port', 'destination_port')
     nineml_child = {'source': ComponentArray,
                     'destination': ComponentArray,
-                    'connectivity': Connectivity,
+                    'connectivity': ConnectionRuleProperties,
                     'delay': Quantity}
 
     def __init__(self, name, source, destination, source_port,
-                 destination_port, delay, connectivity=None,
-                 connection_rule_properties=None,
-                 connectivity_class=Connectivity):
+                 destination_port, delay, connectivity):
         self._name = validate_identifier(name)
         BaseULObject.__init__(self)
         DocumentLevelObject.__init__(self)
@@ -38,18 +35,7 @@ class BaseConnectionGroup(
         self._destination = destination
         self._source_port = source_port
         self._destination_port = destination_port
-        if connectivity is not None:
-            assert isinstance(connectivity, BaseConnectivity)
-            if connection_rule_properties is not None:
-                raise NineMLUsageError(
-                    "Cannot provide both connectivty and "
-                    "connection_rule_properties as kwargs to projection class")
-            self._connectivity = connectivity
-        else:
-            connectivity = connectivity_class(
-                connection_rule_properties, source.size, destination.size)
         self._connectivity = connectivity
-        self._connections = None
         self._delay = delay
         if isinstance(source_port, Port):
             self._check_ports(source_port, destination_port)
@@ -85,14 +71,9 @@ class BaseConnectionGroup(
     def __len__(self):
         return len(self.connections)
 
-    @property
-    def connections(self):
-        if self._connections is None:
-            self._connections = list(self._connectivity.connections())
-        return self._connections
-
     @classmethod
-    def from_port_connection(self, port_conn, projection, component_arrays):
+    def from_port_connection(self, port_conn, projection, component_arrays,
+                             connections):
         if isinstance(port_conn, EventPortConnection):
             cls = EventConnectionGroup
         else:
@@ -117,24 +98,20 @@ class BaseConnectionGroup(
                     ComponentArray.suffix[port_conn.receiver_role]],
                 source_port=port_conn.send_port_name,
                 destination_port=port_conn.receive_port_name,
-                connection_rule_properties=conn_props, delay=None)]
+                connectivity=conn_props, delay=None)]
         else:
             if (port_conn.sender_role == 'pre' and
                     port_conn.receiver_role == 'post'):
-                conns = projection.connections()
+                conns = connections
             elif (port_conn.sender_role == 'post' and
                   port_conn.receiver_role == 'pre'):
-                conns = [
-                    (d, s) for s, d in projection.connections()]
+                conns = connections.inverse()
             elif port_conn.sender_role == 'pre':
                 conns = [
-                    (s, i) for i, (s, _) in enumerate(sorted(
-                        projection.connections()))]
+                    (s, i) for i, (s, _) in enumerate(sorted(connections))]
             elif port_conn.receiver_role == 'post':
                 conns = [
-                    (i, d)
-                    for i, (_, d) in enumerate(sorted(
-                        projection.connections()))]
+                    (i, d) for i, (_, d) in enumerate(sorted(connections))]
             else:
                 assert False
             # FIXME: This will need to change in version 2, when each connection

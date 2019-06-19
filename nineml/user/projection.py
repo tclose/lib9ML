@@ -4,7 +4,7 @@ from itertools import chain
 from . import BaseULObject
 from nineml.exceptions import (
     NineMLMissingSerializationError, NineMLSerializationError)
-from .connectionrule import ConnectionRuleProperties, Connectivity
+from .connectionrule import ConnectionRuleProperties, Connections
 from .dynamics import DynamicsProperties
 from .population import Population
 from .selection import Selection
@@ -15,7 +15,7 @@ from nineml.abstraction.ports import EventReceivePort
 from .port_connections import (
     AnalogPortConnection, EventPortConnection, BasePortConnection)
 from nineml.values import SingleValue
-from nineml.exceptions import NineMLUsageError, name_error
+from nineml.exceptions import name_error
 
 
 V1_DELAY_VALUE_TYPES = ('SingleValue', 'ArrayValue', 'ExternalArrayValue',
@@ -42,9 +42,9 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
             plasticity rule for the synaptic weight/efficacy.
         delay
             a :class:`Quantity` object specifying the delay of the connections.
-        connection_rule_properties : ConnectionRuleProperties
+        connectivity : ConnectionRuleProperties
             a :class:`ConnectionRuleProperties` that defines
-            an algorithm for wiring up the neurons.
+            an algorithm for connection the pre and post populations.
         port_connections : list(AnalogPortConnection | EventPortConnection)
             A list of port connections between pre, post, response, plasticity
             dynamics
@@ -64,7 +64,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
     # either be Dynamics or MultiDynamics classes.
     nineml_child = {'pre': None,
                     'post': None,
-                    'connectivity': None,
+                    'connectivity': ConnectionRuleProperties,
                     'response': None,
                     'plasticity': None,
                     'delay': Quantity}
@@ -72,14 +72,10 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
 
     _component_roles = set(['pre', 'post', 'plasticity', 'response'])
 
-    def __init__(self, name, pre, post, response, delay,
-                 connection_rule_properties=None,
+    def __init__(self, name, pre, post, response, delay, connectivity,
                  plasticity=None, port_connections=None,
                  analog_port_connections=None, event_port_connections=None,
-                 **kwargs):
-        """
-        Create a new projection.
-        """
+                 **kwargs):  # @UnusedVariable
         self._name = validate_identifier(name)
         BaseULObject.__init__(self)
         ContainerObject.__init__(self)
@@ -94,18 +90,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         self._post = post
         self._response = response
         self._plasticity = plasticity
-        self._connection_rule_properties = connection_rule_properties
-#         if connectivity is not None:
-#             assert isinstance(connectivity, Connectivity)
-#             if connection_rule_properties is not None:
-#                 raise NineMLUsageError(
-#                     "Cannot provide both connectivty and "
-#                     "connection_rule_properties as kwargs to projection class")
-#             self._connectivity = connectivity
-#         else:
-#             self._connectivity = connectivity_class(
-#                 connection_rule_properties, pre.size, post.size,
-#                 random_state=random_state, **kwargs)
+        self._connectivity = connectivity
         self._delay = delay
         if port_connections is None:
             port_connections = []
@@ -149,12 +134,12 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
     def connectivity(self):
         return self._connectivity
 
-    @property
-    def connection_rule_properties(self):
-        return self._rule_properties
-
-    def connections(self):
-        return self.connectivity.connections()
+    def sample_connections(self, random_state):
+        """
+        Sample the connectivity given a random_state
+        """
+        return Connections(self.connection_rule_properties,
+                           self.pre.size, self.post.size, random_state)
 
     @property
     def delay(self):
@@ -235,8 +220,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         node.attr('name', self.name, **options)
         node.child(self.pre, reference=True, within='Pre', **options)
         node.child(self.post, reference=True, within='Post', **options)
-        node.child(self.connectivity.rule_properties,
-                   within='Connectivity', **options)
+        node.child(self.connectivity, within='Connectivity', **options)
         node.child(self.response, within='Response', **options),
         if self.plasticity is not None:
             node.child(self.plasticity, within='Plasticity', **options)
@@ -263,7 +247,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         plasticity = node.child(
             DynamicsProperties, allow_ref=True, within='Plasticity',
             allow_none=True, **options)
-        connection_rule_props = node.child(
+        connectivity = node.child(
             ConnectionRuleProperties, within='Connectivity',
             allow_ref=True, **options)
         port_connections = node.children(
@@ -273,7 +257,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
                    post=post,
                    response=response,
                    plasticity=plasticity,
-                   connection_rule_properties=connection_rule_props,
+                   connectivity=connectivity,
                    delay=delay,
                    port_connections=port_connections)
 
@@ -284,8 +268,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
             self.pre, within='Source', reference=True, **options)
         endpoints['post'] = node.child(
             self.post, within='Destination', reference=True, **options)
-        node.child(self.connectivity.rule_properties,
-                   within='Connectivity', **options)
+        node.child(self.connectivity, within='Connectivity', **options)
         endpoints['response'] = node.child(
             self.response, within='Response', **options)
         if self.plasticity:
@@ -358,7 +341,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
         plasticity = node.child(
             DynamicsProperties, allow_ref=True, within='Plasticity',
             allow_none=True, **options)
-        connection_rule_props = node.child(
+        connectivity = node.child(
             ConnectionRuleProperties, within='Connectivity',
             allow_ref=True, **options)
         port_connections = []
@@ -402,7 +385,7 @@ class Projection(BaseULObject, DocumentLevelObject, ContainerObject):
                    post=post,
                    response=response,
                    plasticity=plasticity,
-                   connection_rule_properties=connection_rule_props,
+                   connectivity=connectivity,
                    delay=delay,
                    port_connections=port_connections)
 

@@ -6,7 +6,7 @@ from .randomdistribution import RandomDistributionProperties
 from .population import Population
 from .dynamics import Initial, DynamicsProperties
 from .connectionrule import (
-    ConnectionRuleProperties, Connectivity, InverseConnectivity)
+    ConnectionRuleProperties, Connections, InverseConnections)
 from .multi import (
     MultiDynamics, MultiDynamicsProperties, append_namespace,
     AnalogReceivePortExposure, AnalogReducePortExposure, BasePortExposure,

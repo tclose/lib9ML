@@ -165,10 +165,16 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
     _conn_group_name_re = re.compile(
         r'(\w+)__(\w+)_(\w+)__(\w+)_(\w+)__connection_group')
 
-    def flatten(self):
+    def flatten(self, random_state):
         """
         Flattens the populations and projections of the network into
         component arrays and connection groups (i.e. core 9ML objects)
+
+        Parameters
+        ----------
+        random_state : RandomState
+            The random state used to sample random connection rules when
+            converting to explicit connection lists
 
         Returns
         -------
@@ -200,7 +206,8 @@ class Network(BaseULObject, DocumentLevelObject, ContainerObject):
             for port_connection in projection.port_connections:
                 conn_groups.extend(
                     BaseConnectionGroup.from_port_connection(
-                        port_connection, projection, comp_array_dict))
+                        port_connection, projection, comp_array_dict,
+                        projection.sample_connections(random_state)))
         return comp_arrays, conn_groups
 
     def scale(self, scale):
