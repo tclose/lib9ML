@@ -424,7 +424,7 @@ class Transition(object):
             # NB: once https://github.com/INCF/nineml-spec/issues/31 is
             # implemented it be necessary to do these substitutions
             rand_vars = {}
-            for rand_func_name in self.random_funcs:
+            for rand_func_name in random_funcs:
                 # NB: this falls down if there are two random function calls
                 # with the same args in the same expression (but #31 will avoid
                 # the need to handle this so I am leaving that for now)

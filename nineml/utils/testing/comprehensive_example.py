@@ -7,6 +7,8 @@ from past.builtins import basestring, long
 import pkgutil
 from collections import defaultdict
 import weakref
+import os
+from numpy.random import RandomState
 from itertools import chain
 import nineml
 import nineml.units as un
@@ -33,7 +35,14 @@ from nineml.user.multi import (
 import sympy
 # from nineml.user.projection import Connectivity
 from nineml.serialization import NINEML_V1_NS
-from .rng import random_state
+
+
+try:
+    RAND_SEED = os.environ['NINML_TEST_RAND_SEED']
+except KeyError:
+    RAND_SEED = None
+
+random_state = RandomState(RAND_SEED)
 
 
 ranDistrA = RandomDistribution(

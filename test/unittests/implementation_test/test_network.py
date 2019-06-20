@@ -22,7 +22,7 @@ if __name__ == '__main__':
         def assertEqual(self, *args, **kwargs):
             pass
 
-    def skip(reason):
+    def skip(reason):  # @UnusedVariable
         """Dummy skip that just returns original function"""
         def decorator(test):  # @UnusedVariable
             return test
@@ -48,6 +48,13 @@ try:
     DISABLE_SIM_TESTS = 'NINEML_DISABLE_SIM_TESTS' in os.environ
 except KeyError:
     DISABLE_SIM_TESTS = False
+
+# try:
+#     RAND_SEED = os.environ['NINML_TEST_RAND_SEED']
+# except KeyError:
+#     RAND_SEED = None
+
+# random_state = RandomState(RAND_SEED)
 
 
 class TestNetwork(TestCase):

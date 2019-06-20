@@ -6,7 +6,6 @@ from nineml import units as un
 from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
     Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
-from nineml.utils.testing.rng import random_state
 if __name__ == '__main__':
 
     class TestCase(object):
@@ -38,6 +37,13 @@ try:
     DISABLE_SIM_TESTS = 'NINEML_DISABLE_SIM_TESTS' in os.environ
 except KeyError:
     DISABLE_SIM_TESTS = False
+
+try:
+    RAND_SEED = os.environ['NINEML_TEST_RAND_SEED']
+except KeyError:
+    RAND_SEED = None
+
+random_state = numpy.random.RandomState(RAND_SEED)
 
 
 class TestDynamics(TestCase):
@@ -214,14 +220,13 @@ class TestDynamics(TestCase):
         initial_regime = 'default'
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
-                            random_state=random_state,
+                            random_state=numpy.random.RandomState(12345),
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
         dynamics.event_send_ports['spike_output'].connect_to(spike_out,
                                                              0 * un.s)
         # Set to fixed seed
-        numpy.random.seed(12345)
         dynamics.simulate(duration, dt=dt, show_progress=show_progress)
         self.assertEqual([round(t, 3) for t in spike_out.events],
                          [0.0, 0.027, 0.03, 0.032, 0.035, 0.043, 0.052, 0.085,
