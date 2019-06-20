@@ -3,7 +3,6 @@ from operator import itemgetter
 from itertools import chain
 from copy import copy
 from collections import deque, OrderedDict
-import numpy.random
 import bisect
 from logging import getLogger
 import sympy as sp
@@ -34,11 +33,14 @@ class Dynamics(object):
         The initial time that dynamics is initialised with
     initial_state : dict(str, float)
         The state that dynamics is initialised with
+    random_state : numpy.random.RandomState
+        A numpy random state used to draw samples from random distributions
+        properties
     """
 
-    def __init__(self, model, start_t, initial_state=None, sample_index=None,
-                 initial_regime=None, dynamics_class=None, name=None,
-                 rank=None, random_state=None):
+    def __init__(self, model, start_t, random_state, initial_state=None,
+                 sample_index=None, initial_regime=None, dynamics_class=None,
+                 name=None, rank=None):
 
         def sample_quantity(elem):
             # If sample index is a dictionary containing different indices for
@@ -54,7 +56,8 @@ class Dynamics(object):
             return float(qty.sample(index, state=random_state).in_si_units())
 
         if dynamics_class is None:
-            dynamics_class = DynamicsClass(model.component_class)
+            dynamics_class = DynamicsClass(model.component_class,
+                                           random_state=random_state)
         self.dynamics_class = dynamics_class
         self.model = model
         self.name = name
@@ -192,7 +195,7 @@ class DynamicsClass(object):
     Representation of a Dynamics object
     """
 
-    def __init__(self, model, regime_kwargs=None, **kwargs):
+    def __init__(self, model, random_state, regime_kwargs=None, **kwargs):
         # Recursively substitute and remove all aliases that are not referenced
         # in analog-send-ports
         logger.info("Initialising '{}' class".format(model.name))
@@ -210,9 +213,10 @@ class DynamicsClass(object):
             else:
                 kwgs = kwargs
             try:
-                regime = LinearRegime(regime_def, self, **kwgs)
+                regime = LinearRegime(regime_def, self, random_state, **kwgs)
             except SolverNotValidForRegimeException:
-                regime = NonlinearRegime(regime_def, self, **kwgs)
+                regime = NonlinearRegime(regime_def, self, random_state,
+                                         **kwgs)
             self.regimes[regime_def.name] = regime
         self.port_aliases = {}
         for port in self.defn.analog_send_ports:
@@ -267,15 +271,15 @@ class Regime(object):
     ----------
     """
 
-    def __init__(self, defn, parent):
+    def __init__(self, defn, parent, random_state):
         self.defn = defn
         self.parent = parent
         self.on_conditions = []
         for oc_def in self.defn.on_conditions:
-            self.on_conditions.append(OnCondition(oc_def, self))
+            self.on_conditions.append(OnCondition(oc_def, self, random_state))
         self.on_events = []
         for oe_def in self.defn.on_events:
-            self.on_events.append(OnEvent(oe_def, self))
+            self.on_events.append(OnEvent(oe_def, self, random_state))
         self.updates = {}
 
     def update(self, dynamics, stop_t, dt):
@@ -405,17 +409,16 @@ class Regime(object):
 
 class Transition(object):
 
-    random_funcs = {'random_uniform_': numpy.random.uniform,
-                    'random_binomial_': numpy.random.binomial,
-                    'random_poisson_': numpy.random.poisson,
-                    'random_exponential_': lambda x: numpy.random.exponential(
-                        1.0 / x),
-                    'random_normal_': numpy.random.normal}
-
-    def __init__(self, defn, parent):
+    def __init__(self, defn, parent, random_state):
         self.defn = defn
         self.parent = parent
         self._assigns = {}
+        random_funcs = {
+            'random_uniform_': random_state.uniform,
+            'random_binomial_': random_state.binomial,
+            'random_poisson_': random_state.poisson,
+            'random_exponential_': lambda x: random_state.exponential(1.0 / x),
+            'random_normal_': random_state.normal}
         for assign in self.defn.state_assignments:
             expr = assign.rhs
             # NB: once https://github.com/INCF/nineml-spec/issues/31 is
@@ -430,7 +433,7 @@ class Transition(object):
                     value_name = '{}{}'.format(rand_func_name, i)
                     args_lambdas = [self.parent.parent.lambdify(a)
                                     for a in func_call.args]
-                    rand_vars[value_name] = (self.random_funcs[rand_func_name],
+                    rand_vars[value_name] = (random_funcs[rand_func_name],
                                              args_lambdas)
                     expr = expr.subs(func_call, value_name)
             self._assigns[assign.name] = (
@@ -454,8 +457,8 @@ class Transition(object):
 
 class OnCondition(Transition):
 
-    def __init__(self, defn, parent):
-        Transition.__init__(self, defn, parent)
+    def __init__(self, defn, parent, random_state):
+        Transition.__init__(self, defn, parent, random_state)
         dynamics = self.parent.parent
         self.trigger_expr = dynamics.lambdify(self.defn.trigger.rhs)
         if self.defn.trigger.crossing_time_expr is not None:
@@ -502,8 +505,8 @@ class OnCondition(Transition):
 
 class OnEvent(Transition):
 
-    def __init__(self, defn, parent):
-        Transition.__init__(self, defn, parent)
+    def __init__(self, defn, parent, random_state):
+        Transition.__init__(self, defn, parent, random_state)
 
     def time_of_next_event(self, dynamics):
         return dynamics.event_receive_ports[
@@ -754,8 +757,8 @@ class LinearRegime(Regime):
         The default step size for the ODE updates
     """
 
-    def __init__(self, defn, parent, **kwargs):  # @UnusedVariable
-        Regime.__init__(self, defn, parent)
+    def __init__(self, defn, parent, random_state, **kwargs):  # @UnusedVariable
+        Regime.__init__(self, defn, parent, random_state)
 
         # Convert state variable names into Sympy symbols
         active_vars = [
@@ -825,8 +828,9 @@ class NonlinearRegime(Regime):
 
     VALID_METHODS = ['rk2', 'rk4', 'euler']
 
-    def __init__(self, defn, parent, integration_method='rk4', **kwargs):  # @UnusedVariable @IgnorePep8
-        Regime.__init__(self, defn, parent)
+    def __init__(self, defn, parent, random_state, integration_method='rk4',
+                 **kwargs):  # @UnusedVariable @IgnorePep8
+        Regime.__init__(self, defn, parent, random_state)
         logger.info("Constructing explicit update equations for '{}' regime of"
                     " '{}' class".format(self.defn.name,
                                          self.parent.defn.name))

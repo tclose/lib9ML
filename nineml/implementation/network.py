@@ -239,7 +239,8 @@ class Network(object):
                 # original graph when it is pickled and sent to a new process
                 sub_graph = NetworkGraph(n for n in graph.nodes
                                          if n.rank == rank)
-                self.sub_graphs.append(sub_graph)
+                self.sub_graphs.append(sub_graph,
+                                       random_state.randint(sys.maxsize))
                 # Delete sub_graph nodes from original graph to free up memory
                 graph.remove_nodes(sub_graph.nodes)
 
@@ -275,17 +276,16 @@ class Network(object):
                     target=self._simulate_sub_graph,
                     args=(sg, self.t, stop_t, dt, self.min_delay,
                           self.model.name, False, self.remote_senders[i],
-                          self.remote_receivers[i], i,
-                          self._random_state.randint(sys.maxsize)))
-                for i, sg in enumerate(self.sub_graphs[1:], start=1)]
+                          self.remote_receivers[i], i, seed))
+                for i, (sg, seed) in enumerate(self.sub_graphs[1:], start=1)]
             # Start all child processes
             for p in processes:
                 p.start()
             # Simulate the first sub-graph on the master process
             self.sinks = self._simulate_sub_graph(
-                self.sub_graphs[0], self.t, stop_t, dt, self.min_delay,
+                self.sub_graphs[0][0], self.t, stop_t, dt, self.min_delay,
                 self.model.name, show_progress, self.remote_senders[0],
-                self.remote_receivers[0], 0, self._random_state)
+                self.remote_receivers[0], 0, self.sub_graphs[0][1])
             # Join all child processes
             for p in processes:
                 p.join()
@@ -340,9 +340,8 @@ class Network(object):
     @classmethod
     def _simulate_sub_graph(cls, sub_graph, t, stop_t, dt, min_delay,
                             model_name, show_progress, remote_senders,
-                            remote_receivers, rank, random_state):
-        if not isinstance(random_state, RandomState):
-            random_state = RandomState(random_state)
+                            remote_receivers, rank, random_seed):
+        random_state = RandomState(random_seed)
         components, sinks, _ = cls._initialise_components(
             sub_graph, t, show_progress, random_state)
         cls._simulate(components, t, stop_t, dt, min_delay, model_name,
@@ -366,7 +365,7 @@ class Network(object):
                     dyn_class = next(dc for m, dc in dyn_class_cache
                                      if m == model)
                 except StopIteration:
-                    dyn_class = DynamicsClass(model)
+                    dyn_class = DynamicsClass(model, random_state)
                     dyn_class_cache.append((model, dyn_class))
                 # Create dynamics object
                 component = Dynamics(

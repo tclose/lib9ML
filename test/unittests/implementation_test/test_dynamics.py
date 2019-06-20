@@ -6,6 +6,7 @@ from nineml import units as un
 from nineml.user import DynamicsProperties, MultiDynamicsProperties
 from nineml.implementation import (
     Dynamics, AnalogSource, AnalogSink, EventSink, EventSource)
+from nineml.utils.testing.rng import random_state
 if __name__ == '__main__':
 
     class TestCase(object):
@@ -53,6 +54,7 @@ class TestDynamics(TestCase):
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -78,6 +80,7 @@ class TestDynamics(TestCase):
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -104,6 +107,7 @@ class TestDynamics(TestCase):
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -132,6 +136,7 @@ class TestDynamics(TestCase):
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -184,6 +189,7 @@ class TestDynamics(TestCase):
         v_out = AnalogSink('v')
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
@@ -208,6 +214,7 @@ class TestDynamics(TestCase):
         initial_regime = 'default'
         spike_out = EventSink('spike')
         dynamics = Dynamics(properties,
+                            random_state=random_state,
                             initial_state=initial_state,
                             initial_regime=initial_regime,
                             start_t=0.0 * un.s)
