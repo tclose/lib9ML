@@ -1,7 +1,8 @@
 import os
 import ninemlcatalog
 import math
-from numpy.random import RandomState
+import sys
+from numpy.random import RandomState, randint
 import logging
 from nineml import units as un
 from nineml.user import Property as Property
@@ -49,12 +50,10 @@ try:
 except KeyError:
     DISABLE_SIM_TESTS = False
 
-# try:
-#     RAND_SEED = os.environ['NINML_TEST_RAND_SEED']
-# except KeyError:
-#     RAND_SEED = None
-
-# random_state = RandomState(RAND_SEED)
+try:
+    RAND_SEED = os.environ['NINEML_TEST_RAND_SEED']
+except KeyError:
+    RAND_SEED = randint(sys.maxsize)
 
 
 class TestNetwork(TestCase):
@@ -65,9 +64,11 @@ class TestNetwork(TestCase):
 
     @skipIf(DISABLE_SIM_TESTS, "Simulation tests have been disabled")
     def test_brunel(self, case='AI', order=50, duration=250.0 * un.ms,
-                    dt=0.01 * un.ms, random_seed=None, num_processes=4,
+                    dt=0.01 * un.ms, random_seed=RAND_SEED, num_processes=4,
                     nrecord=50, record_v=False, nrecord_v=5, record_ext=True,
                     **kwargs):
+        print("Using {} to seed random state".format(random_seed))
+        random_state = RandomState(random_seed)
         model = ninemlcatalog.load('network/Brunel2000/' + case).as_network(
             'Brunel_{}'.format(case))
         if order is not None:
@@ -79,7 +80,7 @@ class TestNetwork(TestCase):
         if record_ext:
             sink_specs.append(('Ext__cell', 'spike_output', range(nrecord)))
         network = Network(model, start_t=0 * un.s, num_processes=num_processes,
-                          sinks=sink_specs, random_state=random_seed)
+                          sinks=sink_specs, random_state=random_state)
         network.simulate(duration, dt=dt, **kwargs)
         sinks = {name: [s.detach() for s in sink_group]
                  for name, sink_group in network.sinks.items()}
@@ -124,7 +125,6 @@ if __name__ == '__main__':
         plt = None
     import os.path as op
     import errno
-    import sys
     from argparse import ArgumentParser
     import pickle as pkl
     # Disable tqdm locking, which causes issues with PyPy
@@ -212,7 +212,7 @@ if __name__ == '__main__':
         tester = TestNetwork()
         test = getattr(tester, 'test_{}'.format(model))
         sinks = test(dt=dt, duration=duration, case=args.case,
-                     order=args.order, random_seed=12345,
+                     order=args.order, random_seed=12345,  # RAND_SEED,
                      show_progress=(not args.hide_progress),
                      num_processes=num_processes, nrecord=args.nrecord,
                      record_v=args.record_v, nrecord_v=args.nrecord_v,
