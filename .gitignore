@@ -28,3 +28,5 @@ cover
 __pycache__
 *.swp
 /build/
+/.history
+.pytest_cache
